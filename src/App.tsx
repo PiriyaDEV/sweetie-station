@@ -27,6 +27,7 @@ import {
   type SheetDefinition,
   type SheetOrder,
   type SheetOrderLine,
+  type MonthlyExpense,
 } from './sheet'
 
 type DraftLine = {
@@ -43,20 +44,31 @@ type DraftLine = {
   originalSalePrice?: number
   originalProfitAmount?: number | null
   originalProfitPercent?: number | null
+  costRMB: string
+  originalCostRMB?: number | null
+  originalExchangeRate?: number
 }
 
 type OrderDraft = {
   lineName: string
   customerName: string
   day: string
+  exchangeRate: string
+  isCampaign: boolean
+  campaignDiscount: string
   paymentStatus: string
   shippingStatus: string
   lines: DraftLine[]
 }
 
 const LOCAL_ORDERS_KEY = 'sweetie-local-orders-v1'
+const MONTHLY_EXPENSES_KEY = 'sweetie-monthly-expenses-v1'
+const EXCHANGE_RATE_KEY = 'sweetie-cny-thb-rate-v1'
+const DEFAULT_CNY_TO_THB = 5.02
 const EMPTY_ORDERS: SheetOrder[] = []
 const MONTH_INDEX: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, june: 5, july: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 }
+type ImageChoice = { url: string; label: string; itemName: string; salePrice: number }
+
 
 function formatMoney(value: number, language: string) {
   return new Intl.NumberFormat(language === 'th' ? 'th-TH' : 'en-US', {
@@ -78,6 +90,34 @@ function loadLocalOrders(): Record<string, SheetOrder[]> {
   }
 }
 
+function loadMonthlyExpenses(): Record<string, MonthlyExpense[]> {
+  try {
+    const saved = localStorage.getItem(MONTHLY_EXPENSES_KEY)
+    return saved ? JSON.parse(saved) as Record<string, MonthlyExpense[]> : {}
+  } catch {
+    return {}
+  }
+}
+
+function loadExchangeRate() {
+  try {
+    const saved = Number(localStorage.getItem(EXCHANGE_RATE_KEY))
+    return Number.isFinite(saved) && saved > 0 ? saved : DEFAULT_CNY_TO_THB
+  } catch {
+    return DEFAULT_CNY_TO_THB
+  }
+}
+
+function getOrderSortTimestamp(order: SheetOrder, sheet: SheetDefinition) {
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(order.day)
+  if (isoMatch) return Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]))
+  const numericDay = Number(order.day)
+  if (numericDay >= 30000) return Date.UTC(1899, 11, 30) + numericDay * 86_400_000
+  if (numericDay > 0 && numericDay <= 31) return Date.UTC(sheet.year, MONTH_INDEX[sheet.monthKey], numericDay)
+  const parsed = new Date(order.day)
+  return Number.isNaN(parsed.getTime()) ? order.sheetRow : parsed.getTime()
+}
+
 function getCurrentDate() {
   return new Date()
 }
@@ -91,24 +131,30 @@ function getCurrentMonthSheet(dataBySheet: Record<string, SheetDataState>): Shee
 }
 
 function paymentStatusLabel(status: string, t: (key: string) => string) {
+  if (status === 'ยังไม่ได้ชำระ') return t('detail.paymentUnpaid')
   if (status === 'จ่ายเต็ม') return t('detail.paymentFull')
   if (status === 'มัดจำ') return t('detail.paymentDeposit')
   return status || t('detail.notSet')
 }
 
 function shippingStatusLabel(status: string, t: (key: string) => string) {
+  if (status === 'ยังไม่ได้สั่ง') return t('detail.shippingNotOrdered')
+  if (status === 'สั่งแล้ว') return t('detail.shippingOrdered')
   if (status === 'รอเข้าไทย') return t('detail.shippingInbound')
   if (status === 'ส่งแล้ว') return t('detail.shippingSent')
   return status || t('detail.notSet')
 }
 
 function paymentBadgeClass(status: string) {
+  if (status === 'ยังไม่ได้ชำระ') return 'unpaid'
   if (status === 'จ่ายเต็ม') return 'paid'
   if (status === 'มัดจำ') return 'deposit'
   return 'neutral'
 }
 
 function shippingBadgeClass(status: string) {
+  if (status === 'ยังไม่ได้สั่ง') return 'not-ordered'
+  if (status === 'สั่งแล้ว') return 'ordered'
   if (status === 'ส่งแล้ว') return 'shipped'
   if (status === 'รอเข้าไทย') return 'inbound'
   return 'neutral'
@@ -218,13 +264,32 @@ function sheetSalesThroughDay(orders: SheetOrder[], day: number) {
   }))
 }
 
-function getProfitSummary(orders: SheetOrder[]) {
+function getPaidTotal(order: SheetOrder) {
+  return order.grossSales !== undefined ? order.bankTotal : order.bankTotal + order.depositTotal
+}
+
+function getDepositDue(order: SheetOrder, sales: number) {
+  if (order.paymentStatus === 'จ่ายเต็ม') return 0
+  const paid = getPaidTotal(order)
+  if (paid > 0) return Math.max(0, sales - paid)
+  if (!order.paymentStatus || order.paymentStatus === 'ยังไม่ได้ชำระ') return sales
+  return null
+}
+
+function getProfitSummary(orders: SheetOrder[], monthlyExpenses = 0) {
   const lines = orders.flatMap((order) => order.lines)
   const knownProfitLines = lines.filter((line) => line.profitAmount !== null)
+  const complete = lines.length > 0 && knownProfitLines.length === lines.length
+  const campaignDiscountsForKnownOrders = orders.reduce((sum, order) => {
+    const allLinesKnown = order.lines.length > 0 && order.lines.every((line) => line.profitAmount !== null)
+    return sum + (allLinesKnown ? order.campaignDiscount ?? 0 : 0)
+  }, 0)
+  const knownProfit = knownProfitLines.reduce((sum, line) => sum + (line.profitAmount ?? 0), 0) - campaignDiscountsForKnownOrders
   return {
-    amount: knownProfitLines.length ? knownProfitLines.reduce((sum, line) => sum + (line.profitAmount ?? 0), 0) : null,
+    amount: knownProfitLines.length ? knownProfit - (complete ? monthlyExpenses : 0) : null,
     knownLines: knownProfitLines.length,
     totalLines: lines.length,
+    complete,
   }
 }
 
@@ -264,8 +329,11 @@ function HomePage({
     .filter(({ sheet }) => t(sheet.titleKey).toLocaleLowerCase().includes(query.toLocaleLowerCase()))
     .filter(({ orders }) => statusFilter === 'all' || orders.some((order) => {
       if (statusFilter === 'paid') return order.paymentStatus === 'จ่ายเต็ม'
+      if (statusFilter === 'unpaid') return order.paymentStatus === 'ยังไม่ได้ชำระ'
       if (statusFilter === 'deposit') return order.paymentStatus === 'มัดจำ'
       if (statusFilter === 'shipped') return order.shippingStatus === 'ส่งแล้ว'
+      if (statusFilter === 'not-ordered') return order.shippingStatus === 'ยังไม่ได้สั่ง'
+      if (statusFilter === 'ordered') return order.shippingStatus === 'สั่งแล้ว'
       if (statusFilter === 'inbound') return order.shippingStatus === 'รอเข้าไทย'
       if (statusFilter === 'unlisted') return !order.paymentStatus && !order.shippingStatus
       return true
@@ -300,7 +368,7 @@ function HomePage({
         </label>
         <div className="sheet-filter-row">
           <label><span className="sr-only">{t('filters.sheetType')}</span><select className="select select-bordered select-sm select-primary" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">{t('filters.allSheets')}</option><option value="sales">{t('sheets.kind.sales')}</option><option value="haul">{t('sheets.kind.haul')}</option></select></label>
-          <label><span className="sr-only">{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
+          <label><span className="sr-only">{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="unpaid">{t('detail.paymentUnpaid')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="not-ordered">{t('detail.shippingNotOrdered')}</option><option value="ordered">{t('detail.shippingOrdered')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
           <label><span className="sr-only">{t('filters.sortSheets')}</span><select className="select select-bordered select-sm select-primary" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="month">{t('filters.monthOrder')}</option><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="orders-desc">{t('filters.ordersHigh')}</option><option value="name">{t('filters.nameAZ')}</option></select></label>
         </div>
       </div>
@@ -350,63 +418,85 @@ function StatusBadge({ status = '', type, label }: { status?: string; type: 'pay
   return <span className={`status-badge ${type} ${className}`}>{text}</span>
 }
 
-function OrderListRow({ order, sheet, onEdit }: { order: SheetOrder; sheet: SheetDefinition; onEdit: (order: SheetOrder) => void }) {
+function OrderListRow({ order, sheet }: { order: SheetOrder; sheet: SheetDefinition }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const language = i18n.resolvedLanguage ?? 'en'
   const image = order.lines.flatMap((line) => line.images)[0]
 
   return (
-    <div className="order-list-row">
-      <button
-        type="button"
-        className="order-row-open"
-        onClick={() => navigate(`/admin/sheets/${sheet.id}/orders/${order.id}`)}
-        aria-label={`${t('orders.open')} ${order.customerName || order.lineName}`}
-      >
-        <span className="order-row-photo">
-          {image ? <img src={image} alt="" loading="lazy" /> : <Package size={22} />}
+    <button
+      type="button"
+      className="order-list-row order-row-open"
+      onClick={() => navigate(`/admin/sheets/${sheet.id}/orders/${order.id}`)}
+      aria-label={`${t('orders.open')} ${order.customerName || order.lineName}`}
+    >
+      <span className="order-row-photo">
+        {image ? <img src={image} alt="" loading="lazy" /> : <Package size={22} />}
+      </span>
+      <span className="order-row-main">
+        <span className="order-row-title">{order.customerName || order.lineName}</span>
+        <span className="order-row-subtitle">{order.lineName} · {formatOrderDate(order.day, sheet, language)}</span>
+        <span className="order-row-badges">
+          <StatusBadge type="payment" status={order.paymentStatus} />
+          <StatusBadge type="shipping" status={order.shippingStatus} />
+          {order.isLocal && <span className="status-badge local">{order.isOverride ? t('orders.editedLocally') : t('orders.deviceOnly')}</span>}
         </span>
-        <span className="order-row-main">
-          <span className="order-row-title">{order.customerName || order.lineName}</span>
-          <span className="order-row-subtitle">{order.lineName} · {formatOrderDate(order.day, sheet, language)} · {order.quantity === 1 ? t('orders.oneItem') : t('orders.manyItems', { count: order.quantity })}</span>
-          <span className="order-row-badges">
-            <StatusBadge type="payment" status={order.paymentStatus} />
-            <StatusBadge type="shipping" status={order.shippingStatus} />
-            {order.isLocal && <span className="status-badge local">{order.isOverride ? t('orders.editedLocally') : t('orders.deviceOnly')}</span>}
+      </span>
+      <span className="order-row-total">{formatMoney(order.totalSales, language)}<small>THB</small></span>
+      <span className="order-row-items" aria-label={t('detail.items')}>
+        {order.lines.map((line, index) => (
+          <span className="order-item-preview" key={`${order.id}-${line.row || index}`}>
+            <span className="order-item-preview-photo">{line.images[0] ? <img src={line.images[0]} alt="" loading="lazy" /> : <Package size={14} />}</span>
+            <span className="order-item-preview-name"><strong>{line.itemName || t('detail.itemNumber', { number: index + 1 })}</strong><small>{t('detail.quantity', { count: line.quantity, unit: line.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</small></span>
+            <strong className="order-item-preview-price">{formatMoney(line.salePrice, language)} THB</strong>
           </span>
-        </span>
-        <span className="order-row-total">{formatMoney(order.totalSales, language)}<small>THB</small></span>
-      </button>
-      <button type="button" className="order-row-edit" aria-label={`${t('orders.edit')} ${order.customerName || order.lineName}`} onClick={() => onEdit(order)}>
-        <Pencil size={15} />
-      </button>
-    </div>
+        ))}
+      </span>
+    </button>
   )
 }
 
-function getDefaultDay(sheet: SheetDefinition) {
-  const monthIndex: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, june: 5, july: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 }
+function getDefaultDay(_sheet: SheetDefinition) {
   const now = new Date()
-  return String(now.getMonth() === monthIndex[sheet.monthKey] ? now.getDate() : 1)
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
-function emptyDraft(sheet: SheetDefinition): OrderDraft {
+function emptyDraftLine(): DraftLine {
   return {
-    lineName: '',
-    customerName: '',
-    day: getDefaultDay(sheet),
-    paymentStatus: '',
-    shippingStatus: '',
-    lines: [{ itemName: '', quantity: '1', salePrice: '', bankAmount: '', depositAmount: '', image: '', images: [], imageName: '', imageIsNew: false, attributes: [] }],
+    itemName: '', quantity: '1', salePrice: '', bankAmount: '', depositAmount: '', image: '', images: [],
+    imageName: '', imageIsNew: false, attributes: [], costRMB: '',
   }
 }
 
-function draftFromOrder(order: SheetOrder): OrderDraft {
+function emptyDraft(sheet: SheetDefinition, exchangeRate: number): OrderDraft {
+  return {
+    lineName: '', customerName: '', day: getDefaultDay(sheet), exchangeRate: String(exchangeRate),
+    isCampaign: false, campaignDiscount: '', paymentStatus: '', shippingStatus: '', lines: [emptyDraftLine()],
+  }
+}
+
+function getDateInputValue(day: string, sheet: SheetDefinition) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) return day
+  const numericDay = Number(day)
+  if (Number.isFinite(numericDay) && numericDay >= 30000) {
+    return new Date(Date.UTC(1899, 11, 30) + numericDay * 86_400_000).toISOString().slice(0, 10)
+  }
+  if (Number.isFinite(numericDay) && numericDay > 0 && numericDay <= 31) {
+    return `${sheet.year}-${String(MONTH_INDEX[sheet.monthKey] + 1).padStart(2, '0')}-${String(numericDay).padStart(2, '0')}`
+  }
+  const parsed = new Date(day)
+  return Number.isNaN(parsed.getTime()) ? getDefaultDay(sheet) : parsed.toISOString().slice(0, 10)
+}
+
+function draftFromOrder(order: SheetOrder, defaultExchangeRate: number, sheet: SheetDefinition): OrderDraft {
   return {
     lineName: order.lineName,
     customerName: order.customerName,
-    day: order.day,
+    day: getDateInputValue(order.day, sheet),
+    exchangeRate: String(order.exchangeRate ?? defaultExchangeRate),
+    isCampaign: order.isCampaign ?? false,
+    campaignDiscount: order.campaignDiscount ? String(order.campaignDiscount) : '',
     paymentStatus: order.paymentStatus,
     shippingStatus: order.shippingStatus,
     lines: order.lines.map((line) => ({
@@ -423,6 +513,9 @@ function draftFromOrder(order: SheetOrder): OrderDraft {
       originalSalePrice: line.salePrice,
       originalProfitAmount: line.profitAmount,
       originalProfitPercent: line.profitPercent,
+      costRMB: line.costRMB == null ? '' : String(line.costRMB),
+      originalCostRMB: line.costRMB,
+      originalExchangeRate: order.exchangeRate ?? defaultExchangeRate,
     })),
   }
 }
@@ -444,25 +537,38 @@ function CreateOrderDialog({
   sheet,
   imageChoices,
   initialOrder,
+  defaultExchangeRate,
+  onExchangeRateChange,
   onClose,
   onSave,
 }: {
   sheet: SheetDefinition
-  imageChoices: Array<{ url: string; label: string }>
+  imageChoices: ImageChoice[]
   initialOrder?: SheetOrder
+  defaultExchangeRate: number
+  onExchangeRateChange: (value: number) => void
   onClose: () => void
   onSave: (draft: OrderDraft) => void
 }) {
-  const { t } = useTranslation()
-  const [draft, setDraft] = useState(() => initialOrder ? draftFromOrder(initialOrder) : emptyDraft(sheet))
+  const { t, i18n } = useTranslation()
+  const language = i18n.resolvedLanguage ?? 'en'
+  const [draft, setDraft] = useState(() => initialOrder ? draftFromOrder(initialOrder, defaultExchangeRate, sheet) : emptyDraft(sheet, defaultExchangeRate))
   const [openPicker, setOpenPicker] = useState<number | null>(null)
   const [imageQuery, setImageQuery] = useState('')
   const [imageError, setImageError] = useState('')
+  const exchangeRate = Number(draft.exchangeRate) || defaultExchangeRate
+  const grossSales = draft.lines.reduce((sum, line) => sum + (Number(line.salePrice) || 0), 0)
+  const campaignDiscount = draft.isCampaign ? Math.min(grossSales, Math.max(0, Number(draft.campaignDiscount) || 0)) : 0
+  const netSales = Math.max(0, grossSales - campaignDiscount)
+  const amountPaid = draft.lines.reduce((sum, line) => sum + (Number(line.bankAmount) || 0), 0)
+  const orderDepositDue = Math.max(0, netSales - amountPaid)
+  const automaticPaymentStatus = netSales > 0 && amountPaid >= netSales ? 'จ่ายเต็ม' : amountPaid > 0 ? 'มัดจำ' : 'ยังไม่ได้ชำระ'
 
   const updateField = <K extends keyof OrderDraft>(key: K, value: OrderDraft[K]) => setDraft((current) => ({ ...current, [key]: value }))
-  const updateLine = (index: number, key: 'itemName' | 'quantity' | 'salePrice' | 'bankAmount' | 'depositAmount' | 'image' | 'imageName', value: string) => {
+  const updateLine = (index: number, key: keyof DraftLine, value: string) => {
     setDraft((current) => ({
       ...current,
+      paymentStatus: key === 'salePrice' || key === 'bankAmount' ? '' : current.paymentStatus,
       lines: current.lines.map((line, lineIndex) => lineIndex === index ? { ...line, [key]: value } : line),
     }))
   }
@@ -475,16 +581,14 @@ function CreateOrderDialog({
     }
     try {
       const image = await imageToDataUrl(file)
-      updateLine(index, 'image', image)
-      updateLine(index, 'imageName', '')
-      setDraft((current) => ({ ...current, lines: current.lines.map((line, lineIndex) => lineIndex === index ? { ...line, images: [image], imageIsNew: true } : line) }))
+      setDraft((current) => ({ ...current, lines: current.lines.map((line, lineIndex) => lineIndex === index ? { ...line, image, images: [image], imageName: '', imageIsNew: true } : line) }))
       setImageError('')
     } catch {
       setImageError(t('createOrder.imageReadError'))
     }
   }
 
-  const filteredImages = imageChoices.filter((choice) => choice.label.toLocaleLowerCase().includes(imageQuery.toLocaleLowerCase()))
+  const filteredImages = imageChoices.filter((choice) => `${choice.label} ${choice.itemName}`.toLocaleLowerCase().includes(imageQuery.toLocaleLowerCase()))
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -505,50 +609,80 @@ function CreateOrderDialog({
         <form className="order-form" onSubmit={submit}>
           <div className="form-grid two-columns">
             <label>{t('detail.lineName')}<input value={draft.lineName} onChange={(event) => updateField('lineName', event.target.value)} placeholder={t('createOrder.linePlaceholder')} /></label>
-            <label>{t('detail.customer')}<input value={draft.customerName} onChange={(event) => updateField('customerName', event.target.value)} required placeholder={t('createOrder.customerPlaceholder')} /></label>
+            <label>{t('detail.customer')} <span className="required-star">*</span><input value={draft.customerName} onChange={(event) => updateField('customerName', event.target.value)} required placeholder={t('createOrder.customerPlaceholder')} /></label>
           </div>
-          <label className="day-field">{t('createOrder.day')}<input type="number" min="1" max="31" value={draft.day} onChange={(event) => updateField('day', event.target.value)} required /></label>
+          <label className="day-field">{t('createOrder.day')} <span className="required-star">*</span><input type="date" value={draft.day} onChange={(event) => updateField('day', event.target.value)} required /></label>
+
+          <div className="exchange-rate-field">
+            <label>{t('createOrder.exchangeRate')} <span className="required-star">*</span><input type="number" min="0.01" step="0.01" value={draft.exchangeRate} onChange={(event) => { updateField('exchangeRate', event.target.value); const nextRate = Number(event.target.value); if (nextRate > 0) onExchangeRateChange(nextRate) }} required /></label>
+            <small>{t('createOrder.exchangeRateHint')}</small>
+          </div>
 
           <div className="form-section-heading"><h3>{t('detail.items')}</h3><span>{t('createOrder.monthOnlyImages', { month: t(sheet.titleKey) })}</span></div>
 
-          {draft.lines.map((line, index) => (
-            <section className="draft-line-card" key={index}>
-              <div className="draft-line-heading"><strong>{t('createOrder.itemNumber', { number: index + 1 })}</strong>{draft.lines.length > 1 && <button type="button" className="remove-line" onClick={() => setDraft((current) => ({ ...current, lines: current.lines.filter((_, lineIndex) => lineIndex !== index) }))}>{t('createOrder.remove')}</button>}</div>
-              <label>{t('createOrder.itemName')}<input value={line.itemName} onChange={(event) => updateLine(index, 'itemName', event.target.value)} required /></label>
-              <div className="form-grid two-columns">
-                <label>{t('createOrder.quantity')}<input type="number" min="1" value={line.quantity} onChange={(event) => updateLine(index, 'quantity', event.target.value)} required /></label>
-                <label>{t('createOrder.price')}<input type="number" min="0" step="0.01" value={line.salePrice} onChange={(event) => updateLine(index, 'salePrice', event.target.value)} required /></label>
-                <label>{t('createOrder.bank')}<input type="number" min="0" step="0.01" value={line.bankAmount} onChange={(event) => updateLine(index, 'bankAmount', event.target.value)} /></label>
-                <label>{t('createOrder.depositAmount')}<input type="number" min="0" step="0.01" value={line.depositAmount} onChange={(event) => updateLine(index, 'depositAmount', event.target.value)} /></label>
-              </div>
-
-              <div className="image-source-row">
-                <label className="upload-image-button btn btn-outline btn-sm">
-                  <ImagePlus size={16} /> {t('createOrder.uploadPhoto')}
-                  <input type="file" accept="image/*" onChange={(event) => void handleFile(index, event.target.files?.[0])} />
-                </label>
-                <button type="button" className="choose-month-image btn btn-outline btn-sm" onClick={() => { setOpenPicker(openPicker === index ? null : index); setImageQuery('') }} disabled={imageChoices.length === 0}>
-                  {t('createOrder.chooseMonthImage')}
-                </button>
-              </div>
-
-              {line.image && <div className="draft-image-preview"><img src={line.image} alt={t('createOrder.selectedImage')} /><button type="button" onClick={() => { updateLine(index, 'image', ''); updateLine(index, 'imageName', ''); setDraft((current) => ({ ...current, lines: current.lines.map((item, lineIndex) => lineIndex === index ? { ...item, images: [], imageIsNew: false } : item) })) }}>{t('createOrder.removeImage')}</button></div>}
-              {line.image && line.imageIsNew && <label>{t('createOrder.photoName')} ({t('createOrder.optional')})<input value={line.imageName} onChange={(event) => updateLine(index, 'imageName', event.target.value)} placeholder={t('createOrder.photoNamePlaceholder')} /></label>}
-
-              {openPicker === index && <div className="month-image-picker">
-                <input value={imageQuery} onChange={(event) => setImageQuery(event.target.value)} placeholder={t('createOrder.filterMonthImages')} aria-label={t('createOrder.filterMonthImages')} />
-                <div className="month-image-grid">
-                  {filteredImages.map((choice) => <button type="button" key={choice.url} title={choice.label} onClick={() => { updateLine(index, 'image', choice.url); updateLine(index, 'imageName', ''); setDraft((current) => ({ ...current, lines: current.lines.map((line, lineIndex) => lineIndex === index ? { ...line, images: [choice.url], imageIsNew: false } : line) })); setOpenPicker(null) }}><img src={choice.url} alt={choice.label} /></button>)}
-                  {filteredImages.length === 0 && <span className="picker-empty">{t('createOrder.noMonthImages')}</span>}
+          {draft.lines.map((line, index) => {
+            const costRequired = line.originalSalePrice === undefined
+            const price = Number(line.salePrice) || 0
+            const paid = Number(line.bankAmount) || 0
+            const costRMB = Number(line.costRMB) || 0
+            const costTHB = costRMB * exchangeRate * (Number(line.quantity) || 1)
+            const depositDue = Math.max(0, price - paid)
+            const previewProfit = line.costRMB.trim() && line.salePrice.trim() ? price - costTHB : null
+            return (
+              <section className="draft-line-card" key={index}>
+                <div className="draft-line-heading"><strong>{t('createOrder.itemNumber', { number: index + 1 })}</strong>{draft.lines.length > 1 && <button type="button" className="remove-line" onClick={() => setDraft((current) => ({ ...current, paymentStatus: '', lines: current.lines.filter((_, lineIndex) => lineIndex !== index) }))}>{t('createOrder.remove')}</button>}</div>
+                <div className="draft-item-main">
+                  <div className="draft-item-photo">{line.image ? <img src={line.image} alt={line.itemName || t('createOrder.selectedImage')} /> : <Package size={22} />}</div>
+                  <div className="draft-item-fields">
+                    <label>{t('createOrder.itemName')} <span className="required-star">*</span><input value={line.itemName} onChange={(event) => updateLine(index, 'itemName', event.target.value)} required /></label>
+                    <div className="form-grid two-columns">
+                      <label>{t('createOrder.price')} <span className="required-star">*</span><input type="number" min="0" step="0.01" value={line.salePrice} onChange={(event) => updateLine(index, 'salePrice', event.target.value)} required /></label>
+                      <label>{t('createOrder.quantity')} <span className="required-star">*</span><input type="number" min="1" step="1" value={line.quantity} onChange={(event) => updateLine(index, 'quantity', event.target.value)} required /></label>
+                    </div>
+                  </div>
                 </div>
-              </div>}
-            </section>
-          ))}
-          <button type="button" className="add-line-button" onClick={() => setDraft((current) => ({ ...current, lines: [...current.lines, { itemName: '', quantity: '1', salePrice: '', bankAmount: '', depositAmount: '', image: '', images: [], imageName: '', imageIsNew: false, attributes: [] }] }))}><Plus size={15} /> {t('createOrder.addItem')}</button>
+                <div className="form-grid two-columns financial-fields">
+                  <label>{t('createOrder.bank')}<input type="number" min="0" step="0.01" value={line.bankAmount} onChange={(event) => updateLine(index, 'bankAmount', event.target.value)} /></label>
+                  <label>{t('createOrder.costRMB')} {costRequired && <span className="required-star">*</span>}<input type="number" min="0" step="0.01" value={line.costRMB} onChange={(event) => updateLine(index, 'costRMB', event.target.value)} required={costRequired} /></label>
+                </div>
+                <div className="line-calculation-summary">
+                  <span>{t('createOrder.depositDue')} <strong>{formatMoney(depositDue, language)} THB</strong></span>
+                  {line.costRMB.trim() && <span>{t('createOrder.costTHBPreview')} <strong>{formatMoney(costTHB, language)} THB</strong></span>}
+                  {previewProfit !== null && <span>{t('createOrder.estimatedProfit')} <strong className={previewProfit < 0 ? 'negative-text' : 'positive-text'}>{formatMoney(previewProfit, language)} THB</strong></span>}
+                </div>
+                <div className="image-source-row">
+                  <label className="upload-image-button btn btn-outline btn-sm">
+                    <ImagePlus size={16} /> {t('createOrder.uploadPhoto')}
+                    <input type="file" accept="image/*" onChange={(event) => void handleFile(index, event.target.files?.[0])} />
+                  </label>
+                  <button type="button" className="choose-month-image btn btn-outline btn-sm" onClick={() => { setOpenPicker(openPicker === index ? null : index); setImageQuery('') }} disabled={imageChoices.length === 0}>
+                    {t('createOrder.chooseMonthImage')}
+                  </button>
+                </div>
+                {line.image && <button type="button" className="remove-photo-button" onClick={() => setDraft((current) => ({ ...current, lines: current.lines.map((item, lineIndex) => lineIndex === index ? { ...item, image: '', images: [], imageName: '', imageIsNew: false } : item) }))}>{t('createOrder.removeImage')}</button>}
+                {openPicker === index && <div className="month-image-picker">
+                  <input value={imageQuery} onChange={(event) => setImageQuery(event.target.value)} placeholder={t('createOrder.filterMonthImages')} aria-label={t('createOrder.filterMonthImages')} />
+                  <div className="month-image-grid">
+                    {filteredImages.map((choice) => <button type="button" key={choice.url} title={`${choice.label} · ${formatMoney(choice.salePrice, language)} THB`} onClick={() => { setDraft((current) => ({ ...current, lines: current.lines.map((currentLine, lineIndex) => lineIndex === index ? { ...currentLine, image: choice.url, images: [choice.url], imageName: '', imageIsNew: false, itemName: choice.itemName || currentLine.itemName, salePrice: choice.salePrice > 0 ? String(choice.salePrice) : currentLine.salePrice } : currentLine) })); setOpenPicker(null) }}><img src={choice.url} alt={choice.label} /><span>{choice.itemName || choice.label}<small>{formatMoney(choice.salePrice, language)} THB</small></span></button>)}
+                    {filteredImages.length === 0 && <span className="picker-empty">{t('createOrder.noMonthImages')}</span>}
+                  </div>
+                </div>}
+              </section>
+            )
+          })}
+          <button type="button" className="add-line-button" onClick={() => setDraft((current) => ({ ...current, paymentStatus: '', lines: [...current.lines, emptyDraftLine()] }))}><Plus size={15} /> {t('createOrder.addItem')}</button>
+
+          <section className="campaign-form-card">
+            <label className="campaign-toggle"><input type="checkbox" checked={draft.isCampaign} onChange={(event) => { updateField('isCampaign', event.target.checked); updateField('paymentStatus', ''); if (!event.target.checked) updateField('campaignDiscount', '') }} />{t('createOrder.isCampaign')}</label>
+            {draft.isCampaign && <label>{t('createOrder.campaignDiscount')} <span className="required-star">*</span><input type="number" min="0" step="0.01" max={grossSales} value={draft.campaignDiscount} onChange={(event) => { updateField('campaignDiscount', event.target.value); updateField('paymentStatus', '') }} required /></label>}
+            <div className="campaign-net-total"><span>{t('createOrder.afterDiscount')}</span><strong>{formatMoney(netSales, language)} THB</strong></div>
+            <div className="campaign-net-total"><span>{t('createOrder.orderDepositDue')}</span><strong>{formatMoney(orderDepositDue, language)} THB</strong></div>
+            <div className="campaign-net-total"><span>{t('createOrder.paymentStatusPreview')}</span><strong>{t((draft.paymentStatus || automaticPaymentStatus) === 'จ่ายเต็ม' ? 'detail.paymentFull' : (draft.paymentStatus || automaticPaymentStatus) === 'มัดจำ' ? 'detail.paymentDeposit' : 'detail.paymentUnpaid')}</strong></div>
+          </section>
 
           <div className="form-grid two-columns">
-            <label>{t('createOrder.paymentStatus')}<select className="select select-bordered select-sm select-primary" value={draft.paymentStatus} onChange={(event) => updateField('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option></select></label>
-            <label>{t('createOrder.shippingStatus')}<select className="select select-bordered select-sm select-primary" value={draft.shippingStatus} onChange={(event) => updateField('shippingStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="รอเข้าไทย">{t('detail.shippingInbound')}</option><option value="ส่งแล้ว">{t('detail.shippingSent')}</option></select></label>
+            <label>{t('createOrder.paymentStatus')}<select className="select select-bordered select-sm select-primary" value={draft.paymentStatus} onChange={(event) => updateField('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้ชำระ">{t('detail.paymentUnpaid')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option></select></label>
+            <label>{t('createOrder.shippingStatus')}<select className="select select-bordered select-sm select-primary" value={draft.shippingStatus} onChange={(event) => updateField('shippingStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้สั่ง">{t('detail.shippingNotOrdered')}</option><option value="สั่งแล้ว">{t('detail.shippingOrdered')}</option><option value="รอเข้าไทย">{t('detail.shippingInbound')}</option><option value="ส่งแล้ว">{t('detail.shippingSent')}</option></select></label>
           </div>
           {imageError && <p className="form-error" role="alert">{imageError}</p>}
           <p className="local-save-note">{t('createOrder.localOnly')}</p>
@@ -562,18 +696,54 @@ function CreateOrderDialog({
   )
 }
 
+function MonthlyExpensesSection({ expenses, onChange }: { expenses: MonthlyExpense[]; onChange: (expenses: MonthlyExpense[]) => void }) {
+  const { t, i18n } = useTranslation()
+  const language = i18n.resolvedLanguage ?? 'en'
+  const total = expenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
+  const update = (id: string, key: keyof MonthlyExpense, value: string | number) => onChange(expenses.map((expense) => expense.id === id ? { ...expense, [key]: value } : expense))
+  const add = () => onChange([...expenses, { id: `expense-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, category: 'shipping', description: '', amount: 0 }])
+
+  return (
+    <section className="monthly-expenses-section">
+      <div className="monthly-expenses-heading"><div><h3>{t('expenses.title')}</h3><span>{t('expenses.note')}</span></div><strong>{formatMoney(total, language)} THB</strong></div>
+      <div className="monthly-expenses-list">
+        {expenses.map((expense) => (
+          <div className="monthly-expense-row" key={expense.id}>
+            <select className="select select-bordered select-sm select-primary" aria-label={t('expenses.category')} value={expense.category} onChange={(event) => update(expense.id, 'category', event.target.value)}>
+              <option value="shipping">{t('expenses.shipping')}</option><option value="packaging">{t('expenses.packaging')}</option><option value="ads">{t('expenses.ads')}</option><option value="other">{t('expenses.other')}</option>
+            </select>
+            <input type="text" aria-label={t('expenses.description')} placeholder={t('expenses.description')} value={expense.description} onChange={(event) => update(expense.id, 'description', event.target.value)} />
+            <input type="number" min="0" step="0.01" aria-label={t('expenses.amount')} value={expense.amount} onChange={(event) => update(expense.id, 'amount', Number(event.target.value) || 0)} />
+            <button type="button" className="expense-remove" onClick={() => onChange(expenses.filter((item) => item.id !== expense.id))} aria-label={t('expenses.remove')}><X size={15} /></button>
+          </div>
+        ))}
+        {expenses.length === 0 && <p className="expenses-empty">{t('expenses.empty')}</p>}
+      </div>
+      <button type="button" className="expense-add-button" onClick={add}><Plus size={14} /> {t('expenses.add')}</button>
+    </section>
+  )
+}
+
 function SheetOrdersPage({
   sheet,
   sheetData,
   loading,
   onRefresh,
   onCreateOrder,
+  monthlyExpenses,
+  onSaveMonthlyExpenses,
+  exchangeRate,
+  onExchangeRateChange,
 }: {
   sheet: SheetDefinition
   sheetData?: SheetDataState
   loading: boolean
   onRefresh: () => void
   onCreateOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => void
+  monthlyExpenses: MonthlyExpense[]
+  onSaveMonthlyExpenses: (sheetId: string, expenses: MonthlyExpense[]) => void
+  exchangeRate: number
+  onExchangeRateChange: (value: number) => void
 }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
@@ -582,22 +752,25 @@ function SheetOrdersPage({
   const sentinelRef = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [sortBy, setSortBy] = useState('sales-desc')
+  const [sortBy, setSortBy] = useState('newest')
   const [visibleCount, setVisibleCount] = useState(10)
   const [createOpen, setCreateOpen] = useState(false)
-  const [editingOrder, setEditingOrder] = useState<SheetOrder | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [notice, setNotice] = useState('')
   const orders = sheetData?.orders ?? EMPTY_ORDERS
-  const totalProfit = getProfitSummary(orders)
+  const expenseTotal = monthlyExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  const totalProfit = getProfitSummary(orders, expenseTotal)
 
   const sortedOrders = useMemo(() => {
     const matching = orders.filter((order) => {
       const searchText = `${order.lineName} ${order.customerName} ${order.lines.map((line) => line.itemName).join(' ')} ${order.paymentStatus} ${order.shippingStatus}`.toLocaleLowerCase()
       if (!searchText.includes(query.toLocaleLowerCase())) return false
       if (statusFilter === 'paid') return order.paymentStatus === 'จ่ายเต็ม'
+      if (statusFilter === 'unpaid') return order.paymentStatus === 'ยังไม่ได้ชำระ'
       if (statusFilter === 'deposit') return order.paymentStatus === 'มัดจำ'
       if (statusFilter === 'shipped') return order.shippingStatus === 'ส่งแล้ว'
+      if (statusFilter === 'not-ordered') return order.shippingStatus === 'ยังไม่ได้สั่ง'
+      if (statusFilter === 'ordered') return order.shippingStatus === 'สั่งแล้ว'
       if (statusFilter === 'inbound') return order.shippingStatus === 'รอเข้าไทย'
       if (statusFilter === 'unlisted') return !order.paymentStatus && !order.shippingStatus
       return true
@@ -605,11 +778,11 @@ function SheetOrdersPage({
     return matching.sort((a, b) => {
       if (sortBy === 'sales-asc') return a.totalSales - b.totalSales
       if (sortBy === 'status') return `${a.paymentStatus}-${a.shippingStatus}`.localeCompare(`${b.paymentStatus}-${b.shippingStatus}`)
-      if (sortBy === 'oldest') return a.sheetRow - b.sheetRow
-      if (sortBy === 'newest') return Number(b.isLocal) - Number(a.isLocal) || b.sheetRow - a.sheetRow
+      if (sortBy === 'oldest') return getOrderSortTimestamp(a, sheet) - getOrderSortTimestamp(b, sheet) || a.sheetRow - b.sheetRow
+      if (sortBy === 'newest') return getOrderSortTimestamp(b, sheet) - getOrderSortTimestamp(a, sheet) || b.sheetRow - a.sheetRow
       return b.totalSales - a.totalSales
     })
-  }, [orders, query, sortBy, statusFilter])
+  }, [orders, query, sheet, sortBy, statusFilter])
   const visibleOrders = sortedOrders.slice(0, visibleCount)
   const hasMore = visibleOrders.length < sortedOrders.length
 
@@ -630,19 +803,19 @@ function SheetOrdersPage({
 
   const imageChoices = useMemo(() => {
     const seen = new Set<string>()
-    return orders.flatMap((order) => order.lines.flatMap((line, lineIndex) => line.images.map((url) => ({ url, label: line.itemName || line.imageName || order.customerName || order.lineName || t('createOrder.itemNumber', { number: lineIndex + 1 }) }))))
+    return orders.flatMap((order) => order.lines.flatMap((line, lineIndex) => line.images.map((url) => ({ url, label: line.itemName || line.imageName || order.customerName || order.lineName || t('createOrder.itemNumber', { number: lineIndex + 1 }), itemName: line.itemName || line.imageName || '', salePrice: line.salePrice }))))
       .filter((choice) => {
-        if (seen.has(choice.url)) return false
-        seen.add(choice.url)
+        const key = `${choice.url}|${choice.itemName}|${choice.salePrice}`
+        if (seen.has(key)) return false
+        seen.add(key)
         return true
       })
   }, [orders, t])
 
-  const saveLocalOrder = (draft: OrderDraft, originalOrder?: SheetOrder) => {
-    onCreateOrder(sheet.id, draft, originalOrder)
+  const saveLocalOrder = (draft: OrderDraft) => {
+    onCreateOrder(sheet.id, draft)
     setCreateOpen(false)
-    setEditingOrder(null)
-    setNotice(t(originalOrder ? 'orders.editSaved' : 'createOrder.savedNotice'))
+    setNotice(t('createOrder.savedNotice'))
     window.setTimeout(() => setNotice(''), 3000)
   }
 
@@ -658,7 +831,7 @@ function SheetOrdersPage({
           {loading && !sheetData ? <p className="sales-growth">{t('sheet.loadingShort')}</p> : sheet.kind === 'sales' ? <>
             <div className="month-sales-summary">
               <div><span>{t('analytics.totalSales')}</span><strong>{formatMoney(sheetTotal(orders), language)} <small>THB</small></strong></div>
-              <div><span>{t('analytics.totalProfit')}</span><strong className={totalProfit.amount === null ? 'profit-unavailable' : 'profit-summary-value'}>{totalProfit.amount === null ? '—' : `${formatMoney(totalProfit.amount, language)} THB`}</strong>{totalProfit.amount === null ? <em className="profit-data-note">{t('analytics.noPeriodProfit')}</em> : totalProfit.knownLines < totalProfit.totalLines && <em className="profit-data-note">{t('analytics.profitCoverage', { known: totalProfit.knownLines, total: totalProfit.totalLines })}</em>}</div>
+              <div><span>{t('analytics.totalProfit')}</span><strong className={totalProfit.amount === null ? 'profit-unavailable' : 'profit-summary-value'}>{totalProfit.amount === null ? '—' : `${formatMoney(totalProfit.amount, language)} THB`}</strong>{totalProfit.amount === null ? <em className="profit-data-note">{t('analytics.noPeriodProfit')}</em> : !totalProfit.complete ? <em className="profit-data-note">{t('analytics.partialProfitNote', { known: totalProfit.knownLines, total: totalProfit.totalLines })}</em> : <em className="profit-data-note">{t('analytics.netProfitNote', { amount: formatMoney(expenseTotal, language) })}</em>}</div>
             </div>
             <p className="month-order-count">{t('sheets.orderCount', { count: orders.length })}</p>
           </> : <p className="sales-growth">{t('sheets.monthSummary', { orders: orders.length, total: formatMoney(sheetTotal(orders), language) })}</p>}
@@ -680,8 +853,8 @@ function SheetOrdersPage({
           </button>
         </div>
         {filtersOpen && <div className="order-filter-row" id="order-filters">
-          <label><span className="sr-only">{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => updateStatus(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
-          <label><span className="sr-only">{t('filters.sort')}</span><select className="select select-bordered select-sm select-primary" value={sortBy} onChange={(event) => updateSort(event.target.value)}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="status">{t('filters.statusAZ')}</option><option value="newest">{t('filters.newest')}</option><option value="oldest">{t('filters.oldest')}</option></select></label>
+          <label><span className="sr-only">{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => updateStatus(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="unpaid">{t('detail.paymentUnpaid')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="not-ordered">{t('detail.shippingNotOrdered')}</option><option value="ordered">{t('detail.shippingOrdered')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
+          <label><span className="sr-only">{t('filters.sort')}</span><select className="select select-bordered select-sm select-primary" value={sortBy} onChange={(event) => updateSort(event.target.value)}><option value="newest">{t('filters.newest')}</option><option value="oldest">{t('filters.oldest')}</option><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="status">{t('filters.statusAZ')}</option></select></label>
         </div>}
         {sheetData?.error && <div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div>}
       </div>
@@ -691,8 +864,9 @@ function SheetOrdersPage({
         {sheetData && !sheetData.error && orders.length === 0 && <p className="sheet-message">{t('sheet.empty')}</p>}
         {sortedOrders.length === 0 && !loading && orders.length > 0 && <p className="sheet-message">{t('orders.noMatch')}</p>}
         {query && sortedOrders.length === 0 && <p className="sheet-message">{t('orders.noMatch')}</p>}
+        {sheet.kind === 'sales' && <MonthlyExpensesSection expenses={monthlyExpenses} onChange={(expenses) => onSaveMonthlyExpenses(sheet.id, expenses)} />}
         <div className="order-list-table">
-          {visibleOrders.map((order) => <OrderListRow key={order.id} order={order} sheet={sheet} onEdit={setEditingOrder} />)}
+          {visibleOrders.map((order) => <OrderListRow key={order.id} order={order} sheet={sheet} />)}
         </div>
         {hasMore && <div className="load-more-sentinel" ref={sentinelRef} aria-live="polite"><span className="loading-more-dot" /> {t('orders.loadingMore')}</div>}
         {!hasMore && sortedOrders.length > 10 && <p className="list-end-note">{t('orders.endOfList')}</p>}
@@ -700,14 +874,13 @@ function SheetOrdersPage({
 
       <div className="create-order-dock"><button type="button" className="create-order-list-button btn btn-primary" onClick={() => setCreateOpen(true)}><Plus size={17} /> {t('createOrder.open')}</button></div>
       <BottomNavigation />
-      {createOpen && <CreateOrderDialog sheet={sheet} imageChoices={imageChoices} onClose={() => setCreateOpen(false)} onSave={saveLocalOrder} />}
-      {editingOrder && <CreateOrderDialog sheet={sheet} initialOrder={editingOrder} imageChoices={imageChoices} onClose={() => setEditingOrder(null)} onSave={(draft) => saveLocalOrder(draft, editingOrder)} />}
+      {createOpen && <CreateOrderDialog sheet={sheet} imageChoices={imageChoices} defaultExchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onClose={() => setCreateOpen(false)} onSave={saveLocalOrder} />}
       {notice && <p className="app-toast" role="status">{notice}</p>}
     </section>
   )
 }
 
-function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder }: { sheet: SheetDefinition; sheetData?: SheetDataState; loading: boolean; onRefresh: () => void; onSaveOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => void }) {
+function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, exchangeRate, onExchangeRateChange }: { sheet: SheetDefinition; sheetData?: SheetDataState; loading: boolean; onRefresh: () => void; onSaveOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => void; exchangeRate: number; onExchangeRateChange: (value: number) => void }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { orderId } = useParams()
@@ -717,17 +890,33 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder }:
   const [editOpen, setEditOpen] = useState(false)
   const [editNotice, setEditNotice] = useState('')
   const order = sheetData?.orders.find((item) => item.id === orderId)
+  const [campaignEnabled, setCampaignEnabled] = useState(() => order?.isCampaign ?? false)
+  const [campaignDiscount, setCampaignDiscount] = useState(() => String(order?.campaignDiscount ?? ''))
   const imageChoices = useMemo(() => {
     const seen = new Set<string>()
-    return (sheetData?.orders ?? EMPTY_ORDERS).flatMap((entry) => entry.lines.flatMap((line, lineIndex) => line.images.map((url) => ({ url, label: line.itemName || line.imageName || entry.customerName || entry.lineName || t('createOrder.itemNumber', { number: lineIndex + 1 }) }))))
-      .filter((choice) => { if (seen.has(choice.url)) return false; seen.add(choice.url); return true })
+    return (sheetData?.orders ?? EMPTY_ORDERS).flatMap((entry) => entry.lines.flatMap((line, lineIndex) => line.images.map((url) => ({ url, label: line.itemName || line.imageName || entry.customerName || entry.lineName || t('createOrder.itemNumber', { number: lineIndex + 1 }), itemName: line.itemName || line.imageName || '', salePrice: line.salePrice }))))
+      .filter((choice) => { const key = `${choice.url}|${choice.itemName}|${choice.salePrice}`; if (seen.has(key)) return false; seen.add(key); return true })
   }, [sheetData?.orders, t])
   if (loading && !sheetData) return <section className="app-screen detail-screen"><div className="detail-scroll-area"><div className="detail-skeleton-hero" /><div className="detail-skeleton-block" /><div className="detail-skeleton-block" /></div></section>
   if (sheetData?.error) return <section className="app-screen detail-screen"><div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div></section>
   if (!order) return <Navigate to={`/admin/sheets/${sheet.id}`} replace />
 
   const heroImage = order.lines.flatMap((line) => line.images)[0]
+  const grossSales = order.grossSales ?? order.lines.reduce((sum, line) => sum + line.salePrice, 0)
   const orderProfit = getProfitSummary([order])
+  const discountAmount = campaignEnabled ? Math.min(grossSales, Math.max(0, Number(campaignDiscount) || 0)) : 0
+  const netSales = Math.max(0, grossSales - discountAmount)
+  const depositDue = getDepositDue(order, netSales)
+  const saveStatus = (key: 'paymentStatus' | 'shippingStatus', value: string) => {
+    onSaveOrder(sheet.id, { ...draftFromOrder(order, exchangeRate, sheet), [key]: value }, order)
+    setEditNotice(t('orders.editSaved'))
+    window.setTimeout(() => setEditNotice(''), 2500)
+  }
+  const saveCampaign = () => {
+    onSaveOrder(sheet.id, { ...draftFromOrder(order, exchangeRate, sheet), isCampaign: campaignEnabled, campaignDiscount: campaignEnabled ? String(discountAmount) : '0' }, order)
+    setEditNotice(t('orders.editSaved'))
+    window.setTimeout(() => setEditNotice(''), 2500)
+  }
   const visibleLines = order.lines.filter((line) => `${line.itemName} ${line.imageName ?? ''}`.toLocaleLowerCase().includes(itemQuery.toLocaleLowerCase())).sort((a, b) => {
     if (itemSort === 'sales-asc') return a.salePrice - b.salePrice
     if (itemSort === 'name') return a.itemName.localeCompare(b.itemName)
@@ -765,6 +954,20 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder }:
             <div><span>{t('detail.customer')}</span><strong>{order.customerName || t('detail.notSet')}</strong></div>
           </section>
 
+          <section className="detail-status-controls" aria-label={t('details.summary')}>
+            <label>{t('createOrder.paymentStatus')}<select className="select select-bordered select-sm select-primary" value={order.paymentStatus} onChange={(event) => saveStatus('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้ชำระ">{t('detail.paymentUnpaid')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option></select></label>
+            <label>{t('createOrder.shippingStatus')}<select className="select select-bordered select-sm select-primary" value={order.shippingStatus} onChange={(event) => saveStatus('shippingStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้สั่ง">{t('detail.shippingNotOrdered')}</option><option value="สั่งแล้ว">{t('detail.shippingOrdered')}</option><option value="รอเข้าไทย">{t('detail.shippingInbound')}</option><option value="ส่งแล้ว">{t('detail.shippingSent')}</option></select></label>
+          </section>
+
+          <section className="campaign-detail-card">
+            <label className="campaign-toggle"><input type="checkbox" checked={campaignEnabled} onChange={(event) => setCampaignEnabled(event.target.checked)} />{t('detail.campaign')}</label>
+            {campaignEnabled && <label>{t('detail.discount')} <span className="required-star">*</span><input type="number" min="0" max={grossSales} step="0.01" value={campaignDiscount} onChange={(event) => setCampaignDiscount(event.target.value)} /></label>}
+            <div className="campaign-net-total"><span>{t('detail.totalBeforeDiscount')}</span><strong>{formatMoney(grossSales, language)} THB</strong></div>
+            {campaignEnabled && <div className="campaign-net-total"><span>{t('detail.discount')}</span><strong>−{formatMoney(discountAmount, language)} THB</strong></div>}
+            <div className="campaign-net-total campaign-final-total"><span>{t('detail.totalAfterDiscount')}</span><strong>{formatMoney(netSales, language)} THB</strong></div>
+            <button type="button" className="save-campaign-button btn btn-primary btn-sm" onClick={saveCampaign}>{t('detail.saveCampaign')}</button>
+          </section>
+
           <section className="detail-section">
             <h3>{t('detail.items')}</h3>
             <div className="item-list-controls">
@@ -781,6 +984,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder }:
                     <strong>{line.itemName || t('detail.itemNumber', { number: index + 1 })}</strong>
                     {line.imageName && <span className="item-photo-name">{t('detail.photoName')}: {line.imageName}</span>}
                     <span>{t('detail.quantity', { count: line.quantity, unit: line.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</span>
+                    {line.costRMB != null && <span className="item-cost-line">{t('createOrder.costRMB')}: {formatMoney(line.costRMB, language)} CNY{line.costTHB != null && ` · ${t('createOrder.costTHBPreview')}: ${formatMoney(line.costTHB, language)} THB`}</span>}
                     {line.attributes.length > 0 && <div className="item-attributes">{line.attributes.slice(0, 3).map((attribute) => <span key={`${attribute.key}-${attribute.value}`}>{fieldLabel(attribute.key, t)}: {attribute.value}</span>)}</div>}
                   </div>
                   <strong className="item-price">{line.salePrice ? `${formatMoney(line.salePrice, language)} THB` : '—'}</strong>
@@ -791,15 +995,15 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder }:
           </section>
 
           <section className="detail-card payment-card">
-            <div><span>{t('detail.totalSales')}</span><strong>{formatMoney(order.totalSales, language)} THB</strong></div>
+            <div><span>{t('detail.totalSales')}</span><strong>{formatMoney(netSales, language)} THB</strong></div>
             <div><span>{t('detail.totalProfit')}</span><strong className={orderProfit.amount === null ? 'profit-unavailable' : orderProfit.amount < 0 ? 'negative-text' : 'positive-text'}>{orderProfit.amount === null ? '—' : `${formatMoney(orderProfit.amount, language)} THB`}</strong>{orderProfit.amount === null ? <em className="profit-data-note">{t('analytics.noPeriodProfit')}</em> : orderProfit.knownLines < orderProfit.totalLines && <em className="profit-data-note">{t('analytics.profitCoverage', { known: orderProfit.knownLines, total: orderProfit.totalLines })}</em>}</div>
             {order.profitPercent !== null && <div><span>{t('detail.profitMargin')}</span><strong className={`profit-text ${order.profitPercent < 0 ? 'negative' : 'positive'}`}>{formatProfitPercent(order.profitPercent, language)}</strong></div>}
-            {order.bankTotal > 0 && <div><span>{t('detail.bank')}</span><strong>{formatMoney(order.bankTotal, language)} THB</strong></div>}
-            {order.depositTotal > 0 && <div><span>{t('detail.deposit')}</span><strong>{formatMoney(order.depositTotal, language)} THB</strong></div>}
+            {getPaidTotal(order) > 0 && <div><span>{t('detail.bank')}</span><strong>{formatMoney(getPaidTotal(order), language)} THB</strong></div>}
+            {depositDue !== null && (depositDue > 0 || order.paymentStatus === 'จ่ายเต็ม') && <div><span>{t('detail.deposit')}</span><strong>{formatMoney(depositDue, language)} THB</strong></div>}
           </section>
         </div>
       </div>
-      {editOpen && order && <CreateOrderDialog sheet={sheet} initialOrder={order} imageChoices={imageChoices} onClose={() => setEditOpen(false)} onSave={(draft) => { onSaveOrder(sheet.id, draft, order); setEditOpen(false); setEditNotice(t('orders.editSaved')) }} />}
+      {editOpen && order && <CreateOrderDialog sheet={sheet} initialOrder={order} imageChoices={imageChoices} defaultExchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onClose={() => setEditOpen(false)} onSave={(draft) => { onSaveOrder(sheet.id, draft, order); setEditOpen(false); setEditNotice(t('orders.editSaved')) }} />}
       {editNotice && <p className="app-toast" role="status">{editNotice}</p>}
     </section>
   )
@@ -862,7 +1066,7 @@ function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: str
   )
 }
 
-function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, SheetDataState>; loading: boolean }) {
+function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, loading }: { dataBySheet: Record<string, SheetDataState>; monthlyExpensesBySheet: Record<string, MonthlyExpense[]>; loading: boolean }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const currentSheet = getCurrentMonthSheet(dataBySheet)
@@ -872,15 +1076,19 @@ function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, S
   const [monthlySort, setMonthlySort] = useState('sales-desc')
   const matchesStatus = (order: SheetOrder) => {
     if (statusFilter === 'paid') return order.paymentStatus === 'จ่ายเต็ม'
+    if (statusFilter === 'unpaid') return order.paymentStatus === 'ยังไม่ได้ชำระ'
     if (statusFilter === 'deposit') return order.paymentStatus === 'มัดจำ'
     if (statusFilter === 'shipped') return order.shippingStatus === 'ส่งแล้ว'
+    if (statusFilter === 'not-ordered') return order.shippingStatus === 'ยังไม่ได้สั่ง'
+    if (statusFilter === 'ordered') return order.shippingStatus === 'สั่งแล้ว'
     if (statusFilter === 'inbound') return order.shippingStatus === 'รอเข้าไทย'
     if (statusFilter === 'unlisted') return !order.paymentStatus && !order.shippingStatus
     return true
   }
   const filteredOrdersForSheet = (sheet: SheetDefinition) => (dataBySheet[sheet.id]?.orders ?? EMPTY_ORDERS).filter(matchesStatus)
   const scopedOrders = currentOrders.filter(matchesStatus)
-  const scopedProfit = getProfitSummary(scopedOrders)
+  const currentExpenseTotal = (monthlyExpensesBySheet[currentSheet.id] ?? []).reduce((sum, expense) => sum + expense.amount, 0)
+  const scopedProfit = getProfitSummary(scopedOrders, statusFilter === 'all' ? currentExpenseTotal : 0)
   const shipped = scopedOrders.filter((order) => order.shippingStatus === 'ส่งแล้ว').length
   const inbound = scopedOrders.filter((order) => order.shippingStatus === 'รอเข้าไทย').length
   const paid = scopedOrders.filter((order) => order.paymentStatus === 'จ่ายเต็ม').length
@@ -929,7 +1137,7 @@ function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, S
           <h1>{t('analytics.title')}</h1>
           <p className="sales-growth">{loading ? t('sheet.loadingShort') : t('analytics.currentMonth')}</p>
         </header>
-        <label className="analytics-status-filter"><span>{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
+        <label className="analytics-status-filter"><span>{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="unpaid">{t('detail.paymentUnpaid')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="not-ordered">{t('detail.shippingNotOrdered')}</option><option value="ordered">{t('detail.shippingOrdered')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
       </div>
       <div className="home-scroll-area analytics-scroll-area">
         <div className="analytics-metrics">
@@ -959,6 +1167,8 @@ function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, S
           <div className="status-summary-row"><span className="status-badge paid">{t('detail.paymentFull')}</span><strong>{paid}</strong></div>
           <div className="status-summary-row"><span className="status-badge deposit">{t('detail.paymentDeposit')}</span><strong>{deposits}</strong></div>
           <div className="status-summary-row"><span className="status-badge shipped">{t('detail.shippingSent')}</span><strong>{shipped}</strong></div>
+          <div className="status-summary-row"><span className="status-badge not-ordered">{t('detail.shippingNotOrdered')}</span><strong>{scopedOrders.filter((order) => order.shippingStatus === 'ยังไม่ได้สั่ง').length}</strong></div>
+          <div className="status-summary-row"><span className="status-badge ordered">{t('detail.shippingOrdered')}</span><strong>{scopedOrders.filter((order) => order.shippingStatus === 'สั่งแล้ว').length}</strong></div>
           <div className="status-summary-row"><span className="status-badge inbound">{t('detail.shippingInbound')}</span><strong>{inbound}</strong></div>
         </section>
 
@@ -997,6 +1207,8 @@ function App() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(readAdminSession)
   const [dataBySheet, setDataBySheet] = useState<Record<string, SheetDataState>>({})
   const [localOrdersBySheet, setLocalOrdersBySheet] = useState<Record<string, SheetOrder[]>>(() => readAdminSession() ? loadLocalOrders() : {})
+  const [monthlyExpensesBySheet, setMonthlyExpensesBySheet] = useState<Record<string, MonthlyExpense[]>>(() => readAdminSession() ? loadMonthlyExpenses() : {})
+  const [exchangeRate, setExchangeRate] = useState(loadExchangeRate)
   const [localOrdersReady, setLocalOrdersReady] = useState(readAdminSession)
   const [loading, setLoading] = useState(readAdminSession)
   const [initialDataReady, setInitialDataReady] = useState(false)
@@ -1038,6 +1250,16 @@ function App() {
     }
   }, [localOrdersBySheet, isAdminAuthenticated, localOrdersReady])
 
+  useEffect(() => {
+    if (!isAdminAuthenticated || !localOrdersReady) return
+    try {
+      localStorage.setItem(MONTHLY_EXPENSES_KEY, JSON.stringify(monthlyExpensesBySheet))
+      localStorage.setItem(EXCHANGE_RATE_KEY, String(exchangeRate))
+    } catch {
+      // Expense and exchange-rate settings remain active for this app session if storage is unavailable.
+    }
+  }, [monthlyExpensesBySheet, exchangeRate, isAdminAuthenticated, localOrdersReady])
+
   const mergedDataBySheet = useMemo(() => Object.fromEntries(SHEETS.map((sheet) => {
     const remote = dataBySheet[sheet.id] ?? { orders: [] }
     const localOrders = localOrdersBySheet[sheet.id] ?? []
@@ -1061,6 +1283,8 @@ function App() {
       // Authentication remains active for this app session if storage is blocked.
     }
     setLocalOrdersBySheet(loadLocalOrders())
+    setMonthlyExpensesBySheet(loadMonthlyExpenses())
+    setExchangeRate(loadExchangeRate())
     setLocalOrdersReady(true)
     setInitialDataReady(false)
     setLoading(true)
@@ -1077,6 +1301,7 @@ function App() {
     }
     setIsAdminAuthenticated(false)
     setLocalOrdersBySheet({})
+    setMonthlyExpensesBySheet({})
     setLocalOrdersReady(false)
     setDataBySheet({})
     setInitialDataReady(false)
@@ -1103,35 +1328,62 @@ function App() {
   }, [expireSession, isAdminAuthenticated])
 
 
+  const saveMonthlyExpenses = (sheetId: string, expenses: MonthlyExpense[]) => {
+    setMonthlyExpensesBySheet((current) => ({ ...current, [sheetId]: expenses }))
+  }
+
   const createLocalOrder = (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => {
-    const lines: SheetOrderLine[] = draft.lines.map((line) => ({
-      row: 0,
-      itemName: line.itemName.trim(),
-      imageName: line.imageName.trim() || undefined,
-      quantity: Number(line.quantity) || 1,
-      salePrice: Number(line.salePrice) || 0,
-      bankAmount: Number(line.bankAmount) || 0,
-      depositAmount: Number(line.depositAmount) || 0,
-      profitAmount: line.originalSalePrice !== undefined && Number(line.salePrice) === line.originalSalePrice ? line.originalProfitAmount ?? null : null,
-      profitPercent: line.originalSalePrice !== undefined && Number(line.salePrice) === line.originalSalePrice ? line.originalProfitPercent ?? null : null,
-      images: line.images.length ? line.images : line.image ? [line.image] : [],
-      attributes: line.attributes,
-    }))
-    const totalSales = lines.reduce((sum, line) => sum + line.salePrice, 0)
+    const rate = Number(draft.exchangeRate) > 0 ? Number(draft.exchangeRate) : exchangeRate
+    const lines: SheetOrderLine[] = draft.lines.map((line) => {
+      const salePrice = Number(line.salePrice) || 0
+      const bankAmount = Number(line.bankAmount) || 0
+      const costRMB = line.costRMB.trim() === '' ? null : Number(line.costRMB) || 0
+      const costTHB = costRMB === null ? null : costRMB * rate * (Number(line.quantity) || 1)
+      const sameOriginalInputs = line.originalSalePrice !== undefined
+        && salePrice === line.originalSalePrice
+        && (costRMB ?? null) === (line.originalCostRMB ?? null)
+        && (costRMB === null || rate === line.originalExchangeRate)
+      const profitAmount = sameOriginalInputs
+        ? line.originalProfitAmount ?? null
+        : costTHB === null ? null : salePrice - costTHB
+      return {
+        row: 0,
+        itemName: line.itemName.trim(),
+        imageName: line.imageName.trim() || undefined,
+        quantity: Number(line.quantity) || 1,
+        salePrice,
+        bankAmount,
+        depositAmount: Math.max(0, salePrice - bankAmount),
+        profitAmount,
+        profitPercent: profitAmount !== null && salePrice > 0 ? (profitAmount / salePrice) * 100 : null,
+        costRMB,
+        costTHB,
+        images: line.images.length ? line.images : line.image ? [line.image] : [],
+        attributes: line.attributes,
+      }
+    })
+    const grossSales = lines.reduce((sum, line) => sum + line.salePrice, 0)
+    const campaignDiscount = draft.isCampaign ? Math.min(grossSales, Number(draft.campaignDiscount) || 0) : 0
+    const totalSales = Math.max(0, grossSales - campaignDiscount)
+    const bankTotal = lines.reduce((sum, line) => sum + line.bankAmount, 0)
     const profitIsComplete = lines.length > 0 && lines.every((line) => line.profitAmount != null)
-    const profitAmount = profitIsComplete ? lines.reduce((sum, line) => sum + (line.profitAmount ?? 0), 0) : null
+    const profitAmount = profitIsComplete ? lines.reduce((sum, line) => sum + (line.profitAmount ?? 0), 0) - campaignDiscount : null
     const order: SheetOrder = {
       id: originalOrder?.id ?? `local-${Date.now()}`,
       sheetRow: originalOrder?.sheetRow ?? 0,
       day: draft.day,
       lineName: draft.lineName.trim(),
       customerName: draft.customerName.trim(),
-      paymentStatus: draft.paymentStatus,
+      paymentStatus: draft.paymentStatus || (bankTotal >= totalSales && totalSales > 0 ? 'จ่ายเต็ม' : bankTotal > 0 ? 'มัดจำ' : 'ยังไม่ได้ชำระ'),
       shippingStatus: draft.shippingStatus,
       lines,
       totalSales,
-      bankTotal: lines.reduce((sum, line) => sum + line.bankAmount, 0),
-      depositTotal: lines.reduce((sum, line) => sum + line.depositAmount, 0),
+      grossSales,
+      exchangeRate: rate,
+      isCampaign: draft.isCampaign,
+      campaignDiscount,
+      bankTotal,
+      depositTotal: Math.max(0, totalSales - bankTotal),
       profitAmount,
       profitPercent: profitIsComplete && totalSales > 0 ? (profitAmount! / totalSales) * 100 : null,
       quantity: lines.reduce((sum, line) => sum + line.quantity, 0),
@@ -1143,6 +1395,7 @@ function App() {
       const alreadySaved = existing.some((item) => item.id === order.id)
       return { ...current, [sheetId]: alreadySaved ? existing.map((item) => item.id === order.id ? order : item) : [order, ...existing] }
     })
+    if (rate !== exchangeRate) setExchangeRate(rate)
   }
 
   const currentMonthSheet = getCurrentMonthSheet(mergedDataBySheet)
@@ -1165,10 +1418,10 @@ function App() {
 
         <Routes>
           <Route path="/admin/home" element={<HomePage dataBySheet={mergedDataBySheet} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} />} />
-          <Route path="/admin/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} />} />
-          <Route path="/admin/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} />} />
-          <Route path="/admin/sheets/:sheetId/orders/:orderId" element={<OrderDetailsRoute dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onSaveOrder={createLocalOrder} />} />
-          <Route path="/admin/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} loading={loading} />} />
+          <Route path="/admin/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} />} />
+          <Route path="/admin/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} />} />
+          <Route path="/admin/sheets/:sheetId/orders/:orderId" element={<OrderDetailsRoute dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onSaveOrder={createLocalOrder} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} />} />
+          <Route path="/admin/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} monthlyExpensesBySheet={monthlyExpensesBySheet} loading={loading} />} />
           <Route path="*" element={<Navigate to="/admin/home" replace />} />
         </Routes>
       </div>
@@ -1182,24 +1435,32 @@ function SheetRouteView({
   loading,
   onRefresh,
   onCreateOrder,
+  monthlyExpensesBySheet,
+  onSaveMonthlyExpenses,
+  exchangeRate,
+  onExchangeRateChange,
 }: {
   sheet?: SheetDefinition
   dataBySheet: Record<string, SheetDataState>
   loading: boolean
   onRefresh: () => void
   onCreateOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => void
+  monthlyExpensesBySheet: Record<string, MonthlyExpense[]>
+  onSaveMonthlyExpenses: (sheetId: string, expenses: MonthlyExpense[]) => void
+  exchangeRate: number
+  onExchangeRateChange: (value: number) => void
 }) {
   const { sheetId } = useParams()
   const sheet = explicitSheet ?? SHEETS.find((item) => item.id === sheetId)
   if (!sheet) return <Navigate to="/admin/home" replace />
-  return <SheetOrdersPage key={sheet.id} sheet={sheet} sheetData={dataBySheet[sheet.id]} loading={loading} onRefresh={onRefresh} onCreateOrder={onCreateOrder} />
+  return <SheetOrdersPage key={sheet.id} sheet={sheet} sheetData={dataBySheet[sheet.id]} loading={loading} onRefresh={onRefresh} onCreateOrder={onCreateOrder} monthlyExpenses={monthlyExpensesBySheet[sheet.id] ?? []} onSaveMonthlyExpenses={onSaveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} />
 }
 
-function OrderDetailsRoute({ dataBySheet, loading, onRefresh, onSaveOrder }: { dataBySheet: Record<string, SheetDataState>; loading: boolean; onRefresh: () => void; onSaveOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => void }) {
+function OrderDetailsRoute({ dataBySheet, loading, onRefresh, onSaveOrder, exchangeRate, onExchangeRateChange }: { dataBySheet: Record<string, SheetDataState>; loading: boolean; onRefresh: () => void; onSaveOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => void; exchangeRate: number; onExchangeRateChange: (value: number) => void }) {
   const { sheetId } = useParams()
   const sheet = SHEETS.find((item) => item.id === sheetId)
   if (!sheet) return <Navigate to="/admin/home" replace />
-  return <OrderDetailsPage sheet={sheet} sheetData={dataBySheet[sheet.id]} loading={loading} onRefresh={onRefresh} onSaveOrder={onSaveOrder} />
+  return <OrderDetailsPage sheet={sheet} sheetData={dataBySheet[sheet.id]} loading={loading} onRefresh={onRefresh} onSaveOrder={onSaveOrder} exchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} />
 }
 
 export default App

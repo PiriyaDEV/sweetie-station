@@ -21,6 +21,8 @@ export type SheetOrderLine = {
   depositAmount: number
   profitAmount: number | null
   profitPercent: number | null
+  costRMB?: number | null
+  costTHB?: number | null
   images: string[]
   attributes: SheetLineAttribute[]
 }
@@ -35,6 +37,10 @@ export type SheetOrder = {
   shippingStatus: string
   lines: SheetOrderLine[]
   totalSales: number
+  grossSales?: number
+  exchangeRate?: number
+  isCampaign?: boolean
+  campaignDiscount?: number
   bankTotal: number
   depositTotal: number
   profitAmount: number | null
@@ -42,6 +48,15 @@ export type SheetOrder = {
   quantity: number
   isLocal?: boolean
   isOverride?: boolean
+}
+
+export type MonthlyExpenseCategory = 'shipping' | 'packaging' | 'ads' | 'other'
+
+export type MonthlyExpense = {
+  id: string
+  category: MonthlyExpenseCategory
+  description: string
+  amount: number
 }
 
 export type SheetDataState = {
@@ -144,6 +159,7 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
     deposit: findHeaderIndex(headers, ['ราคามัดจำ']),
     profit: findHeaderIndex(headers, ['กำไรสุทธิ', 'กำไร']),
     costTHB: findHeaderIndex(headers, ['ต้นทุน(บาท)', 'ต้นทุน(THB)']),
+    costRMB: findHeaderIndex(headers, ['ต้นทุน(RMB)', 'ต้นทุน(หยวน)', 'ค่าสินค้า(Y)', 'ราคาจีน']),
   }
   const baseColumns = new Set(Object.values(column).filter((index) => index >= 0))
   const orders: SheetOrder[] = []
@@ -162,6 +178,7 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
     const depositText = cell(row, column.deposit)
     const profitText = cell(row, column.profit)
     const costText = cell(row, column.costTHB)
+    const costRMBText = cell(row, column.costRMB)
     if (date) currentDay = date
 
     if (lineName) {
@@ -187,7 +204,7 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
     if (!currentOrder) return
 
     const paymentStatus = row.find((value) => ['จ่ายเต็ม', 'มัดจำ'].includes(value.trim()))?.trim() ?? ''
-    const shippingStatus = row.find((value) => ['รอเข้าไทย', 'ส่งแล้ว'].includes(value.trim()))?.trim() ?? ''
+    const shippingStatus = row.find((value) => ['ยังไม่ได้สั่ง', 'สั่งแล้ว', 'รอเข้าไทย', 'ส่งแล้ว'].includes(value.trim()))?.trim() ?? ''
     if (paymentStatus) currentOrder.paymentStatus = paymentStatus
     if (shippingStatus) currentOrder.shippingStatus = shippingStatus
 
@@ -198,7 +215,7 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
         : []
     })
 
-    const hasLineData = Boolean(lineName || customerName || itemName || quantityText || bankText || depositText)
+    const hasLineData = Boolean(lineName || customerName || itemName || quantityText || bankText || depositText || costText || costRMBText)
     // Summary rows only contain a total in the price column; they are not order lines.
     if (!hasLineData) return
 
@@ -213,6 +230,8 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
       depositAmount: numberFromCell(depositText),
       profitAmount,
       profitPercent: profitAmount !== null && saleValue > 0 ? (profitAmount / saleValue) * 100 : null,
+      costRMB: costRMBText ? numberFromCell(costRMBText) : null,
+      costTHB: costText ? numberFromCell(costText) : null,
       images: orderImages[sheet.id]?.[String(rowNumber)] ?? [],
       attributes,
     }
@@ -274,6 +293,11 @@ export async function fetchAllSheets(signal?: AbortSignal): Promise<Record<strin
 }
 
 export function formatOrderDate(day: string, sheet: SheetDefinition, locale: string) {
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day)
+  if (isoMatch) {
+    const date = new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])))
+    return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(date)
+  }
   const value = Number(day)
   if (Number.isFinite(value) && value >= 30000) {
     const date = new Date(Date.UTC(1899, 11, 30) + value * 86_400_000)
