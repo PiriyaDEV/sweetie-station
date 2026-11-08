@@ -19,6 +19,7 @@ export type SheetOrderLine = {
   bankAmount: number
   depositAmount: number
   profitAmount: number | null
+  profitPercent: number | null
   images: string[]
   attributes: SheetLineAttribute[]
 }
@@ -35,6 +36,8 @@ export type SheetOrder = {
   totalSales: number
   bankTotal: number
   depositTotal: number
+  profitAmount: number | null
+  profitPercent: number | null
   quantity: number
   isLocal?: boolean
 }
@@ -138,6 +141,7 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
     bank: findHeaderIndex(headers, ['BANK']),
     deposit: findHeaderIndex(headers, ['ราคามัดจำ']),
     profit: findHeaderIndex(headers, ['กำไรสุทธิ', 'กำไร']),
+    costTHB: findHeaderIndex(headers, ['ต้นทุน(บาท)', 'ต้นทุน(THB)']),
   }
   const baseColumns = new Set(Object.values(column).filter((index) => index >= 0))
   const orders: SheetOrder[] = []
@@ -155,6 +159,7 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
     const bankText = cell(row, column.bank)
     const depositText = cell(row, column.deposit)
     const profitText = cell(row, column.profit)
+    const costText = cell(row, column.costTHB)
     if (date) currentDay = date
 
     if (lineName) {
@@ -170,6 +175,8 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
         totalSales: 0,
         bankTotal: 0,
         depositTotal: 0,
+        profitAmount: null,
+        profitPercent: null,
         quantity: 0,
       }
       orders.push(currentOrder)
@@ -193,14 +200,17 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
     // Summary rows only contain a total in the price column; they are not order lines.
     if (!hasLineData) return
 
+    const saleValue = numberFromCell(salePriceText)
+    const profitAmount = profitText ? numberFromCell(profitText) : costText && salePriceText ? saleValue - numberFromCell(costText) : null
     const line: SheetOrderLine = {
       row: rowNumber,
       itemName,
       quantity: numberFromCell(quantityText),
-      salePrice: numberFromCell(salePriceText),
+      salePrice: saleValue,
       bankAmount: numberFromCell(bankText),
       depositAmount: numberFromCell(depositText),
-      profitAmount: profitText ? numberFromCell(profitText) : null,
+      profitAmount,
+      profitPercent: profitAmount !== null && saleValue > 0 ? (profitAmount / saleValue) * 100 : null,
       images: orderImages[sheet.id]?.[String(rowNumber)] ?? [],
       attributes,
     }
@@ -209,6 +219,12 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
     currentOrder.bankTotal += line.bankAmount
     currentOrder.depositTotal += line.depositAmount
     currentOrder.quantity += line.quantity
+  })
+
+  orders.forEach((order) => {
+    const hasProfitForEveryLine = order.lines.length > 0 && order.lines.every((line) => line.profitAmount !== null)
+    order.profitAmount = hasProfitForEveryLine ? order.lines.reduce((sum, line) => sum + (line.profitAmount ?? 0), 0) : null
+    order.profitPercent = hasProfitForEveryLine && order.totalSales > 0 ? ((order.profitAmount ?? 0) / order.totalSales) * 100 : null
   })
 
   return orders.filter((order) => order.lines.length > 0)

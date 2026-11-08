@@ -56,6 +56,11 @@ function formatMoney(value: number, language: string) {
   }).format(value)
 }
 
+function formatProfitPercent(value: number, language: string) {
+  const sign = value > 0 ? '+' : value < 0 ? '−' : ''
+  return `${sign}${formatMoney(Math.abs(value), language)}%`
+}
+
 function loadLocalOrders(): Record<string, SheetOrder[]> {
   try {
     const saved = localStorage.getItem(LOCAL_ORDERS_KEY)
@@ -292,6 +297,8 @@ function OrderListRow({ order, sheet }: { order: SheetOrder; sheet: SheetDefinit
   const navigate = useNavigate()
   const language = i18n.resolvedLanguage ?? 'en'
   const image = order.lines.flatMap((line) => line.images)[0]
+  const profitClass = order.profitPercent === null ? 'unknown' : order.profitPercent < 0 ? 'negative' : 'positive'
+  const profitLabel = order.profitPercent === null ? t('orders.profitUnavailable') : formatProfitPercent(order.profitPercent, language)
 
   return (
     <button
@@ -310,6 +317,7 @@ function OrderListRow({ order, sheet }: { order: SheetOrder; sheet: SheetDefinit
           <StatusBadge type="payment" status={order.paymentStatus} />
           <StatusBadge type="shipping" status={order.shippingStatus} />
           {order.isLocal && <span className="status-badge local">{t('orders.deviceOnly')}</span>}
+          <span className={`profit-badge ${profitClass}`}>{t('orders.profit')} {profitLabel}</span>
         </span>
       </span>
       <span className="order-row-total">{formatMoney(order.totalSales, language)}<small>THB</small></span>
@@ -668,6 +676,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh }: { sheet: She
 
           <section className="detail-card payment-card">
             <div><span>{t('detail.totalSales')}</span><strong>{formatMoney(order.totalSales, language)} THB</strong></div>
+            {order.profitPercent !== null && <div><span>{t('detail.profitMargin')}</span><strong className={`profit-text ${order.profitPercent < 0 ? 'negative' : 'positive'}`}>{formatProfitPercent(order.profitPercent, language)}</strong></div>}
             {order.bankTotal > 0 && <div><span>{t('detail.bank')}</span><strong>{formatMoney(order.bankTotal, language)} THB</strong></div>}
             {order.depositTotal > 0 && <div><span>{t('detail.deposit')}</span><strong>{formatMoney(order.depositTotal, language)} THB</strong></div>}
           </section>
@@ -821,6 +830,7 @@ function App() {
       bankAmount: Number(line.bankAmount) || 0,
       depositAmount: Number(line.depositAmount) || 0,
       profitAmount: null,
+      profitPercent: null,
       images: line.image ? [line.image] : [],
       attributes: [],
     }))
@@ -836,6 +846,8 @@ function App() {
       totalSales: lines.reduce((sum, line) => sum + line.salePrice, 0),
       bankTotal: lines.reduce((sum, line) => sum + line.bankAmount, 0),
       depositTotal: lines.reduce((sum, line) => sum + line.depositAmount, 0),
+      profitAmount: null,
+      profitPercent: null,
       quantity: lines.reduce((sum, line) => sum + line.quantity, 0),
       isLocal: true,
     }
