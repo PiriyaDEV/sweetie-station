@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
   BarChart3,
@@ -14,6 +14,7 @@ import {
   Search,
   X,
 } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
 import {
@@ -33,6 +34,8 @@ type DraftLine = {
   bankAmount: string
   depositAmount: string
   image: string
+  imageName: string
+  imageIsNew: boolean
 }
 
 type OrderDraft = {
@@ -147,23 +150,14 @@ function LanguageToggle() {
 
 function SplashScreen() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => navigate('/home', { replace: true }), 1800)
-    return () => window.clearTimeout(timeoutId)
-  }, [navigate])
 
   return (
     <section className="app-screen splash-screen" aria-label={t('screen.splash')}>
-      <button type="button" className="splash-continue" onClick={() => navigate('/home')}>
-        <span className="splash-content">
-          <SweetieMark />
-          <span className="splash-tagline">{t('splash.tagline')}</span>
-        </span>
-        <span className="splash-loading" aria-hidden="true"><i /></span>
-        <span className="sr-only">{t('splash.continue')}</span>
-      </button>
+      <div className="splash-content">
+        <SweetieMark />
+        <p className="splash-tagline">{t('splash.tagline')}</p>
+      </div>
+      <span className="splash-loading" aria-hidden="true"><i /></span>
     </section>
   )
 }
@@ -206,6 +200,35 @@ function HomePage({
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const language = i18n.resolvedLanguage ?? 'en'
+  const [query, setQuery] = useState('')
+  const [kindFilter, setKindFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('month')
+
+  const sheetRows = SHEETS.map((sheet, index) => ({
+    sheet,
+    index,
+    orders: dataBySheet[sheet.id]?.orders ?? EMPTY_ORDERS,
+    error: dataBySheet[sheet.id]?.error,
+  }))
+  const visibleSheets = sheetRows
+    .filter(({ sheet }) => kindFilter === 'all' || sheet.kind === kindFilter)
+    .filter(({ sheet }) => t(sheet.titleKey).toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+    .filter(({ orders }) => statusFilter === 'all' || orders.some((order) => {
+      if (statusFilter === 'paid') return order.paymentStatus === 'จ่ายเต็ม'
+      if (statusFilter === 'deposit') return order.paymentStatus === 'มัดจำ'
+      if (statusFilter === 'shipped') return order.shippingStatus === 'ส่งแล้ว'
+      if (statusFilter === 'inbound') return order.shippingStatus === 'รอเข้าไทย'
+      if (statusFilter === 'unlisted') return !order.paymentStatus && !order.shippingStatus
+      return true
+    }))
+    .sort((a, b) => {
+      if (sortBy === 'sales-desc') return sheetTotal(b.orders) - sheetTotal(a.orders)
+      if (sortBy === 'sales-asc') return sheetTotal(a.orders) - sheetTotal(b.orders)
+      if (sortBy === 'orders-desc') return b.orders.length - a.orders.length
+      if (sortBy === 'name') return t(a.sheet.titleKey).localeCompare(t(b.sheet.titleKey))
+      return a.index - b.index
+    })
 
   return (
     <section className="app-screen home-screen" aria-label={t('screen.home')}>
@@ -224,35 +247,49 @@ function HomePage({
           </button>
         </div>
 
-        <div className="sheet-grid">
-          {SHEETS.map((sheet) => {
-            const sheetData = dataBySheet[sheet.id]
-            const orders = sheetData?.orders ?? []
-            const image = getPreviewImage(orders)
-            return (
-              <button
-                type="button"
-                className="sheet-card"
-                key={sheet.id}
-                onClick={() => navigate(`/sheets/${sheet.id}`)}
-                aria-label={`${t(sheet.titleKey)} · ${orders.length} ${t('orders.orders')}`}
-              >
-                {image
-                  ? <img className="sheet-card-image" src={image} alt="" loading="lazy" />
-                  : <span className={`sheet-card-placeholder ${sheet.kind}`}><CalendarDays size={25} /></span>}
-                <span className="sheet-card-topline">
-                  <span className={`sheet-kind ${sheet.kind}`}>{t(`sheets.kind.${sheet.kind}`)}</span>
-                  <ArrowRight size={15} />
-                </span>
-                <span className="sheet-card-caption">
-                  <strong>{t(sheet.titleKey)}</strong>
-                  <span>{sheetData?.error ? t('sheet.errorShort') : loading && !sheetData ? t('sheet.loadingShort') : t('sheets.orderCount', { count: orders.length })}</span>
-                  <b>{sheetData?.error ? '—' : `${formatMoney(sheetTotal(orders), language)} THB`}</b>
-                </span>
-              </button>
-            )
-          })}
+        <label className="order-search">
+          <Search size={16} />
+          <span className="sr-only">{t('sheets.search')}</span>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('sheets.search')} />
+        </label>
+        <div className="sheet-filter-row">
+          <label><span className="sr-only">{t('filters.sheetType')}</span><select value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">{t('filters.allSheets')}</option><option value="sales">{t('sheets.kind.sales')}</option><option value="haul">{t('sheets.kind.haul')}</option></select></label>
+          <label><span className="sr-only">{t('filters.status')}</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
+          <label><span className="sr-only">{t('filters.sortSheets')}</span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="month">{t('filters.monthOrder')}</option><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="orders-desc">{t('filters.ordersHigh')}</option><option value="name">{t('filters.nameAZ')}</option></select></label>
         </div>
+
+        {loading && Object.keys(dataBySheet).length === 0 ? <div className="sheet-grid" aria-label={t('sheet.loading')}>
+          {Array.from({ length: 6 }, (_, index) => <div className="sheet-card-skeleton" key={index}><i /><b /><b /></div>)}
+        </div> : <>
+          {!loading && visibleSheets.length === 0 && <p className="sheet-message">{t('sheets.noMatch')}</p>}
+          <div className="sheet-grid">
+            {visibleSheets.map(({ sheet, orders, error }) => {
+              const image = getPreviewImage(orders)
+              return (
+                <button
+                  type="button"
+                  className="sheet-card"
+                  key={sheet.id}
+                  onClick={() => navigate(`/sheets/${sheet.id}`)}
+                  aria-label={`${t(sheet.titleKey)} · ${orders.length} ${t('orders.orders')}`}
+                >
+                  {image
+                    ? <img className="sheet-card-image" src={image} alt="" loading="lazy" />
+                    : <span className={`sheet-card-placeholder ${sheet.kind}`}><CalendarDays size={25} /></span>}
+                  <span className="sheet-card-topline">
+                    <span className={`sheet-kind ${sheet.kind}`}>{t(`sheets.kind.${sheet.kind}`)}</span>
+                    <ArrowRight size={15} />
+                  </span>
+                  <span className="sheet-card-caption">
+                    <strong>{t(sheet.titleKey)}</strong>
+                    <span>{error ? t('sheet.errorShort') : t('sheets.orderCount', { count: orders.length })}</span>
+                    <b>{error ? '—' : `${formatMoney(sheetTotal(orders), language)} THB`}</b>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </>}
       </div>
       <BottomNavigation />
     </section>
@@ -310,7 +347,7 @@ function emptyDraft(sheet: SheetDefinition): OrderDraft {
     day: getDefaultDay(sheet),
     paymentStatus: '',
     shippingStatus: '',
-    lines: [{ itemName: '', quantity: '1', salePrice: '', bankAmount: '', depositAmount: '', image: '' }],
+    lines: [{ itemName: '', quantity: '1', salePrice: '', bankAmount: '', depositAmount: '', image: '', imageName: '', imageIsNew: false }],
   }
 }
 
@@ -345,7 +382,7 @@ function CreateOrderDialog({
   const [imageError, setImageError] = useState('')
 
   const updateField = <K extends keyof OrderDraft>(key: K, value: OrderDraft[K]) => setDraft((current) => ({ ...current, [key]: value }))
-  const updateLine = (index: number, key: keyof DraftLine, value: string) => {
+  const updateLine = (index: number, key: 'itemName' | 'quantity' | 'salePrice' | 'bankAmount' | 'depositAmount' | 'image' | 'imageName', value: string) => {
     setDraft((current) => ({
       ...current,
       lines: current.lines.map((line, lineIndex) => lineIndex === index ? { ...line, [key]: value } : line),
@@ -361,6 +398,8 @@ function CreateOrderDialog({
     try {
       const image = await imageToDataUrl(file)
       updateLine(index, 'image', image)
+      updateLine(index, 'imageName', '')
+      setDraft((current) => ({ ...current, lines: current.lines.map((line, lineIndex) => lineIndex === index ? { ...line, imageIsNew: true } : line) }))
       setImageError('')
     } catch {
       setImageError(t('createOrder.imageReadError'))
@@ -374,7 +413,7 @@ function CreateOrderDialog({
     onSave(draft)
   }
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="create-order-modal" role="dialog" aria-modal="true" aria-labelledby="create-order-heading">
         <header className="modal-header">
@@ -415,18 +454,19 @@ function CreateOrderDialog({
                 </button>
               </div>
 
-              {line.image && <div className="draft-image-preview"><img src={line.image} alt={t('createOrder.selectedImage')} /><button type="button" onClick={() => updateLine(index, 'image', '')}>{t('createOrder.removeImage')}</button></div>}
+              {line.image && <div className="draft-image-preview"><img src={line.image} alt={t('createOrder.selectedImage')} /><button type="button" onClick={() => { updateLine(index, 'image', ''); updateLine(index, 'imageName', ''); setDraft((current) => ({ ...current, lines: current.lines.map((item, lineIndex) => lineIndex === index ? { ...item, imageIsNew: false } : item) })) }}>{t('createOrder.removeImage')}</button></div>}
+              {line.image && line.imageIsNew && <label>{t('createOrder.photoName')} ({t('createOrder.optional')})<input value={line.imageName} onChange={(event) => updateLine(index, 'imageName', event.target.value)} placeholder={t('createOrder.photoNamePlaceholder')} /></label>}
 
               {openPicker === index && <div className="month-image-picker">
                 <input value={imageQuery} onChange={(event) => setImageQuery(event.target.value)} placeholder={t('createOrder.filterMonthImages')} aria-label={t('createOrder.filterMonthImages')} />
                 <div className="month-image-grid">
-                  {filteredImages.map((choice) => <button type="button" key={choice.url} title={choice.label} onClick={() => { updateLine(index, 'image', choice.url); setOpenPicker(null) }}><img src={choice.url} alt={choice.label} /></button>)}
+                  {filteredImages.map((choice) => <button type="button" key={choice.url} title={choice.label} onClick={() => { updateLine(index, 'image', choice.url); updateLine(index, 'imageName', ''); setDraft((current) => ({ ...current, lines: current.lines.map((line, lineIndex) => lineIndex === index ? { ...line, imageIsNew: false } : line) })); setOpenPicker(null) }}><img src={choice.url} alt={choice.label} /></button>)}
                   {filteredImages.length === 0 && <span className="picker-empty">{t('createOrder.noMonthImages')}</span>}
                 </div>
               </div>}
             </section>
           ))}
-          <button type="button" className="add-line-button" onClick={() => setDraft((current) => ({ ...current, lines: [...current.lines, { itemName: '', quantity: '1', salePrice: '', bankAmount: '', depositAmount: '', image: '' }] }))}><Plus size={15} /> {t('createOrder.addItem')}</button>
+          <button type="button" className="add-line-button" onClick={() => setDraft((current) => ({ ...current, lines: [...current.lines, { itemName: '', quantity: '1', salePrice: '', bankAmount: '', depositAmount: '', image: '', imageName: '', imageIsNew: false }] }))}><Plus size={15} /> {t('createOrder.addItem')}</button>
 
           <div className="form-grid two-columns">
             <label>{t('createOrder.paymentStatus')}<select value={draft.paymentStatus} onChange={(event) => updateField('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option></select></label>
@@ -440,7 +480,8 @@ function CreateOrderDialog({
           </footer>
         </form>
       </section>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -460,14 +501,56 @@ function SheetOrdersPage({
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const language = i18n.resolvedLanguage ?? 'en'
+  const scrollRootRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('sales-desc')
+  const [visibleCount, setVisibleCount] = useState(10)
   const [createOpen, setCreateOpen] = useState(false)
   const [notice, setNotice] = useState('')
   const orders = sheetData?.orders ?? EMPTY_ORDERS
-  const filteredOrders = orders.filter((order) => `${order.lineName} ${order.customerName} ${order.lines.map((line) => line.itemName).join(' ')}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+
+  const sortedOrders = useMemo(() => {
+    const matching = orders.filter((order) => {
+      const searchText = `${order.lineName} ${order.customerName} ${order.lines.map((line) => line.itemName).join(' ')} ${order.paymentStatus} ${order.shippingStatus}`.toLocaleLowerCase()
+      if (!searchText.includes(query.toLocaleLowerCase())) return false
+      if (statusFilter === 'paid') return order.paymentStatus === 'จ่ายเต็ม'
+      if (statusFilter === 'deposit') return order.paymentStatus === 'มัดจำ'
+      if (statusFilter === 'shipped') return order.shippingStatus === 'ส่งแล้ว'
+      if (statusFilter === 'inbound') return order.shippingStatus === 'รอเข้าไทย'
+      if (statusFilter === 'unlisted') return !order.paymentStatus && !order.shippingStatus
+      return true
+    })
+    return matching.sort((a, b) => {
+      if (sortBy === 'sales-asc') return a.totalSales - b.totalSales
+      if (sortBy === 'status') return `${a.paymentStatus}-${a.shippingStatus}`.localeCompare(`${b.paymentStatus}-${b.shippingStatus}`)
+      if (sortBy === 'oldest') return a.sheetRow - b.sheetRow
+      if (sortBy === 'newest') return Number(b.isLocal) - Number(a.isLocal) || b.sheetRow - a.sheetRow
+      return b.totalSales - a.totalSales
+    })
+  }, [orders, query, sortBy, statusFilter])
+  const visibleOrders = sortedOrders.slice(0, visibleCount)
+  const hasMore = visibleOrders.length < sortedOrders.length
+
+  useEffect(() => {
+    const root = scrollRootRef.current
+    const sentinel = sentinelRef.current
+    if (!root || !sentinel || !hasMore || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) setVisibleCount((count) => Math.min(count + 10, sortedOrders.length))
+    }, { root, rootMargin: '140px' })
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, sortedOrders.length, visibleCount])
+
+  const updateQuery = (value: string) => { setQuery(value); setVisibleCount(10) }
+  const updateStatus = (value: string) => { setStatusFilter(value); setVisibleCount(10) }
+  const updateSort = (value: string) => { setSortBy(value); setVisibleCount(10) }
+
   const imageChoices = useMemo(() => {
     const seen = new Set<string>()
-    return orders.flatMap((order) => order.lines.flatMap((line, lineIndex) => line.images.map((url) => ({ url, label: line.itemName || order.customerName || order.lineName || t('createOrder.itemNumber', { number: lineIndex + 1 }) }))))
+    return orders.flatMap((order) => order.lines.flatMap((line, lineIndex) => line.images.map((url) => ({ url, label: line.itemName || line.imageName || order.customerName || order.lineName || t('createOrder.itemNumber', { number: lineIndex + 1 }) }))))
       .filter((choice) => {
         if (seen.has(choice.url)) return false
         seen.add(choice.url)
@@ -483,8 +566,8 @@ function SheetOrdersPage({
   }
 
   return (
-    <section className="app-screen home-screen" aria-label={t('screen.sheetOrders')}>
-      <div className="home-scroll-area">
+    <section className="app-screen home-screen orders-screen" aria-label={t('screen.sheetOrders')}>
+      <div className="home-scroll-area" ref={scrollRootRef}>
         <button type="button" className="screen-back-button" onClick={() => navigate('/home')} aria-label={t('nav.backToSheets')}>
           <ChevronLeft size={18} /> {t('nav.allSheets')}
         </button>
@@ -495,26 +578,32 @@ function SheetOrdersPage({
         </header>
 
         <div className="order-list-heading">
-          <div><h2>{t('orders.title')}</h2><span>{t('sheets.orderCount', { count: filteredOrders.length })}</span></div>
+          <div><h2>{t('orders.title')}</h2><span>{t('orders.resultCount', { shown: visibleOrders.length, total: sortedOrders.length })}</span></div>
           <button type="button" className="view-all" onClick={onRefresh} disabled={loading}><RefreshCw size={13} className={loading ? 'refreshing-icon' : ''} />{loading ? t('orders.refreshing') : t('orders.refresh')}</button>
         </div>
 
         <label className="order-search">
           <Search size={16} />
           <span className="sr-only">{t('orders.search')}</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('orders.search')} />
+          <input value={query} onChange={(event) => updateQuery(event.target.value)} placeholder={t('orders.search')} />
         </label>
-        <button type="button" className="create-order-list-button" onClick={() => setCreateOpen(true)}><Plus size={17} /> {t('createOrder.open')}</button>
+        <div className="order-filter-row">
+          <label><span className="sr-only">{t('filters.status')}</span><select value={statusFilter} onChange={(event) => updateStatus(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
+          <label><span className="sr-only">{t('filters.sort')}</span><select value={sortBy} onChange={(event) => updateSort(event.target.value)}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="status">{t('filters.statusAZ')}</option><option value="newest">{t('filters.newest')}</option><option value="oldest">{t('filters.oldest')}</option></select></label>
+        </div>
 
         {sheetData?.error && <div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div>}
-        {!sheetData && loading && <p className="sheet-message">{t('sheet.loading')}</p>}
+        {!sheetData && loading && <div className="order-list-table">{Array.from({ length: 6 }, (_, index) => <div className="skeleton-order-row" key={index}><i /><span><b /><b /><em /></span><b /></div>)}</div>}
         {sheetData && !sheetData.error && orders.length === 0 && <p className="sheet-message">{t('sheet.empty')}</p>}
-        {query && filteredOrders.length === 0 && <p className="sheet-message">{t('orders.noMatch')}</p>}
+        {query && sortedOrders.length === 0 && <p className="sheet-message">{t('orders.noMatch')}</p>}
 
         <div className="order-list-table">
-          {filteredOrders.map((order) => <OrderListRow key={order.id} order={order} sheet={sheet} />)}
+          {visibleOrders.map((order) => <OrderListRow key={order.id} order={order} sheet={sheet} />)}
         </div>
+        {hasMore && <div className="load-more-sentinel" ref={sentinelRef} aria-live="polite"><span className="loading-more-dot" /> {t('orders.loadingMore')}</div>}
+        {!hasMore && sortedOrders.length > 10 && <p className="list-end-note">{t('orders.endOfList')}</p>}
       </div>
+      <div className="create-order-dock"><button type="button" className="create-order-list-button" onClick={() => setCreateOpen(true)}><Plus size={17} /> {t('createOrder.open')}</button></div>
       <BottomNavigation />
       {createOpen && <CreateOrderDialog sheet={sheet} imageChoices={imageChoices} onClose={() => setCreateOpen(false)} onSave={saveLocalOrder} />}
       {notice && <p className="app-toast" role="status">{notice}</p>}
@@ -527,12 +616,19 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh }: { sheet: She
   const navigate = useNavigate()
   const { orderId } = useParams()
   const language = i18n.resolvedLanguage ?? 'en'
+  const [itemQuery, setItemQuery] = useState('')
+  const [itemSort, setItemSort] = useState('sales-desc')
   const order = sheetData?.orders.find((item) => item.id === orderId)
-  if (loading && !sheetData) return <section className="app-screen detail-screen"><p className="sheet-message">{t('sheet.loading')}</p></section>
+  if (loading && !sheetData) return <section className="app-screen detail-screen"><div className="detail-scroll-area"><div className="detail-skeleton-hero" /><div className="detail-skeleton-block" /><div className="detail-skeleton-block" /></div></section>
   if (sheetData?.error) return <section className="app-screen detail-screen"><div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div></section>
   if (!order) return <Navigate to={`/sheets/${sheet.id}`} replace />
 
   const heroImage = order.lines.flatMap((line) => line.images)[0]
+  const visibleLines = order.lines.filter((line) => `${line.itemName} ${line.imageName ?? ''}`.toLocaleLowerCase().includes(itemQuery.toLocaleLowerCase())).sort((a, b) => {
+    if (itemSort === 'sales-asc') return a.salePrice - b.salePrice
+    if (itemSort === 'name') return a.itemName.localeCompare(b.itemName)
+    return b.salePrice - a.salePrice
+  })
 
   return (
     <section className="app-screen detail-screen" aria-label={t('screen.detail')}>
@@ -565,20 +661,26 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh }: { sheet: She
 
           <section className="detail-section">
             <h3>{t('detail.items')}</h3>
+            <div className="item-list-controls">
+              <input value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder={t('orders.searchItems')} aria-label={t('orders.searchItems')} />
+              <select value={itemSort} onChange={(event) => setItemSort(event.target.value)} aria-label={t('filters.sortItems')}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="name">{t('filters.nameAZ')}</option></select>
+            </div>
             <div className="item-list">
-              {order.lines.map((line, index) => (
+              {visibleLines.map((line, index) => (
                 <article className="item-row" key={`${order.id}-${line.row || index}`}>
                   {line.images.length > 0
                     ? <div className="item-images">{line.images.slice(0, 3).map((image, imageIndex) => <img key={`${image.slice(0, 48)}-${imageIndex}`} src={image} alt={t('detail.itemImage', { number: index + 1, image: imageIndex + 1 })} loading="lazy" />)}{line.images.length > 3 && <span>+{line.images.length - 3}</span>}</div>
                     : <span className="item-index"><Package size={15} /></span>}
                   <div className="item-description">
                     <strong>{line.itemName || t('detail.itemNumber', { number: index + 1 })}</strong>
+                    {line.imageName && <span className="item-photo-name">{t('detail.photoName')}: {line.imageName}</span>}
                     <span>{t('detail.quantity', { count: line.quantity, unit: line.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</span>
                     {line.attributes.length > 0 && <div className="item-attributes">{line.attributes.slice(0, 3).map((attribute) => <span key={`${attribute.key}-${attribute.value}`}>{fieldLabel(attribute.key, t)}: {attribute.value}</span>)}</div>}
                   </div>
                   <strong className="item-price">{line.salePrice ? `${formatMoney(line.salePrice, language)} THB` : '—'}</strong>
                 </article>
               ))}
+              {visibleLines.length === 0 && <p className="picker-empty">{t('orders.noMatch')}</p>}
             </div>
           </section>
 
@@ -597,13 +699,37 @@ function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, S
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const currentSheet = getCurrentMonthSheet(dataBySheet)
-  const currentOrders = dataBySheet[currentSheet.id]?.orders ?? []
+  const currentOrders = dataBySheet[currentSheet.id]?.orders ?? EMPTY_ORDERS
   const language = i18n.resolvedLanguage ?? 'en'
-  const shipped = currentOrders.filter((order) => order.shippingStatus === 'ส่งแล้ว').length
-  const inbound = currentOrders.filter((order) => order.shippingStatus === 'รอเข้าไทย').length
-  const paid = currentOrders.filter((order) => order.paymentStatus === 'จ่ายเต็ม').length
-  const deposits = currentOrders.filter((order) => order.paymentStatus === 'มัดจำ').length
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [monthlySort, setMonthlySort] = useState('sales-desc')
+  const matchesStatus = (order: SheetOrder) => {
+    if (statusFilter === 'paid') return order.paymentStatus === 'จ่ายเต็ม'
+    if (statusFilter === 'deposit') return order.paymentStatus === 'มัดจำ'
+    if (statusFilter === 'shipped') return order.shippingStatus === 'ส่งแล้ว'
+    if (statusFilter === 'inbound') return order.shippingStatus === 'รอเข้าไทย'
+    if (statusFilter === 'unlisted') return !order.paymentStatus && !order.shippingStatus
+    return true
+  }
+  const scopedOrders = currentOrders.filter(matchesStatus)
+  const shipped = scopedOrders.filter((order) => order.shippingStatus === 'ส่งแล้ว').length
+  const inbound = scopedOrders.filter((order) => order.shippingStatus === 'รอเข้าไทย').length
+  const paid = scopedOrders.filter((order) => order.paymentStatus === 'จ่ายเต็ม').length
+  const deposits = scopedOrders.filter((order) => order.paymentStatus === 'มัดจำ').length
   const salesSheets = SHEETS.filter((sheet) => sheet.kind === 'sales')
+  const populatedSalesSheets = salesSheets.filter((sheet) => (dataBySheet[sheet.id]?.orders.length ?? 0) > 0)
+  const averageSales = populatedSalesSheets.length
+    ? populatedSalesSheets.reduce((sum, sheet) => sum + sheetTotal(dataBySheet[sheet.id]?.orders ?? []), 0) / populatedSalesSheets.length
+    : 0
+  const recordedProfits = SHEETS.flatMap((sheet) => dataBySheet[sheet.id]?.orders ?? [])
+    .flatMap((order) => order.lines)
+    .flatMap((line) => line.profitAmount == null ? [] : [line.profitAmount])
+  const averageProfit = recordedProfits.length ? recordedProfits.reduce((sum, value) => sum + value, 0) / recordedProfits.length : null
+  const sortedSalesSheets = [...salesSheets].sort((a, b) => {
+    if (monthlySort === 'sales-asc') return sheetTotal(dataBySheet[a.id]?.orders ?? []) - sheetTotal(dataBySheet[b.id]?.orders ?? [])
+    if (monthlySort === 'month') return salesSheets.indexOf(a) - salesSheets.indexOf(b)
+    return sheetTotal(dataBySheet[b.id]?.orders ?? []) - sheetTotal(dataBySheet[a.id]?.orders ?? [])
+  })
   const maximum = Math.max(1, ...salesSheets.map((sheet) => sheetTotal(dataBySheet[sheet.id]?.orders ?? [])))
 
   return (
@@ -615,11 +741,17 @@ function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, S
           <p className="sales-growth">{loading ? t('sheet.loadingShort') : t('analytics.currentMonth')}</p>
         </header>
 
+        <label className="analytics-status-filter"><span>{t('filters.status')}</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
+
         <div className="analytics-metrics">
-          <article className="metric-card featured"><span>{t('analytics.sales')}</span><strong>{formatMoney(sheetTotal(currentOrders), language)} <small>THB</small></strong></article>
-          <article className="metric-card"><span>{t('analytics.orders')}</span><strong>{currentOrders.length}</strong></article>
-          <article className="metric-card"><span>{t('analytics.items')}</span><strong>{currentOrders.reduce((sum, order) => sum + order.quantity, 0)}</strong></article>
-          <article className="metric-card"><span>{t('analytics.shipped')}</span><strong>{shipped}</strong></article>
+          {loading && Object.keys(dataBySheet).length === 0 ? Array.from({ length: 6 }, (_, index) => <div className="metric-card-skeleton" key={index}><i /><b /></div>) : <>
+            <article className="metric-card featured"><span>{t('analytics.thisMonth')}</span><strong>{formatMoney(sheetTotal(scopedOrders), language)} <small>THB</small></strong></article>
+            <article className="metric-card"><span>{t('analytics.averageSales')}</span><strong>{formatMoney(averageSales, language)} <small>THB</small></strong><em>{t('analytics.averageMonths', { count: populatedSalesSheets.length })}</em></article>
+            <article className="metric-card"><span>{t('analytics.averageProfit')}</span><strong>{averageProfit === null ? '—' : `${formatMoney(averageProfit, language)} THB`}</strong><em>{averageProfit === null ? t('analytics.noProfitData') : t('analytics.profitSample', { count: recordedProfits.length })}</em></article>
+            <article className="metric-card"><span>{t('analytics.orders')}</span><strong>{scopedOrders.length}</strong></article>
+            <article className="metric-card"><span>{t('analytics.items')}</span><strong>{scopedOrders.reduce((sum, order) => sum + order.quantity, 0)}</strong></article>
+            <article className="metric-card"><span>{t('analytics.shipped')}</span><strong>{shipped}</strong></article>
+          </>}
         </div>
 
         <section className="analytics-section">
@@ -631,8 +763,8 @@ function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, S
         </section>
 
         <section className="analytics-section sales-by-month">
-          <div className="analytics-heading"><h2>{t('analytics.monthlySales')}</h2><button type="button" onClick={() => navigate('/home')}>{t('analytics.allSheets')}</button></div>
-          {salesSheets.map((sheet) => {
+          <div className="analytics-heading"><h2>{t('analytics.monthlySales')}</h2><label><span className="sr-only">{t('filters.sort')}</span><select value={monthlySort} onChange={(event) => setMonthlySort(event.target.value)}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="month">{t('filters.monthOrder')}</option></select></label></div>
+          {sortedSalesSheets.map((sheet) => {
             const amount = sheetTotal(dataBySheet[sheet.id]?.orders ?? [])
             const width = Math.max(amount > 0 ? 5 : 0, Math.round((amount / maximum) * 100))
             return <button type="button" className="monthly-bar-row" key={sheet.id} onClick={() => navigate(`/sheets/${sheet.id}`)}><span>{t(sheet.titleKey)}</span><span className="monthly-bar"><i style={{ width: `${width}%` }} /></span><strong>{formatMoney(amount, language)}</strong></button>
@@ -649,6 +781,12 @@ function App() {
   const [localOrdersBySheet, setLocalOrdersBySheet] = useState<Record<string, SheetOrder[]>>(loadLocalOrders)
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [bootReady, setBootReady] = useState(false)
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setBootReady(true), 1000)
+    return () => window.clearTimeout(timeoutId)
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -688,10 +826,12 @@ function App() {
     const lines: SheetOrderLine[] = draft.lines.map((line) => ({
       row: 0,
       itemName: line.itemName.trim(),
+      imageName: line.imageName.trim() || undefined,
       quantity: Number(line.quantity) || 1,
       salePrice: Number(line.salePrice) || 0,
       bankAmount: Number(line.bankAmount) || 0,
       depositAmount: Number(line.depositAmount) || 0,
+      profitAmount: null,
       images: line.image ? [line.image] : [],
       attributes: [],
     }))
@@ -719,15 +859,15 @@ function App() {
     <main className="app-stage">
       <div className="app-shell">
         <LanguageToggle />
-        <Routes>
-          <Route path="/" element={<SplashScreen />} />
+        {!bootReady ? <SplashScreen /> : <Routes>
+          <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="/home" element={<HomePage dataBySheet={mergedDataBySheet} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} />} />
           <Route path="/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} />} />
           <Route path="/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} />} />
           <Route path="/sheets/:sheetId/orders/:orderId" element={<OrderDetailsRoute dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} />} />
           <Route path="/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} loading={loading} />} />
           <Route path="*" element={<Navigate to="/home" replace />} />
-        </Routes>
+        </Routes>}
       </div>
     </main>
   )
@@ -749,7 +889,7 @@ function SheetRouteView({
   const { sheetId } = useParams()
   const sheet = explicitSheet ?? SHEETS.find((item) => item.id === sheetId)
   if (!sheet) return <Navigate to="/home" replace />
-  return <SheetOrdersPage sheet={sheet} sheetData={dataBySheet[sheet.id]} loading={loading} onRefresh={onRefresh} onCreateOrder={onCreateOrder} />
+  return <SheetOrdersPage key={sheet.id} sheet={sheet} sheetData={dataBySheet[sheet.id]} loading={loading} onRefresh={onRefresh} onCreateOrder={onCreateOrder} />
 }
 
 function OrderDetailsRoute({ dataBySheet, loading, onRefresh }: { dataBySheet: Record<string, SheetDataState>; loading: boolean; onRefresh: () => void }) {

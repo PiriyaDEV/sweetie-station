@@ -9,20 +9,20 @@ const resources = {
       splash: { tagline: 'Find Your Dream\nDestination With Us', continue: 'Skip loading and open home' },
       sheets: {
         kicker: 'Sweetie order book', chooseMonth: 'Choose a month', sheetCount: '{{count}} sheets · tap one to view its orders',
-        allSheets: 'All sheets', orderCount: '{{count}} orders', monthSummary: '{{orders}} orders · {{total}} THB',
+        allSheets: 'All sheets', orderCount: '{{count}} orders', monthSummary: '{{orders}} orders · {{total}} THB', search: 'Search sheets', noMatch: 'No sheets match this search.',
         kind: { sales: 'SALES', haul: 'HAUL' },
         may: 'May', june: 'June', haulJul: 'Guangzhou · 4–18 Jul', july: 'July', aug: 'August', sep: 'September',
         haulSep: 'Guangzhou · 16–23 Sep', oct: 'October', nov: 'November', dec: 'December',
       },
       orders: {
         title: 'Orders', orders: 'orders', refresh: 'Refresh', refreshing: 'Updating', open: 'Open order',
-        item: 'item', items: 'items', oneItem: '1 item', manyItems: '{{count}} items', search: 'Search customer or item', noMatch: 'No matching orders', deviceOnly: 'On this device',
+        item: 'item', items: 'items', oneItem: '1 item', manyItems: '{{count}} items', itemCount: '{{count}} items', resultCount: '{{shown}} of {{total}} orders', search: 'Search customer or item', searchItems: 'Search items', noMatch: 'No matching orders', deviceOnly: 'On this device', loadingMore: 'Loading more orders…', endOfList: 'You’re all caught up.' ,
       },
       details: { title: 'Order details', summary: 'Order summary' },
       detail: {
         orderDay: '{{day}}', quantity: '{{count}} {{unit}}', piece: 'pc', pieces: 'pcs', paymentFull: 'Paid in full', paymentDeposit: 'Deposit',
         shippingInbound: 'Waiting for Thailand', shippingSent: 'Shipped', notSet: 'Not listed', lineName: 'LINE name', customer: 'Customer',
-        items: 'Items', itemNumber: 'Order item {{number}}', itemImage: 'Order item {{number}}, photo {{image}}',
+        items: 'Items', itemNumber: 'Order item {{number}}', itemImage: 'Order item {{number}}, photo {{image}}', photoName: 'Photo name',
         totalSales: 'Sales total', bank: 'BANK recorded', deposit: 'Deposit recorded',
       },
       detailFields: {
@@ -32,7 +32,7 @@ const resources = {
       },
       createOrder: {
         title: 'Create an order', open: 'Create order', close: 'Close create order', linePlaceholder: 'LINE account or handle',
-        customerPlaceholder: 'Customer name', day: 'Order day', itemNumber: 'Item {{number}}', itemName: 'Item name',
+        customerPlaceholder: 'Customer name', day: 'Order day', itemNumber: 'Item {{number}}', itemName: 'Item name', photoName: 'Name this photo', optional: 'optional', photoNamePlaceholder: 'e.g. Blue ribbon pouch',
         quantity: 'Quantity', price: 'Sale price (THB)', bank: 'Paid to bank (THB)', depositAmount: 'Deposit (THB)', paymentStatus: 'Payment status',
         shippingStatus: 'Shipping status', uploadPhoto: 'Upload item photo', chooseMonthImage: 'Use this month’s photo',
         monthOnlyImages: 'Photos from {{month}} only', filterMonthImages: 'Filter this month’s photos', noMonthImages: 'No item photos in this sheet yet.',
@@ -42,8 +42,9 @@ const resources = {
       },
       analytics: {
         title: 'Analytics', currentMonth: 'Current month overview', sales: 'Sales', orders: 'Orders', items: 'Items', shipped: 'Shipped',
-        statusTitle: 'Order status', monthlySales: 'Sales by month', allSheets: 'All sheets',
+        statusTitle: 'Order status', monthlySales: 'Sales by month', allSheets: 'All sheets', thisMonth: 'Sales this month', averageSales: 'Average monthly sales', averageProfit: 'Average recorded profit / item', averageMonths: 'Across {{count}} populated months', profitSample: 'From {{count}} items with profit data', noProfitData: 'No profit data in linked sheets',
       },
+      filters: { sheetType: 'Sheet type', allSheets: 'All types', sortSheets: 'Sort sheets', monthOrder: 'Month order', salesHigh: 'Sales: high to low', salesLow: 'Sales: low to high', ordersHigh: 'Orders: most first', nameAZ: 'Name: A to Z', status: 'Filter by status', allStatuses: 'All statuses', sort: 'Sort by', statusAZ: 'Status', newest: 'Newest first', oldest: 'Oldest first', unlisted: 'Status not listed', sortItems: 'Sort items' },
       sheet: {
         loading: 'Loading workbook sheets…', loadingShort: 'Loading…', empty: 'No orders in this sheet yet.',
         error: 'Could not load this sheet.', errorShort: 'Unavailable', retry: 'Retry',
@@ -61,20 +62,20 @@ const resources = {
       splash: { tagline: 'ค้นหาจุดหมายในฝัน\nไปกับเรา', continue: 'ข้ามหน้ารอและไปหน้าหลัก' },
       sheets: {
         kicker: 'สมุดออเดอร์ Sweetie', chooseMonth: 'เลือกเดือน', sheetCount: '{{count}} ชีต · แตะเพื่อดูคำสั่งซื้อ',
-        allSheets: 'ชีตทั้งหมด', orderCount: '{{count}} ออเดอร์', monthSummary: '{{orders}} ออเดอร์ · {{total}} THB',
+        allSheets: 'ชีตทั้งหมด', orderCount: '{{count}} ออเดอร์', monthSummary: '{{orders}} ออเดอร์ · {{total}} THB', search: 'ค้นหาชีต', noMatch: 'ไม่พบชีตที่ตรงกับคำค้นหา',
         kind: { sales: 'ยอดขาย', haul: 'หิ้วสินค้า' },
         may: 'พฤษภาคม', june: 'มิถุนายน', haulJul: 'กวางโจว · 4–18 ก.ค.', july: 'กรกฎาคม', aug: 'สิงหาคม', sep: 'กันยายน',
         haulSep: 'กวางโจว · 16–23 ก.ย.', oct: 'ตุลาคม', nov: 'พฤศจิกายน', dec: 'ธันวาคม',
       },
       orders: {
         title: 'รายการคำสั่งซื้อ', orders: 'ออเดอร์', refresh: 'รีเฟรช', refreshing: 'กำลังอัปเดต', open: 'เปิดคำสั่งซื้อ',
-        item: 'ชิ้น', items: 'ชิ้น', oneItem: '1 ชิ้น', manyItems: '{{count}} ชิ้น', search: 'ค้นหาลูกค้าหรือสินค้า', noMatch: 'ไม่พบออเดอร์ที่ตรงกัน', deviceOnly: 'บันทึกในเครื่อง',
+        item: 'ชิ้น', items: 'ชิ้น', oneItem: '1 ชิ้น', manyItems: '{{count}} ชิ้น', itemCount: '{{count}} รายการ', resultCount: 'แสดง {{shown}} จาก {{total}} ออเดอร์', search: 'ค้นหาลูกค้าหรือสินค้า', searchItems: 'ค้นหารายการสินค้า', noMatch: 'ไม่พบออเดอร์ที่ตรงกัน', deviceOnly: 'บันทึกในเครื่อง', loadingMore: 'กำลังโหลดออเดอร์เพิ่ม…', endOfList: 'แสดงครบแล้ว',
       },
       details: { title: 'รายละเอียดคำสั่งซื้อ', summary: 'สรุปคำสั่งซื้อ' },
       detail: {
         orderDay: '{{day}}', quantity: '{{count}} {{unit}}', piece: 'ชิ้น', pieces: 'ชิ้น', paymentFull: 'จ่ายเต็มแล้ว', paymentDeposit: 'มัดจำ',
         shippingInbound: 'รอเข้าไทย', shippingSent: 'ส่งแล้ว', notSet: 'ไม่มีข้อมูล', lineName: 'ชื่อไลน์', customer: 'ชื่อลูกค้า',
-        items: 'รายการสินค้า', itemNumber: 'รายการที่ {{number}}', itemImage: 'รายการที่ {{number}} รูปที่ {{image}}',
+        items: 'รายการสินค้า', itemNumber: 'รายการที่ {{number}}', itemImage: 'รายการที่ {{number}} รูปที่ {{image}}', photoName: 'ชื่อรูปภาพ',
         totalSales: 'ยอดขายรวม', bank: 'ยอดโอน (BANK)', deposit: 'ยอดมัดจำ',
       },
       detailFields: {
@@ -84,7 +85,7 @@ const resources = {
       },
       createOrder: {
         title: 'สร้างคำสั่งซื้อ', open: 'สร้างออเดอร์', close: 'ปิดหน้าสร้างออเดอร์', linePlaceholder: 'บัญชีหรือชื่อ LINE',
-        customerPlaceholder: 'ชื่อลูกค้า', day: 'วันที่สั่งซื้อ', itemNumber: 'สินค้า {{number}}', itemName: 'ชื่อสินค้า',
+        customerPlaceholder: 'ชื่อลูกค้า', day: 'วันที่สั่งซื้อ', itemNumber: 'สินค้า {{number}}', itemName: 'ชื่อสินค้า', photoName: 'ตั้งชื่อรูปภาพ', optional: 'ไม่บังคับ', photoNamePlaceholder: 'เช่น กระเป๋าริบบิ้นสีฟ้า',
         quantity: 'จำนวน', price: 'ราคาขาย (THB)', bank: 'ยอดโอน (THB)', depositAmount: 'ยอดมัดจำ (THB)', paymentStatus: 'สถานะชำระเงิน',
         shippingStatus: 'สถานะจัดส่ง', uploadPhoto: 'อัปโหลดรูปสินค้า', chooseMonthImage: 'ใช้รูปจากเดือนนี้',
         monthOnlyImages: 'เลือกรูปจาก {{month}} เท่านั้น', filterMonthImages: 'ค้นหารูปในเดือนนี้', noMonthImages: 'ยังไม่มีรูปสินค้าในชีตนี้',
@@ -94,8 +95,9 @@ const resources = {
       },
       analytics: {
         title: 'วิเคราะห์ข้อมูล', currentMonth: 'ภาพรวมเดือนปัจจุบัน', sales: 'ยอดขาย', orders: 'ออเดอร์', items: 'จำนวนสินค้า', shipped: 'ส่งแล้ว',
-        statusTitle: 'สถานะออเดอร์', monthlySales: 'ยอดขายรายเดือน', allSheets: 'ดูชีตทั้งหมด',
+        statusTitle: 'สถานะออเดอร์', monthlySales: 'ยอดขายรายเดือน', allSheets: 'ดูชีตทั้งหมด', thisMonth: 'ยอดขายเดือนนี้', averageSales: 'ยอดขายเฉลี่ยต่อเดือน', averageProfit: 'กำไรเฉลี่ยต่อรายการ', averageMonths: 'จาก {{count}} เดือนที่มีข้อมูล', profitSample: 'คำนวณจาก {{count}} รายการที่มีข้อมูลกำไร', noProfitData: 'ชีตที่เชื่อมไว้ไม่มีข้อมูลกำไร',
       },
+      filters: { sheetType: 'ประเภทชีต', allSheets: 'ทุกประเภท', sortSheets: 'เรียงชีต', monthOrder: 'ตามเดือน', salesHigh: 'ยอดขาย: มากไปน้อย', salesLow: 'ยอดขาย: น้อยไปมาก', ordersHigh: 'จำนวนออเดอร์: มากไปน้อย', nameAZ: 'ชื่อ: ก ถึง ฮ', status: 'กรองตามสถานะ', allStatuses: 'ทุกสถานะ', sort: 'เรียงตาม', statusAZ: 'สถานะ', newest: 'ใหม่ไปเก่า', oldest: 'เก่าไปใหม่', unlisted: 'ไม่ระบุสถานะ', sortItems: 'เรียงสินค้า' },
       sheet: {
         loading: 'กำลังโหลดข้อมูลทุกชีต…', loadingShort: 'กำลังโหลด…', empty: 'ยังไม่มีออเดอร์ในชีตนี้',
         error: 'โหลดชีตนี้ไม่สำเร็จ', errorShort: 'โหลดไม่ได้', retry: 'ลองอีกครั้ง',

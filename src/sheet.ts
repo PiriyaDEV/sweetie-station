@@ -13,10 +13,12 @@ export type SheetLineAttribute = { key: string; value: string }
 export type SheetOrderLine = {
   row: number
   itemName: string
+  imageName?: string
   quantity: number
   salePrice: number
   bankAmount: number
   depositAmount: number
+  profitAmount: number | null
   images: string[]
   attributes: SheetLineAttribute[]
 }
@@ -135,6 +137,7 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
     salePrice: findHeaderIndex(headers, ['ราคาขาย']),
     bank: findHeaderIndex(headers, ['BANK']),
     deposit: findHeaderIndex(headers, ['ราคามัดจำ']),
+    profit: findHeaderIndex(headers, ['กำไรสุทธิ', 'กำไร']),
   }
   const baseColumns = new Set(Object.values(column).filter((index) => index >= 0))
   const orders: SheetOrder[] = []
@@ -151,6 +154,7 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
     const salePriceText = cell(row, column.salePrice)
     const bankText = cell(row, column.bank)
     const depositText = cell(row, column.deposit)
+    const profitText = cell(row, column.profit)
     if (date) currentDay = date
 
     if (lineName) {
@@ -196,6 +200,7 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
       salePrice: numberFromCell(salePriceText),
       bankAmount: numberFromCell(bankText),
       depositAmount: numberFromCell(depositText),
+      profitAmount: profitText ? numberFromCell(profitText) : null,
       images: orderImages[sheet.id]?.[String(rowNumber)] ?? [],
       attributes,
     }
