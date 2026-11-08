@@ -125,15 +125,27 @@ function fieldLabel(key: string, t: (key: string) => string) {
 }
 
 
-function LanguageToggle() {
+function AnalyticsSettings() {
   const { i18n, t } = useTranslation()
   const language = i18n.resolvedLanguage ?? 'en'
 
+  const changeLanguage = (nextLanguage: string) => {
+    void i18n.changeLanguage(nextLanguage)
+    try {
+      localStorage.setItem('sweetie-language', nextLanguage)
+    } catch {
+      // Language remains active for this app session if storage is unavailable.
+    }
+  }
+
   return (
-    <div className="language-toggle" aria-label={t('language')}>
-      <button type="button" className={language === 'en' ? 'selected' : ''} onClick={() => void i18n.changeLanguage('en')}>EN</button>
-      <button type="button" className={language === 'th' ? 'selected' : ''} onClick={() => void i18n.changeLanguage('th')}>TH</button>
-    </div>
+    <section className="analytics-settings">
+      <div><h2>{t('settings.title')}</h2><span>{t('settings.displayLanguage')}</span></div>
+      <select className="select select-bordered select-sm select-primary" value={language} onChange={(event) => changeLanguage(event.target.value)} aria-label={t('settings.displayLanguage')}>
+        <option value="en">English</option>
+        <option value="th">ไทย</option>
+      </select>
+    </section>
   )
 }
 
@@ -804,6 +816,8 @@ function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, S
           <div className="status-summary-row"><span className="status-badge inbound">{t('detail.shippingInbound')}</span><strong>{inbound}</strong></div>
         </section>
 
+        <AnalyticsSettings />
+
         <section className="analytics-section sales-by-month">
           <div className="analytics-heading"><h2>{t('analytics.monthlySales')}</h2><label><span className="sr-only">{t('filters.sort')}</span><select className="select select-bordered select-sm select-primary" value={monthlySort} onChange={(event) => setMonthlySort(event.target.value)}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="month">{t('filters.monthOrder')}</option></select></label></div>
           {sortedSalesSheets.map((sheet) => {
@@ -940,20 +954,20 @@ function App() {
   const currentMonthSheet = getCurrentMonthSheet(mergedDataBySheet)
 
   if (!isAdminPath) {
-    return <main className="app-stage"><div className="app-shell"><LanguageToggle /><SplashScreen showLoading={false} /></div></main>
+    return <main className="app-stage"><div className="app-shell"><SplashScreen showLoading={false} /></div></main>
   }
   if (!isAdminAuthenticated) {
-    return <main className="app-stage"><div className="app-shell"><LanguageToggle /><AdminLoginPage onLogin={login} /></div></main>
+    return <main className="app-stage"><div className="app-shell"><AdminLoginPage onLogin={login} /></div></main>
   }
   if (location.pathname === '/admin') return <Navigate to="/admin/home" replace />
   if (!bootReady || !initialDataReady) {
-    return <main className="app-stage"><div className="app-shell"><LanguageToggle /><SplashScreen /></div></main>
+    return <main className="app-stage"><div className="app-shell"><SplashScreen /></div></main>
   }
 
   return (
     <main className="app-stage">
       <div className="app-shell">
-        <LanguageToggle />
+
         <AdminLogoutButton onLogout={logout} />
         <Routes>
           <Route path="/admin/home" element={<HomePage dataBySheet={mergedDataBySheet} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} />} />

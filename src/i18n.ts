@@ -19,6 +19,7 @@ const resources = {
         item: 'item', items: 'items', oneItem: '1 item', manyItems: '{{count}} items', itemCount: '{{count}} items', resultCount: '{{shown}} of {{total}} orders', search: 'Search customer or item', searchItems: 'Search items', noMatch: 'No matching orders', deviceOnly: 'On this device', loadingMore: 'Loading more orders…', endOfList: 'You’re all caught up.', profit: 'Profit', profitUnavailable: '—',
       },
       details: { title: 'Order details', summary: 'Order summary' },
+      settings: { title: 'Settings', displayLanguage: 'Display language' },
       auth: { kicker: 'Sweetie admin', title: 'Admin sign in', username: 'Username', password: 'Password', signIn: 'Sign in', logout: 'Log out', invalid: 'Incorrect username or password.', temporary: 'Temporary demo login only — not secure access control.' },
       detail: {
         orderDay: '{{day}}', quantity: '{{count}} {{unit}}', piece: 'pc', pieces: 'pcs', paymentFull: 'Paid in full', paymentDeposit: 'Deposit',
@@ -73,6 +74,7 @@ const resources = {
         item: 'ชิ้น', items: 'ชิ้น', oneItem: '1 ชิ้น', manyItems: '{{count}} ชิ้น', itemCount: '{{count}} รายการ', resultCount: 'แสดง {{shown}} จาก {{total}} ออเดอร์', search: 'ค้นหาลูกค้าหรือสินค้า', searchItems: 'ค้นหารายการสินค้า', noMatch: 'ไม่พบออเดอร์ที่ตรงกัน', deviceOnly: 'บันทึกในเครื่อง', loadingMore: 'กำลังโหลดออเดอร์เพิ่ม…', endOfList: 'แสดงครบแล้ว', profit: 'กำไร', profitUnavailable: '—',
       },
       details: { title: 'รายละเอียดคำสั่งซื้อ', summary: 'สรุปคำสั่งซื้อ' },
+      settings: { title: 'ตั้งค่า', displayLanguage: 'ภาษาที่แสดง' },
       auth: { kicker: 'ผู้ดูแล Sweetie', title: 'เข้าสู่ระบบผู้ดูแล', username: 'ชื่อผู้ใช้', password: 'รหัสผ่าน', signIn: 'เข้าสู่ระบบ', logout: 'ออกจากระบบ', invalid: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', temporary: 'ล็อกอินชั่วคราวสำหรับตัวอย่าง — ยังไม่ใช่ระบบรักษาความปลอดภัย' },
       detail: {
         orderDay: '{{day}}', quantity: '{{count}} {{unit}}', piece: 'ชิ้น', pieces: 'ชิ้น', paymentFull: 'จ่ายเต็มแล้ว', paymentDeposit: 'มัดจำ',
@@ -112,9 +114,16 @@ const resources = {
   },
 } as const
 
+let initialLanguage = 'en'
+try {
+  initialLanguage = localStorage.getItem('sweetie-language') ?? 'en'
+} catch {
+  // Keep English as the default when browser storage is unavailable.
+}
+
 void i18n.use(initReactI18next).init({
   resources,
-  lng: 'en',
+  lng: initialLanguage,
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
 })
