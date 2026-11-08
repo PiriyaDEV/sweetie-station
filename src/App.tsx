@@ -14,8 +14,8 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
+import sweetieLogo from './assets/sweetie-logo.webp'
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
 import {
   fetchAllSheets,
@@ -118,23 +118,6 @@ function fieldLabel(key: string, t: (key: string) => string) {
   return translationKey ? t(translationKey) : key
 }
 
-function SweetieMark() {
-  return (
-    <svg className="sweetie-mark" viewBox="0 0 190 150" role="img" aria-label="Sweetie">
-      <path
-        className="mark-heart"
-        d="M95 137 18 67C-4 45 10 9 42 9c22 0 37 13 53 32C111 22 126 9 148 9c32 0 46 36 24 58L95 137Z"
-      />
-      <path className="mark-heart-line" d="M95 124 25 62C9 45 18 18 42 18c19 0 34 12 53 36 19-24 34-36 53-36 24 0 33 27 17 44l-70 62Z" />
-      <text x="95" y="79" textAnchor="middle" className="mark-word">sweetie</text>
-      <text x="95" y="99" textAnchor="middle" className="mark-caption">D E S T I N A T I O N</text>
-      <circle cx="49" cy="38" r="2" className="mark-sparkle" />
-      <circle cx="137" cy="38" r="2" className="mark-sparkle" />
-      <circle cx="42" cy="52" r="1.5" className="mark-sparkle" />
-      <circle cx="148" cy="52" r="1.5" className="mark-sparkle" />
-    </svg>
-  )
-}
 
 function LanguageToggle() {
   const { i18n, t } = useTranslation()
@@ -154,7 +137,7 @@ function SplashScreen() {
   return (
     <section className="app-screen splash-screen" aria-label={t('screen.splash')}>
       <div className="splash-content">
-        <SweetieMark />
+        <img className="sweetie-mark-image" src={sweetieLogo} alt={t('splash.logoAlt')} />
         <p className="splash-tagline">{t('splash.tagline')}</p>
       </div>
       <span className="splash-loading" aria-hidden="true"><i /></span>
@@ -253,9 +236,9 @@ function HomePage({
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('sheets.search')} />
         </label>
         <div className="sheet-filter-row">
-          <label><span className="sr-only">{t('filters.sheetType')}</span><select value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">{t('filters.allSheets')}</option><option value="sales">{t('sheets.kind.sales')}</option><option value="haul">{t('sheets.kind.haul')}</option></select></label>
-          <label><span className="sr-only">{t('filters.status')}</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
-          <label><span className="sr-only">{t('filters.sortSheets')}</span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="month">{t('filters.monthOrder')}</option><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="orders-desc">{t('filters.ordersHigh')}</option><option value="name">{t('filters.nameAZ')}</option></select></label>
+          <label><span className="sr-only">{t('filters.sheetType')}</span><select className="select select-bordered select-sm select-primary" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">{t('filters.allSheets')}</option><option value="sales">{t('sheets.kind.sales')}</option><option value="haul">{t('sheets.kind.haul')}</option></select></label>
+          <label><span className="sr-only">{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
+          <label><span className="sr-only">{t('filters.sortSheets')}</span><select className="select select-bordered select-sm select-primary" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="month">{t('filters.monthOrder')}</option><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="orders-desc">{t('filters.ordersHigh')}</option><option value="name">{t('filters.nameAZ')}</option></select></label>
         </div>
 
         {loading && Object.keys(dataBySheet).length === 0 ? <div className="sheet-grid" aria-label={t('sheet.loading')}>
@@ -413,7 +396,7 @@ function CreateOrderDialog({
     onSave(draft)
   }
 
-  return createPortal(
+  return (
     <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="create-order-modal" role="dialog" aria-modal="true" aria-labelledby="create-order-heading">
         <header className="modal-header">
@@ -445,11 +428,11 @@ function CreateOrderDialog({
               </div>
 
               <div className="image-source-row">
-                <label className="upload-image-button">
+                <label className="upload-image-button btn btn-outline btn-sm">
                   <ImagePlus size={16} /> {t('createOrder.uploadPhoto')}
                   <input type="file" accept="image/*" onChange={(event) => void handleFile(index, event.target.files?.[0])} />
                 </label>
-                <button type="button" className="choose-month-image" onClick={() => { setOpenPicker(openPicker === index ? null : index); setImageQuery('') }} disabled={imageChoices.length === 0}>
+                <button type="button" className="choose-month-image btn btn-outline btn-sm" onClick={() => { setOpenPicker(openPicker === index ? null : index); setImageQuery('') }} disabled={imageChoices.length === 0}>
                   {t('createOrder.chooseMonthImage')}
                 </button>
               </div>
@@ -469,19 +452,18 @@ function CreateOrderDialog({
           <button type="button" className="add-line-button" onClick={() => setDraft((current) => ({ ...current, lines: [...current.lines, { itemName: '', quantity: '1', salePrice: '', bankAmount: '', depositAmount: '', image: '', imageName: '', imageIsNew: false }] }))}><Plus size={15} /> {t('createOrder.addItem')}</button>
 
           <div className="form-grid two-columns">
-            <label>{t('createOrder.paymentStatus')}<select value={draft.paymentStatus} onChange={(event) => updateField('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option></select></label>
-            <label>{t('createOrder.shippingStatus')}<select value={draft.shippingStatus} onChange={(event) => updateField('shippingStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="รอเข้าไทย">{t('detail.shippingInbound')}</option><option value="ส่งแล้ว">{t('detail.shippingSent')}</option></select></label>
+            <label>{t('createOrder.paymentStatus')}<select className="select select-bordered select-sm select-primary" value={draft.paymentStatus} onChange={(event) => updateField('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option></select></label>
+            <label>{t('createOrder.shippingStatus')}<select className="select select-bordered select-sm select-primary" value={draft.shippingStatus} onChange={(event) => updateField('shippingStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="รอเข้าไทย">{t('detail.shippingInbound')}</option><option value="ส่งแล้ว">{t('detail.shippingSent')}</option></select></label>
           </div>
           {imageError && <p className="form-error" role="alert">{imageError}</p>}
           <p className="local-save-note">{t('createOrder.localOnly')}</p>
           <footer className="modal-actions">
-            <button type="button" className="cancel-order-button" onClick={onClose}>{t('createOrder.cancel')}</button>
-            <button type="submit" className="save-order-button"><Check size={16} /> {t('createOrder.save')}</button>
+            <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose}>{t('createOrder.cancel')}</button>
+            <button type="submit" className="save-order-button btn btn-primary"><Check size={16} /> {t('createOrder.save')}</button>
           </footer>
         </form>
       </section>
-    </div>,
-    document.body,
+    </div>
   )
 }
 
@@ -588,8 +570,8 @@ function SheetOrdersPage({
           <input value={query} onChange={(event) => updateQuery(event.target.value)} placeholder={t('orders.search')} />
         </label>
         <div className="order-filter-row">
-          <label><span className="sr-only">{t('filters.status')}</span><select value={statusFilter} onChange={(event) => updateStatus(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
-          <label><span className="sr-only">{t('filters.sort')}</span><select value={sortBy} onChange={(event) => updateSort(event.target.value)}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="status">{t('filters.statusAZ')}</option><option value="newest">{t('filters.newest')}</option><option value="oldest">{t('filters.oldest')}</option></select></label>
+          <label><span className="sr-only">{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => updateStatus(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
+          <label><span className="sr-only">{t('filters.sort')}</span><select className="select select-bordered select-sm select-primary" value={sortBy} onChange={(event) => updateSort(event.target.value)}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="status">{t('filters.statusAZ')}</option><option value="newest">{t('filters.newest')}</option><option value="oldest">{t('filters.oldest')}</option></select></label>
         </div>
 
         {sheetData?.error && <div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div>}
@@ -603,7 +585,7 @@ function SheetOrdersPage({
         {hasMore && <div className="load-more-sentinel" ref={sentinelRef} aria-live="polite"><span className="loading-more-dot" /> {t('orders.loadingMore')}</div>}
         {!hasMore && sortedOrders.length > 10 && <p className="list-end-note">{t('orders.endOfList')}</p>}
       </div>
-      <div className="create-order-dock"><button type="button" className="create-order-list-button" onClick={() => setCreateOpen(true)}><Plus size={17} /> {t('createOrder.open')}</button></div>
+      <div className="create-order-dock"><button type="button" className="create-order-list-button btn btn-primary" onClick={() => setCreateOpen(true)}><Plus size={17} /> {t('createOrder.open')}</button></div>
       <BottomNavigation />
       {createOpen && <CreateOrderDialog sheet={sheet} imageChoices={imageChoices} onClose={() => setCreateOpen(false)} onSave={saveLocalOrder} />}
       {notice && <p className="app-toast" role="status">{notice}</p>}
@@ -663,7 +645,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh }: { sheet: She
             <h3>{t('detail.items')}</h3>
             <div className="item-list-controls">
               <input value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder={t('orders.searchItems')} aria-label={t('orders.searchItems')} />
-              <select value={itemSort} onChange={(event) => setItemSort(event.target.value)} aria-label={t('filters.sortItems')}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="name">{t('filters.nameAZ')}</option></select>
+              <select className="select select-bordered select-sm select-primary" value={itemSort} onChange={(event) => setItemSort(event.target.value)} aria-label={t('filters.sortItems')}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="name">{t('filters.nameAZ')}</option></select>
             </div>
             <div className="item-list">
               {visibleLines.map((line, index) => (
@@ -741,11 +723,11 @@ function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, S
           <p className="sales-growth">{loading ? t('sheet.loadingShort') : t('analytics.currentMonth')}</p>
         </header>
 
-        <label className="analytics-status-filter"><span>{t('filters.status')}</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
+        <label className="analytics-status-filter"><span>{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
 
         <div className="analytics-metrics">
           {loading && Object.keys(dataBySheet).length === 0 ? Array.from({ length: 6 }, (_, index) => <div className="metric-card-skeleton" key={index}><i /><b /></div>) : <>
-            <article className="metric-card featured"><span>{t('analytics.thisMonth')}</span><strong>{formatMoney(sheetTotal(scopedOrders), language)} <small>THB</small></strong></article>
+            <article className="metric-card featured"><span>{statusFilter === 'all' ? t('analytics.thisMonth') : t('analytics.filteredSales')}</span><strong>{formatMoney(sheetTotal(scopedOrders), language)} <small>THB</small></strong></article>
             <article className="metric-card"><span>{t('analytics.averageSales')}</span><strong>{formatMoney(averageSales, language)} <small>THB</small></strong><em>{t('analytics.averageMonths', { count: populatedSalesSheets.length })}</em></article>
             <article className="metric-card"><span>{t('analytics.averageProfit')}</span><strong>{averageProfit === null ? '—' : `${formatMoney(averageProfit, language)} THB`}</strong><em>{averageProfit === null ? t('analytics.noProfitData') : t('analytics.profitSample', { count: recordedProfits.length })}</em></article>
             <article className="metric-card"><span>{t('analytics.orders')}</span><strong>{scopedOrders.length}</strong></article>
@@ -763,7 +745,7 @@ function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, S
         </section>
 
         <section className="analytics-section sales-by-month">
-          <div className="analytics-heading"><h2>{t('analytics.monthlySales')}</h2><label><span className="sr-only">{t('filters.sort')}</span><select value={monthlySort} onChange={(event) => setMonthlySort(event.target.value)}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="month">{t('filters.monthOrder')}</option></select></label></div>
+          <div className="analytics-heading"><h2>{t('analytics.monthlySales')}</h2><label><span className="sr-only">{t('filters.sort')}</span><select className="select select-bordered select-sm select-primary" value={monthlySort} onChange={(event) => setMonthlySort(event.target.value)}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="month">{t('filters.monthOrder')}</option></select></label></div>
           {sortedSalesSheets.map((sheet) => {
             const amount = sheetTotal(dataBySheet[sheet.id]?.orders ?? [])
             const width = Math.max(amount > 0 ? 5 : 0, Math.round((amount / maximum) * 100))
@@ -780,6 +762,7 @@ function App() {
   const [dataBySheet, setDataBySheet] = useState<Record<string, SheetDataState>>({})
   const [localOrdersBySheet, setLocalOrdersBySheet] = useState<Record<string, SheetOrder[]>>(loadLocalOrders)
   const [loading, setLoading] = useState(true)
+  const [initialDataReady, setInitialDataReady] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [bootReady, setBootReady] = useState(false)
 
@@ -793,10 +776,16 @@ function App() {
     fetchAllSheets(controller.signal)
       .then((result) => setDataBySheet(result))
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+          setInitialDataReady(true)
+        }
       })
       .catch(() => {
-        if (!controller.signal.aborted) setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+          setInitialDataReady(true)
+        }
       })
     return () => controller.abort()
   }, [refreshKey])
@@ -859,7 +848,7 @@ function App() {
     <main className="app-stage">
       <div className="app-shell">
         <LanguageToggle />
-        {!bootReady ? <SplashScreen /> : <Routes>
+        {!bootReady || !initialDataReady ? <SplashScreen /> : <Routes>
           <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="/home" element={<HomePage dataBySheet={mergedDataBySheet} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} />} />
           <Route path="/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} />} />
