@@ -6,6 +6,7 @@ export type SheetDefinition = {
   titleKey: string
   kind: 'sales' | 'haul'
   monthKey: string
+  year: number
 }
 
 export type SheetLineAttribute = { key: string; value: string }
@@ -40,6 +41,7 @@ export type SheetOrder = {
   profitPercent: number | null
   quantity: number
   isLocal?: boolean
+  isOverride?: boolean
 }
 
 export type SheetDataState = {
@@ -50,16 +52,16 @@ export type SheetDataState = {
 const SHEET_ID = '1Y5z_jWtQd5-dxG_hWQlHYWNWtR4giR6k8tAwpmqRF5w'
 
 export const SHEETS: SheetDefinition[] = [
-  { id: 'may', gid: '246786947', titleKey: 'sheets.may', kind: 'sales', monthKey: 'may' },
-  { id: 'june', gid: '2065480441', titleKey: 'sheets.june', kind: 'sales', monthKey: 'june' },
-  { id: 'haul-jul', gid: '767554552', titleKey: 'sheets.haulJul', kind: 'haul', monthKey: 'july' },
-  { id: 'july', gid: '1487621265', titleKey: 'sheets.july', kind: 'sales', monthKey: 'july' },
-  { id: 'aug', gid: '1083277464', titleKey: 'sheets.aug', kind: 'sales', monthKey: 'aug' },
-  { id: 'sep', gid: '1314167799', titleKey: 'sheets.sep', kind: 'sales', monthKey: 'sep' },
-  { id: 'haul-sep', gid: '51699199', titleKey: 'sheets.haulSep', kind: 'haul', monthKey: 'sep' },
-  { id: 'oct', gid: '1666163539', titleKey: 'sheets.oct', kind: 'sales', monthKey: 'oct' },
-  { id: 'nov', gid: '402607796', titleKey: 'sheets.nov', kind: 'sales', monthKey: 'nov' },
-  { id: 'dec', gid: '905302264', titleKey: 'sheets.dec', kind: 'sales', monthKey: 'dec' },
+  { id: 'may', gid: '246786947', titleKey: 'sheets.may', kind: 'sales', monthKey: 'may', year: 2026 },
+  { id: 'june', gid: '2065480441', titleKey: 'sheets.june', kind: 'sales', monthKey: 'june', year: 2026 },
+  { id: 'haul-jul', gid: '767554552', titleKey: 'sheets.haulJul', kind: 'haul', monthKey: 'july', year: 2026 },
+  { id: 'july', gid: '1487621265', titleKey: 'sheets.july', kind: 'sales', monthKey: 'july', year: 2026 },
+  { id: 'aug', gid: '1083277464', titleKey: 'sheets.aug', kind: 'sales', monthKey: 'aug', year: 2026 },
+  { id: 'sep', gid: '1314167799', titleKey: 'sheets.sep', kind: 'sales', monthKey: 'sep', year: 2026 },
+  { id: 'haul-sep', gid: '51699199', titleKey: 'sheets.haulSep', kind: 'haul', monthKey: 'sep', year: 2026 },
+  { id: 'oct', gid: '1666163539', titleKey: 'sheets.oct', kind: 'sales', monthKey: 'oct', year: 2026 },
+  { id: 'nov', gid: '402607796', titleKey: 'sheets.nov', kind: 'sales', monthKey: 'nov', year: 2026 },
+  { id: 'dec', gid: '905302264', titleKey: 'sheets.dec', kind: 'sales', monthKey: 'dec', year: 2026 },
 ]
 
 function parseCsv(text: string): string[][] {
@@ -279,7 +281,7 @@ export function formatOrderDate(day: string, sheet: SheetDefinition, locale: str
   }
   if (Number.isFinite(value) && value > 0 && value <= 31) {
     const monthIndex: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, june: 5, july: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 }
-    const date = new Date(Date.UTC(2026, monthIndex[sheet.monthKey] ?? 0, 1))
+    const date = new Date(Date.UTC(sheet.year, monthIndex[sheet.monthKey] ?? 0, 1))
     const month = new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' }).format(date)
     return `${value} ${month}`
   }
