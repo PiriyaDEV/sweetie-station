@@ -108,7 +108,7 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .splash-loading { position: absolute; right: 0; bottom: 34px; left: 0; display: flex; justify-content: center; }
 .splash-loading i { width: 24px; height: 3px; border-radius: 3px; background: rgb(255 255 255 / 55%); animation: loading 1s ease-in-out infinite alternate; }
 @keyframes loading { from { transform: scaleX(.45); opacity: .55; } to { transform: scaleX(1); opacity: 1; } }
-.home-screen { padding: 50px 18px 0; }
+.home-screen { padding: 20px 18px 0; }
 .home-scroll-area, .detail-scroll-area { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow-y: auto; scrollbar-width: none; }
 .home-scroll-area::-webkit-scrollbar, .detail-scroll-area::-webkit-scrollbar { display: none; }
 .sales-summary { flex: none; text-align: center; }
@@ -468,3 +468,15 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .analytics-settings span { color: #918785; font-size: 9px; }
 .analytics-settings .select { width: 128px; min-height: 36px; height: 36px; font-size: 10px; }
 .admin-logout { right: 15px; }
+.screen-fixed-header { flex: none; min-width: 0; }
+.sheets-home-screen .section-heading { margin: 14px 4px 10px; }
+.sheets-home-screen .order-search { margin-bottom: 8px; }
+.sheets-home-screen .sheet-filter-row { margin-bottom: 10px; }
+.orders-fixed-header { padding-bottom: 8px; }
+.orders-fixed-header .screen-back-button { margin-bottom: 3px; }
+.orders-fixed-header .sales-summary { margin-bottom: 3px; }
+.analytics-fixed-header { padding-bottom: 8px; }
+.analytics-fixed-header .analytics-status-filter { margin-bottom: 4px; }
+.detail-screen { display: flex; flex-direction: column; }
+.detail-screen > .detail-hero { flex: none; }
+.detail-scroll-area { min-height: 0; flex: 1; overflow-y: auto; }

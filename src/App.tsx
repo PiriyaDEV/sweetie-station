@@ -205,12 +205,7 @@ function HomePage({
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('month')
 
-  const sheetRows = SHEETS.map((sheet, index) => ({
-    sheet,
-    index,
-    orders: dataBySheet[sheet.id]?.orders ?? EMPTY_ORDERS,
-    error: dataBySheet[sheet.id]?.error,
-  }))
+  const sheetRows = SHEETS.map((sheet, index) => ({ sheet, index, orders: dataBySheet[sheet.id]?.orders ?? EMPTY_ORDERS, error: dataBySheet[sheet.id]?.error }))
   const visibleSheets = sheetRows
     .filter(({ sheet }) => kindFilter === 'all' || sheet.kind === kindFilter)
     .filter(({ sheet }) => t(sheet.titleKey).toLocaleLowerCase().includes(query.toLocaleLowerCase()))
@@ -231,14 +226,13 @@ function HomePage({
     })
 
   return (
-    <section className="app-screen home-screen" aria-label={t('screen.home')}>
-      <div className="home-scroll-area">
+    <section className="app-screen home-screen sheets-home-screen" aria-label={t('screen.home')}>
+      <div className="screen-fixed-header">
         <header className="sales-summary sheet-home-summary">
           <p>{t('sheets.kicker')}</p>
           <h1>{t('sheets.chooseMonth')}</h1>
           <p className="sales-growth">{t('sheets.sheetCount', { count: SHEETS.length })}</p>
         </header>
-
         <div className="section-heading">
           <h2>{t('sheets.allSheets')}</h2>
           <button type="button" className="view-all" onClick={onRefresh} disabled={refreshing}>
@@ -246,7 +240,6 @@ function HomePage({
             {refreshing ? t('orders.refreshing') : t('orders.refresh')}
           </button>
         </div>
-
         <label className="order-search">
           <Search size={16} />
           <span className="sr-only">{t('sheets.search')}</span>
@@ -257,39 +250,39 @@ function HomePage({
           <label><span className="sr-only">{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
           <label><span className="sr-only">{t('filters.sortSheets')}</span><select className="select select-bordered select-sm select-primary" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="month">{t('filters.monthOrder')}</option><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="orders-desc">{t('filters.ordersHigh')}</option><option value="name">{t('filters.nameAZ')}</option></select></label>
         </div>
+      </div>
 
+      <div className="home-scroll-area sheet-list-scroll">
         {loading && Object.keys(dataBySheet).length === 0 ? <div className="sheet-grid" aria-label={t('sheet.loading')}>
           {Array.from({ length: 6 }, (_, index) => <div className="sheet-card-skeleton" key={index}><i /><b /><b /></div>)}
-        </div> : <>
-          {!loading && visibleSheets.length === 0 && <p className="sheet-message">{t('sheets.noMatch')}</p>}
-          <div className="sheet-grid">
-            {visibleSheets.map(({ sheet, orders, error }) => {
-              const image = getPreviewImage(orders)
-              return (
-                <button
-                  type="button"
-                  className="sheet-card"
-                  key={sheet.id}
-                  onClick={() => navigate(`/admin/sheets/${sheet.id}`)}
-                  aria-label={`${t(sheet.titleKey)} · ${orders.length} ${t('orders.orders')}`}
-                >
-                  {image
-                    ? <img className="sheet-card-image" src={image} alt="" loading="lazy" />
-                    : <span className={`sheet-card-placeholder ${sheet.kind}`}><CalendarDays size={25} /></span>}
-                  <span className="sheet-card-topline">
-                    <span className={`sheet-kind ${sheet.kind}`}>{t(`sheets.kind.${sheet.kind}`)}</span>
-                    <ArrowRight size={15} />
-                  </span>
-                  <span className="sheet-card-caption">
-                    <strong>{t(sheet.titleKey)}</strong>
-                    <span>{error ? t('sheet.errorShort') : t('sheets.orderCount', { count: orders.length })}</span>
-                    <b>{error ? '—' : `${formatMoney(sheetTotal(orders), language)} THB`}</b>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </>}
+        </div> : <div className="sheet-grid">
+          {visibleSheets.map(({ sheet, orders, error }) => {
+            const image = getPreviewImage(orders)
+            return (
+              <button
+                type="button"
+                className="sheet-card"
+                key={sheet.id}
+                onClick={() => navigate(`/admin/sheets/${sheet.id}`)}
+                aria-label={`${t(sheet.titleKey)} · ${orders.length} ${t('orders.orders')}`}
+              >
+                {image
+                  ? <img className="sheet-card-image" src={image} alt="" loading="lazy" />
+                  : <span className={`sheet-card-placeholder ${sheet.kind}`}><CalendarDays size={25} /></span>}
+                <span className="sheet-card-topline">
+                  <span className={`sheet-kind ${sheet.kind}`}>{t(`sheets.kind.${sheet.kind}`)}</span>
+                  <ArrowRight size={15} />
+                </span>
+                <span className="sheet-card-caption">
+                  <strong>{t(sheet.titleKey)}</strong>
+                  <span>{error ? t('sheet.errorShort') : t('sheets.orderCount', { count: orders.length })}</span>
+                  <b>{error ? '—' : `${formatMoney(sheetTotal(orders), language)} THB`}</b>
+                </span>
+              </button>
+            )
+          })}
+          {visibleSheets.length === 0 && <p className="sheet-message">{t('sheets.noMatch')}</p>}
+        </div>}
       </div>
       <BottomNavigation />
     </section>
@@ -569,7 +562,7 @@ function SheetOrdersPage({
 
   return (
     <section className="app-screen home-screen orders-screen" aria-label={t('screen.sheetOrders')}>
-      <div className="home-scroll-area" ref={scrollRootRef}>
+      <div className="screen-fixed-header orders-fixed-header">
         <button type="button" className="screen-back-button" onClick={() => navigate('/admin/home')} aria-label={t('nav.backToSheets')}>
           <ChevronLeft size={18} /> {t('nav.allSheets')}
         </button>
@@ -593,18 +586,21 @@ function SheetOrdersPage({
           <label><span className="sr-only">{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => updateStatus(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
           <label><span className="sr-only">{t('filters.sort')}</span><select className="select select-bordered select-sm select-primary" value={sortBy} onChange={(event) => updateSort(event.target.value)}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="status">{t('filters.statusAZ')}</option><option value="newest">{t('filters.newest')}</option><option value="oldest">{t('filters.oldest')}</option></select></label>
         </div>
-
         {sheetData?.error && <div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div>}
+      </div>
+
+      <div className="home-scroll-area order-list-scroll" ref={scrollRootRef}>
         {!sheetData && loading && <div className="order-list-table">{Array.from({ length: 6 }, (_, index) => <div className="skeleton-order-row" key={index}><i /><span><b /><b /><em /></span><b /></div>)}</div>}
         {sheetData && !sheetData.error && orders.length === 0 && <p className="sheet-message">{t('sheet.empty')}</p>}
+        {sortedOrders.length === 0 && !loading && orders.length > 0 && <p className="sheet-message">{t('orders.noMatch')}</p>}
         {query && sortedOrders.length === 0 && <p className="sheet-message">{t('orders.noMatch')}</p>}
-
         <div className="order-list-table">
           {visibleOrders.map((order) => <OrderListRow key={order.id} order={order} sheet={sheet} />)}
         </div>
         {hasMore && <div className="load-more-sentinel" ref={sentinelRef} aria-live="polite"><span className="loading-more-dot" /> {t('orders.loadingMore')}</div>}
         {!hasMore && sortedOrders.length > 10 && <p className="list-end-note">{t('orders.endOfList')}</p>}
       </div>
+
       <div className="create-order-dock"><button type="button" className="create-order-list-button btn btn-primary" onClick={() => setCreateOpen(true)}><Plus size={17} /> {t('createOrder.open')}</button></div>
       <BottomNavigation />
       {createOpen && <CreateOrderDialog sheet={sheet} imageChoices={imageChoices} onClose={() => setCreateOpen(false)} onSave={saveLocalOrder} />}
@@ -634,16 +630,15 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh }: { sheet: She
 
   return (
     <section className="app-screen detail-screen" aria-label={t('screen.detail')}>
-      <div className="detail-scroll-area">
-        <div className={`detail-hero${heroImage ? ' has-product-image' : ''}`}>
-          {heroImage && <img src={heroImage} alt="" />}
-          <button type="button" className="back-button" onClick={() => navigate(`/admin/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ChevronLeft size={20} /></button>
-          <div className="hero-label">
-            <h1>{order.customerName || order.lineName}</h1>
-            <p>{t(sheet.titleKey)} · {formatOrderDate(order.day, sheet, language)} · {formatMoney(order.totalSales, language)} THB</p>
-          </div>
+      <div className={`detail-hero${heroImage ? ' has-product-image' : ''}`}>
+        {heroImage && <img src={heroImage} alt="" />}
+        <button type="button" className="back-button" onClick={() => navigate(`/admin/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ChevronLeft size={20} /></button>
+        <div className="hero-label">
+          <h1>{order.customerName || order.lineName}</h1>
+          <p>{t(sheet.titleKey)} · {formatOrderDate(order.day, sheet, language)} · {formatMoney(order.totalSales, language)} THB</p>
         </div>
-
+      </div>
+      <div className="detail-scroll-area">
         <div className="detail-body">
           <div className="detail-title-row">
             <h2>{t('details.title')}</h2>
@@ -794,15 +789,15 @@ function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, S
 
   return (
     <section className="app-screen home-screen analytics-screen" aria-label={t('screen.analytics')}>
-      <div className="home-scroll-area">
+      <div className="screen-fixed-header analytics-fixed-header">
         <header className="sales-summary analytics-summary">
           <p>{t('sheets.kind.sales')} · {t(currentSheet.titleKey)}</p>
           <h1>{t('analytics.title')}</h1>
           <p className="sales-growth">{loading ? t('sheet.loadingShort') : t('analytics.currentMonth')}</p>
         </header>
-
         <label className="analytics-status-filter"><span>{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
-
+      </div>
+      <div className="home-scroll-area analytics-scroll-area">
         <div className="analytics-metrics">
           {loading && Object.keys(dataBySheet).length === 0 ? Array.from({ length: 6 }, (_, index) => <div className="metric-card-skeleton" key={index}><i /><b /></div>) : <>
             <article className="metric-card featured"><span>{statusFilter === 'all' ? t('analytics.thisMonth') : t('analytics.filteredSales')}</span><strong>{formatMoney(sheetTotal(scopedOrders), language)} <small>THB</small></strong></article>
