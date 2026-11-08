@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ClipboardList,
   Home,
-  LogOut,
   ImagePlus,
   Package,
   Plus,
@@ -702,13 +701,25 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh }: { sheet: She
 const ADMIN_SESSION_KEY = 'sweetie-admin-session'
 const ADMIN_USERNAME = 'admin'
 const ADMIN_PASSWORD = '1234'
+const ADMIN_SESSION_TTL_MS = 24 * 60 * 60 * 1000
+
+function readAdminSessionExpiry() {
+  try {
+    const value = localStorage.getItem(ADMIN_SESSION_KEY)
+    if (!value) return null
+    const session = JSON.parse(value) as { username?: string; expiresAt?: number }
+    if (session.username !== ADMIN_USERNAME || typeof session.expiresAt !== 'number' || session.expiresAt <= Date.now()) {
+      localStorage.removeItem(ADMIN_SESSION_KEY)
+      return null
+    }
+    return session.expiresAt
+  } catch {
+    return null
+  }
+}
 
 function readAdminSession() {
-  try {
-    return sessionStorage.getItem(ADMIN_SESSION_KEY) === '1'
-  } catch {
-    return false
-  }
+  return readAdminSessionExpiry() !== null
 }
 
 function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: string) => boolean }) {
@@ -742,11 +753,6 @@ function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: str
       </div>
     </section>
   )
-}
-
-function AdminLogoutButton({ onLogout }: { onLogout: () => void }) {
-  const { t } = useTranslation()
-  return <button type="button" className="admin-logout btn btn-ghost btn-xs" onClick={onLogout}><LogOut size={13} /> {t('auth.logout')}</button>
 }
 
 function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, SheetDataState>; loading: boolean }) {
@@ -837,7 +843,8 @@ function App() {
   const location = useLocation()
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(readAdminSession)
   const [dataBySheet, setDataBySheet] = useState<Record<string, SheetDataState>>({})
-  const [localOrdersBySheet, setLocalOrdersBySheet] = useState<Record<string, SheetOrder[]>>(loadLocalOrders)
+  const [localOrdersBySheet, setLocalOrdersBySheet] = useState<Record<string, SheetOrder[]>>(() => readAdminSession() ? loadLocalOrders() : {})
+  const [localOrdersReady, setLocalOrdersReady] = useState(readAdminSession)
   const [loading, setLoading] = useState(readAdminSession)
   const [initialDataReady, setInitialDataReady] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -870,12 +877,13 @@ function App() {
   }, [refreshKey, isAdminAuthenticated, isAdminPath])
 
   useEffect(() => {
+    if (!isAdminAuthenticated || !localOrdersReady) return
     try {
       localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(localOrdersBySheet))
     } catch {
       // The current session remains usable if browser storage is full or disabled.
     }
-  }, [localOrdersBySheet])
+  }, [localOrdersBySheet, isAdminAuthenticated, localOrdersReady])
 
   const mergedDataBySheet = useMemo(() => Object.fromEntries(SHEETS.map((sheet) => {
     const remote = dataBySheet[sheet.id] ?? { orders: [] }
@@ -893,10 +901,12 @@ function App() {
   const login = (username: string, password: string) => {
     if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) return false
     try {
-      sessionStorage.setItem(ADMIN_SESSION_KEY, '1')
+      localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({ username, expiresAt: Date.now() + ADMIN_SESSION_TTL_MS }))
     } catch {
       // Authentication remains active for this app session if storage is blocked.
     }
+    setLocalOrdersBySheet(loadLocalOrders())
+    setLocalOrdersReady(true)
     setInitialDataReady(false)
     setLoading(true)
     setIsAdminAuthenticated(true)
@@ -904,18 +914,39 @@ function App() {
     return true
   }
 
-  const logout = () => {
+  const expireSession = useCallback(() => {
     try {
-      sessionStorage.removeItem(ADMIN_SESSION_KEY)
+      localStorage.removeItem(ADMIN_SESSION_KEY)
     } catch {
-      // Ignore storage restrictions; the in-memory gate still closes.
+      // Ignore storage restrictions; the in-memory guard still closes.
     }
     setIsAdminAuthenticated(false)
+    setLocalOrdersBySheet({})
+    setLocalOrdersReady(false)
     setDataBySheet({})
     setInitialDataReady(false)
     setLoading(false)
-    navigate('/', { replace: true })
-  }
+    navigate('/admin', { replace: true })
+  }, [navigate])
+
+  useEffect(() => {
+    if (!isAdminAuthenticated) return
+    const expiresAt = readAdminSessionExpiry()
+    if (expiresAt === null) {
+      const timeoutId = window.setTimeout(expireSession, 0)
+      return () => window.clearTimeout(timeoutId)
+    }
+    const timeoutId = window.setTimeout(expireSession, Math.max(0, expiresAt - Date.now()))
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === ADMIN_SESSION_KEY && !event.newValue) expireSession()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => {
+      window.clearTimeout(timeoutId)
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [expireSession, isAdminAuthenticated])
+
 
   const createLocalOrder = (sheetId: string, draft: OrderDraft) => {
     const lines: SheetOrderLine[] = draft.lines.map((line) => ({
@@ -956,6 +987,7 @@ function App() {
   if (!isAdminPath) {
     return <main className="app-stage"><div className="app-shell"><SplashScreen showLoading={false} /></div></main>
   }
+  if (!isAdminAuthenticated && location.pathname !== '/admin') return <Navigate to="/admin" replace />
   if (!isAdminAuthenticated) {
     return <main className="app-stage"><div className="app-shell"><AdminLoginPage onLogin={login} /></div></main>
   }
@@ -968,7 +1000,6 @@ function App() {
     <main className="app-stage">
       <div className="app-shell">
 
-        <AdminLogoutButton onLogout={logout} />
         <Routes>
           <Route path="/admin/home" element={<HomePage dataBySheet={mergedDataBySheet} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} />} />
           <Route path="/admin/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} />} />

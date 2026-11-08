@@ -52,15 +52,18 @@
 }
 
 * { box-sizing: border-box; }
-html, body, #root { width: 100%; min-width: 320px; min-height: 100%; margin: 0; }
+html, body, #root { width: 100%; height: 100%; min-width: 320px; margin: 0; overflow: hidden; }
 html { scroll-behavior: smooth; }
-body { min-height: 100vh; }
+body { height: 100%; overflow: hidden; }
 button { font: inherit; -webkit-tap-highlight-color: transparent; }
 
 .app-stage {
   display: grid;
-  min-height: 100vh;
-  min-height: 100svh;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   place-items: center;
   padding: 24px;
   background: #1d1d1d;
@@ -68,8 +71,9 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .app-shell {
   position: relative;
   width: min(100%, 410px);
-  height: min(860px, calc(100svh - 48px));
-  min-height: 700px;
+  height: min(860px, calc(100dvh - 48px));
+  min-height: 0;
+  max-height: calc(100dvh - 48px);
   overflow: hidden;
   border-radius: 40px;
   background: #fff;
@@ -157,12 +161,12 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
 
 @media (max-width: 600px) {
-  .app-stage { display: block; min-height: 100vh; min-height: 100svh; padding: 0; background: #fff; }
-  .app-shell { width: 100%; height: 100vh; height: 100svh; min-height: 0; border-radius: 0; box-shadow: none; }
+  .app-stage { display: block; width: 100%; height: 100vh; height: 100dvh; min-height: 0; padding: 0; background: #fff; }
+  .app-shell { width: 100%; height: 100vh; height: 100dvh; min-height: 0; max-height: none; border-radius: 0; box-shadow: none; }
 }
 @media (max-height: 740px) and (min-width: 601px) {
-  .app-stage { padding-block: 12px; }
-  .app-shell { height: calc(100svh - 24px); min-height: 640px; }
+  .app-stage { height: 100dvh; padding-block: 12px; }
+  .app-shell { height: calc(100dvh - 24px); min-height: 0; max-height: calc(100dvh - 24px); }
   .detail-screen { padding-bottom: 24px; }
   .customer-list { gap: 13px; margin-top: 22px; }
 }
@@ -198,8 +202,8 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .payment-card > div:first-child strong { color: #333; font-size: 14px; }
 .payment-card > div:last-child strong { color: #67b900; }
 @media (max-height: 760px) and (min-width: 601px) {
-  .app-stage { padding-block: 12px; }
-  .app-shell { height: calc(100svh - 24px); min-height: 640px; }
+  .app-stage { height: 100dvh; padding-block: 12px; }
+  .app-shell { height: calc(100dvh - 24px); min-height: 0; max-height: calc(100dvh - 24px); }
   .detail-screen { padding: 14px 18px 16px; }
   .detail-scroll-area { padding-bottom: 10px; }
   .detail-hero { height: 180px; }
@@ -446,7 +450,7 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .profit-badge.unknown { color: #8e8785; }
 .profit-text { border-radius: 999px; padding: 3px 7px; font-size: 10px; font-weight: 700; }
 
-.admin-login-screen { display: grid; place-items: center; padding: 74px 22px 32px; background: linear-gradient(160deg,#fffafb,#fff4f7 60%,#fff); }
+.admin-login-screen { display: grid; place-items: center; overflow-y: auto; scrollbar-width: none; padding: 74px 22px 32px; background: linear-gradient(160deg,#fffafb,#fff4f7 60%,#fff); }
 .admin-login-card { width: 100%; max-width: 350px; border: 1px solid #f2e6e9; border-radius: 24px; padding: 25px 22px; background: #fff; box-shadow: 0 14px 32px rgb(108 57 74 / 8%); }
 .admin-login-card > img { display: block; width: 104px; height: 94px; margin: 0 auto 12px; object-fit: contain; }
 .admin-login-card > p { margin: 0; color: #a26378; text-align: center; font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
