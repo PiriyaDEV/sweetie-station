@@ -1,32 +1,119 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  ArrowRight,
+  BarChart3,
+  CalendarDays,
+  Check,
   ChevronLeft,
-  Clock3,
-  Heart,
+  ClipboardList,
   Home,
-  Send,
-  UserRound,
+  ImagePlus,
+  Package,
+  Plus,
+  RefreshCw,
+  Search,
+  X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router'
-import cityPhoto from './assets/order-city.png'
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
+import {
+  fetchAllSheets,
+  formatOrderDate,
+  SHEETS,
+  type SheetDataState,
+  type SheetDefinition,
+  type SheetOrder,
+  type SheetOrderLine,
+} from './sheet'
 
-type Order = {
-  id: number
-  month: string
-  amount: string
-  change: string
-  hasPhoto?: boolean
+type DraftLine = {
+  itemName: string
+  quantity: string
+  salePrice: string
+  bankAmount: string
+  depositAmount: string
+  image: string
 }
 
-const orders: Order[] = [
-  { id: 1, month: 'Oct', amount: '1,000 THB', change: '+ 10,230 THB', hasPhoto: true },
-  { id: 2, month: 'Oct', amount: '1,000 THB', change: '+ 10,230 THB' },
-  { id: 3, month: 'Oct', amount: '1,000 THB', change: '+ 10,230 THB' },
-  { id: 4, month: 'Oct', amount: '1,000 THB', change: '+ 10,230 THB' },
-  { id: 5, month: 'Sep', amount: '850 THB', change: '+ 8,500 THB' },
-  { id: 6, month: 'Sep', amount: '720 THB', change: '+ 7,200 THB' },
-]
+type OrderDraft = {
+  lineName: string
+  customerName: string
+  day: string
+  paymentStatus: string
+  shippingStatus: string
+  lines: DraftLine[]
+}
+
+const LOCAL_ORDERS_KEY = 'sweetie-local-orders-v1'
+const EMPTY_ORDERS: SheetOrder[] = []
+
+function formatMoney(value: number, language: string) {
+  return new Intl.NumberFormat(language === 'th' ? 'th-TH' : 'en-US', {
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
+function loadLocalOrders(): Record<string, SheetOrder[]> {
+  try {
+    const saved = localStorage.getItem(LOCAL_ORDERS_KEY)
+    return saved ? JSON.parse(saved) as Record<string, SheetOrder[]> : {}
+  } catch {
+    return {}
+  }
+}
+
+function getCurrentMonthSheet(dataBySheet: Record<string, SheetDataState>): SheetDefinition {
+  const monthKey = ['jan', 'feb', 'mar', 'apr', 'may', 'june', 'july', 'aug', 'sep', 'oct', 'nov', 'dec'][new Date().getMonth()]
+  const thisMonth = SHEETS.find((sheet) => sheet.kind === 'sales' && sheet.monthKey === monthKey)
+  if (thisMonth) return thisMonth
+  return [...SHEETS].reverse().find((sheet) => sheet.kind === 'sales' && (dataBySheet[sheet.id]?.orders.length ?? 0) > 0) ?? SHEETS[0]
+}
+
+function paymentStatusLabel(status: string, t: (key: string) => string) {
+  if (status === 'จ่ายเต็ม') return t('detail.paymentFull')
+  if (status === 'มัดจำ') return t('detail.paymentDeposit')
+  return status || t('detail.notSet')
+}
+
+function shippingStatusLabel(status: string, t: (key: string) => string) {
+  if (status === 'รอเข้าไทย') return t('detail.shippingInbound')
+  if (status === 'ส่งแล้ว') return t('detail.shippingSent')
+  return status || t('detail.notSet')
+}
+
+function paymentBadgeClass(status: string) {
+  if (status === 'จ่ายเต็ม') return 'paid'
+  if (status === 'มัดจำ') return 'deposit'
+  return 'neutral'
+}
+
+function shippingBadgeClass(status: string) {
+  if (status === 'ส่งแล้ว') return 'shipped'
+  if (status === 'รอเข้าไทย') return 'inbound'
+  return 'neutral'
+}
+
+const translatedFieldLabels: Record<string, string> = {
+  'ส่วนลด': 'detailFields.discount',
+  'ราคาจีน': 'detailFields.chinaPrice',
+  'ต้นทุน(บาท)': 'detailFields.costTHB',
+  'กำไร': 'detailFields.profit',
+  'ค่าส่ง': 'detailFields.shipping',
+  'ค่าส่งเก็บเพิ่มเติม': 'detailFields.extraShipping',
+  'ค่าส่งเก็บเพิ่ม': 'detailFields.extraShipping',
+  'ค่าสินค้า (Y)': 'detailFields.productCostY',
+  'ค่าสินค้า (B)': 'detailFields.productCostB',
+  'ต้นทุน(RMB)': 'detailFields.costRMB',
+  'ต้นทุน(THB)': 'detailFields.costTHB',
+  'ต้นทุน(หยวน)': 'detailFields.costRMB',
+  'ค่าส่งจีน': 'detailFields.chinaShipping',
+  'กำไรสุทธิ': 'detailFields.netProfit',
+}
+
+function fieldLabel(key: string, t: (key: string) => string) {
+  const translationKey = translatedFieldLabels[key]
+  return translationKey ? t(translationKey) : key
+}
 
 function SweetieMark() {
   return (
@@ -84,52 +171,87 @@ function SplashScreen() {
 function BottomNavigation() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
+  const isHome = location.pathname === '/home'
+  const isAnalytics = location.pathname === '/analytics'
 
   return (
     <nav className="bottom-nav" aria-label={t('nav.label')}>
-      <button type="button" className="nav-item active" aria-label={t('nav.home')} onClick={() => navigate('/home')}><Home size={22} fill="currentColor" /></button>
-      <button type="button" className="nav-item" aria-label={t('nav.orders')} onClick={() => navigate('/orders/1')}><Clock3 size={22} /></button>
-      <button type="button" className="nav-item" aria-label={t('nav.favorites')} disabled><Heart size={22} /></button>
-      <button type="button" className="nav-item" aria-label={t('nav.profile')} disabled><UserRound size={21} /></button>
+      <button type="button" className={`nav-item${isHome ? ' active' : ''}`} aria-label={t('nav.home')} onClick={() => navigate('/home')}><Home size={22} fill={isHome ? 'currentColor' : 'none'} /></button>
+      <button type="button" className={`nav-item${!isHome && !isAnalytics ? ' active' : ''}`} aria-label={t('nav.orders')} onClick={() => navigate('/orders')}><ClipboardList size={22} /></button>
+      <button type="button" className={`nav-item${isAnalytics ? ' active' : ''}`} aria-label={t('nav.analytics')} onClick={() => navigate('/analytics')}><BarChart3 size={22} /></button>
     </nav>
   )
 }
 
-function HomeScreen() {
-  const { t } = useTranslation()
+function sheetTotal(orders: SheetOrder[]) {
+  return orders.reduce((sum, order) => sum + order.totalSales, 0)
+}
+
+function getPreviewImage(orders: SheetOrder[]) {
+  return orders.flatMap((order) => order.lines).flatMap((line) => line.images)[0]
+}
+
+function HomePage({
+  dataBySheet,
+  loading,
+  refreshing,
+  onRefresh,
+}: {
+  dataBySheet: Record<string, SheetDataState>
+  loading: boolean
+  refreshing: boolean
+  onRefresh: () => void
+}) {
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const language = i18n.resolvedLanguage ?? 'en'
 
   return (
     <section className="app-screen home-screen" aria-label={t('screen.home')}>
       <div className="home-scroll-area">
-        <header className="sales-summary">
-          <p>{t('sales.currentMonth')}</p>
-          <h1>16,124.214 <span>THB</span></h1>
-          <p className="sales-growth">+ 1,000 THB (12.34%)</p>
+        <header className="sales-summary sheet-home-summary">
+          <p>{t('sheets.kicker')}</p>
+          <h1>{t('sheets.chooseMonth')}</h1>
+          <p className="sales-growth">{t('sheets.sheetCount', { count: SHEETS.length })}</p>
         </header>
 
         <div className="section-heading">
-          <h2>{t('orders.title')}</h2>
-          <button type="button" className="view-all">{t('orders.viewAll')}</button>
+          <h2>{t('sheets.allSheets')}</h2>
+          <button type="button" className="view-all" onClick={onRefresh} disabled={refreshing}>
+            <RefreshCw size={13} className={refreshing ? 'refreshing-icon' : ''} />
+            {refreshing ? t('orders.refreshing') : t('orders.refresh')}
+          </button>
         </div>
 
-        <div className="order-grid">
-          {orders.map((order) => (
-            <button
-              type="button"
-              className={`order-card${order.hasPhoto ? ' order-card-photo' : ''}`}
-              key={order.id}
-              onClick={() => navigate(`/orders/${order.id}`)}
-              aria-label={`${t('orders.open')} ${t('orders.sale')}, ${order.month}`}
-            >
-              {order.hasPhoto && <img src={cityPhoto} alt="City storefront" />}
-              {order.hasPhoto && <span className="favorite-badge"><Heart size={15} /></span>}
-              <span className="order-caption">
-                <span className="order-title">{t('orders.sale')}, {order.month}</span>
-                <span className="order-value">{order.amount} <b>{order.change}</b></span>
-              </span>
-            </button>
-          ))}
+        <div className="sheet-grid">
+          {SHEETS.map((sheet) => {
+            const sheetData = dataBySheet[sheet.id]
+            const orders = sheetData?.orders ?? []
+            const image = getPreviewImage(orders)
+            return (
+              <button
+                type="button"
+                className="sheet-card"
+                key={sheet.id}
+                onClick={() => navigate(`/sheets/${sheet.id}`)}
+                aria-label={`${t(sheet.titleKey)} · ${orders.length} ${t('orders.orders')}`}
+              >
+                {image
+                  ? <img className="sheet-card-image" src={image} alt="" loading="lazy" />
+                  : <span className={`sheet-card-placeholder ${sheet.kind}`}><CalendarDays size={25} /></span>}
+                <span className="sheet-card-topline">
+                  <span className={`sheet-kind ${sheet.kind}`}>{t(`sheets.kind.${sheet.kind}`)}</span>
+                  <ArrowRight size={15} />
+                </span>
+                <span className="sheet-card-caption">
+                  <strong>{t(sheet.titleKey)}</strong>
+                  <span>{sheetData?.error ? t('sheet.errorShort') : loading && !sheetData ? t('sheet.loadingShort') : t('sheets.orderCount', { count: orders.length })}</span>
+                  <b>{sheetData?.error ? '—' : `${formatMoney(sheetTotal(orders), language)} THB`}</b>
+                </span>
+              </button>
+            )
+          })}
         </div>
       </div>
       <BottomNavigation />
@@ -137,82 +259,504 @@ function HomeScreen() {
   )
 }
 
-function OrderDetailsScreen() {
+function StatusBadge({ status = '', type, label }: { status?: string; type: 'payment' | 'shipping' | 'quantity'; label?: string }) {
   const { t } = useTranslation()
+  if (type === 'quantity') return <span className="status-badge quantity">{label}</span>
+  const text = type === 'payment' ? paymentStatusLabel(status, t) : shippingStatusLabel(status, t)
+  const className = type === 'payment' ? paymentBadgeClass(status) : shippingBadgeClass(status)
+  return <span className={`status-badge ${type} ${className}`}>{text}</span>
+}
+
+function OrderListRow({ order, sheet }: { order: SheetOrder; sheet: SheetDefinition }) {
+  const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
+  const language = i18n.resolvedLanguage ?? 'en'
+  const image = order.lines.flatMap((line) => line.images)[0]
+
+  return (
+    <button
+      type="button"
+      className="order-list-row"
+      onClick={() => navigate(`/sheets/${sheet.id}/orders/${order.id}`)}
+      aria-label={`${t('orders.open')} ${order.customerName || order.lineName}`}
+    >
+      <span className="order-row-photo">
+        {image ? <img src={image} alt="" loading="lazy" /> : <Package size={22} />}
+      </span>
+      <span className="order-row-main">
+        <span className="order-row-title">{order.customerName || order.lineName}</span>
+        <span className="order-row-subtitle">{order.lineName} · {formatOrderDate(order.day, sheet, language)} · {order.quantity === 1 ? t('orders.oneItem') : t('orders.manyItems', { count: order.quantity })}</span>
+        <span className="order-row-badges">
+          <StatusBadge type="payment" status={order.paymentStatus} />
+          <StatusBadge type="shipping" status={order.shippingStatus} />
+          {order.isLocal && <span className="status-badge local">{t('orders.deviceOnly')}</span>}
+        </span>
+      </span>
+      <span className="order-row-total">{formatMoney(order.totalSales, language)}<small>THB</small></span>
+    </button>
+  )
+}
+
+function getDefaultDay(sheet: SheetDefinition) {
+  const monthIndex: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, june: 5, july: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 }
+  const now = new Date()
+  return String(now.getMonth() === monthIndex[sheet.monthKey] ? now.getDate() : 1)
+}
+
+function emptyDraft(sheet: SheetDefinition): OrderDraft {
+  return {
+    lineName: '',
+    customerName: '',
+    day: getDefaultDay(sheet),
+    paymentStatus: '',
+    shippingStatus: '',
+    lines: [{ itemName: '', quantity: '1', salePrice: '', bankAmount: '', depositAmount: '', image: '' }],
+  }
+}
+
+async function imageToDataUrl(file: File) {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, 720 / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Image processing is unavailable.')
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  return canvas.toDataURL('image/webp', 0.76)
+}
+
+function CreateOrderDialog({
+  sheet,
+  imageChoices,
+  onClose,
+  onSave,
+}: {
+  sheet: SheetDefinition
+  imageChoices: Array<{ url: string; label: string }>
+  onClose: () => void
+  onSave: (draft: OrderDraft) => void
+}) {
+  const { t } = useTranslation()
+  const [draft, setDraft] = useState(() => emptyDraft(sheet))
+  const [openPicker, setOpenPicker] = useState<number | null>(null)
+  const [imageQuery, setImageQuery] = useState('')
+  const [imageError, setImageError] = useState('')
+
+  const updateField = <K extends keyof OrderDraft>(key: K, value: OrderDraft[K]) => setDraft((current) => ({ ...current, [key]: value }))
+  const updateLine = (index: number, key: keyof DraftLine, value: string) => {
+    setDraft((current) => ({
+      ...current,
+      lines: current.lines.map((line, lineIndex) => lineIndex === index ? { ...line, [key]: value } : line),
+    }))
+  }
+
+  const handleFile = async (index: number, file?: File) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setImageError(t('createOrder.imageTypeError'))
+      return
+    }
+    try {
+      const image = await imageToDataUrl(file)
+      updateLine(index, 'image', image)
+      setImageError('')
+    } catch {
+      setImageError(t('createOrder.imageReadError'))
+    }
+  }
+
+  const filteredImages = imageChoices.filter((choice) => choice.label.toLocaleLowerCase().includes(imageQuery.toLocaleLowerCase()))
+
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    onSave(draft)
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
+      <section className="create-order-modal" role="dialog" aria-modal="true" aria-labelledby="create-order-heading">
+        <header className="modal-header">
+          <div>
+            <p>{t(sheet.titleKey)}</p>
+            <h2 id="create-order-heading">{t('createOrder.title')}</h2>
+          </div>
+          <button type="button" className="modal-close" onClick={onClose} aria-label={t('createOrder.close')}><X size={20} /></button>
+        </header>
+
+        <form className="order-form" onSubmit={submit}>
+          <div className="form-grid two-columns">
+            <label>{t('detail.lineName')}<input value={draft.lineName} onChange={(event) => updateField('lineName', event.target.value)} placeholder={t('createOrder.linePlaceholder')} /></label>
+            <label>{t('detail.customer')}<input value={draft.customerName} onChange={(event) => updateField('customerName', event.target.value)} required placeholder={t('createOrder.customerPlaceholder')} /></label>
+          </div>
+          <label className="day-field">{t('createOrder.day')}<input type="number" min="1" max="31" value={draft.day} onChange={(event) => updateField('day', event.target.value)} required /></label>
+
+          <div className="form-section-heading"><h3>{t('detail.items')}</h3><span>{t('createOrder.monthOnlyImages', { month: t(sheet.titleKey) })}</span></div>
+
+          {draft.lines.map((line, index) => (
+            <section className="draft-line-card" key={index}>
+              <div className="draft-line-heading"><strong>{t('createOrder.itemNumber', { number: index + 1 })}</strong>{draft.lines.length > 1 && <button type="button" className="remove-line" onClick={() => setDraft((current) => ({ ...current, lines: current.lines.filter((_, lineIndex) => lineIndex !== index) }))}>{t('createOrder.remove')}</button>}</div>
+              <label>{t('createOrder.itemName')}<input value={line.itemName} onChange={(event) => updateLine(index, 'itemName', event.target.value)} required /></label>
+              <div className="form-grid two-columns">
+                <label>{t('createOrder.quantity')}<input type="number" min="1" value={line.quantity} onChange={(event) => updateLine(index, 'quantity', event.target.value)} required /></label>
+                <label>{t('createOrder.price')}<input type="number" min="0" step="0.01" value={line.salePrice} onChange={(event) => updateLine(index, 'salePrice', event.target.value)} required /></label>
+                <label>{t('createOrder.bank')}<input type="number" min="0" step="0.01" value={line.bankAmount} onChange={(event) => updateLine(index, 'bankAmount', event.target.value)} /></label>
+                <label>{t('createOrder.depositAmount')}<input type="number" min="0" step="0.01" value={line.depositAmount} onChange={(event) => updateLine(index, 'depositAmount', event.target.value)} /></label>
+              </div>
+
+              <div className="image-source-row">
+                <label className="upload-image-button">
+                  <ImagePlus size={16} /> {t('createOrder.uploadPhoto')}
+                  <input type="file" accept="image/*" onChange={(event) => void handleFile(index, event.target.files?.[0])} />
+                </label>
+                <button type="button" className="choose-month-image" onClick={() => { setOpenPicker(openPicker === index ? null : index); setImageQuery('') }} disabled={imageChoices.length === 0}>
+                  {t('createOrder.chooseMonthImage')}
+                </button>
+              </div>
+
+              {line.image && <div className="draft-image-preview"><img src={line.image} alt={t('createOrder.selectedImage')} /><button type="button" onClick={() => updateLine(index, 'image', '')}>{t('createOrder.removeImage')}</button></div>}
+
+              {openPicker === index && <div className="month-image-picker">
+                <input value={imageQuery} onChange={(event) => setImageQuery(event.target.value)} placeholder={t('createOrder.filterMonthImages')} aria-label={t('createOrder.filterMonthImages')} />
+                <div className="month-image-grid">
+                  {filteredImages.map((choice) => <button type="button" key={choice.url} title={choice.label} onClick={() => { updateLine(index, 'image', choice.url); setOpenPicker(null) }}><img src={choice.url} alt={choice.label} /></button>)}
+                  {filteredImages.length === 0 && <span className="picker-empty">{t('createOrder.noMonthImages')}</span>}
+                </div>
+              </div>}
+            </section>
+          ))}
+          <button type="button" className="add-line-button" onClick={() => setDraft((current) => ({ ...current, lines: [...current.lines, { itemName: '', quantity: '1', salePrice: '', bankAmount: '', depositAmount: '', image: '' }] }))}><Plus size={15} /> {t('createOrder.addItem')}</button>
+
+          <div className="form-grid two-columns">
+            <label>{t('createOrder.paymentStatus')}<select value={draft.paymentStatus} onChange={(event) => updateField('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option></select></label>
+            <label>{t('createOrder.shippingStatus')}<select value={draft.shippingStatus} onChange={(event) => updateField('shippingStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="รอเข้าไทย">{t('detail.shippingInbound')}</option><option value="ส่งแล้ว">{t('detail.shippingSent')}</option></select></label>
+          </div>
+          {imageError && <p className="form-error" role="alert">{imageError}</p>}
+          <p className="local-save-note">{t('createOrder.localOnly')}</p>
+          <footer className="modal-actions">
+            <button type="button" className="cancel-order-button" onClick={onClose}>{t('createOrder.cancel')}</button>
+            <button type="submit" className="save-order-button"><Check size={16} /> {t('createOrder.save')}</button>
+          </footer>
+        </form>
+      </section>
+    </div>
+  )
+}
+
+function SheetOrdersPage({
+  sheet,
+  sheetData,
+  loading,
+  onRefresh,
+  onCreateOrder,
+}: {
+  sheet: SheetDefinition
+  sheetData?: SheetDataState
+  loading: boolean
+  onRefresh: () => void
+  onCreateOrder: (sheetId: string, draft: OrderDraft) => void
+}) {
+  const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
+  const language = i18n.resolvedLanguage ?? 'en'
+  const [query, setQuery] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
+  const [notice, setNotice] = useState('')
+  const orders = sheetData?.orders ?? EMPTY_ORDERS
+  const filteredOrders = orders.filter((order) => `${order.lineName} ${order.customerName} ${order.lines.map((line) => line.itemName).join(' ')}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+  const imageChoices = useMemo(() => {
+    const seen = new Set<string>()
+    return orders.flatMap((order) => order.lines.flatMap((line, lineIndex) => line.images.map((url) => ({ url, label: line.itemName || order.customerName || order.lineName || t('createOrder.itemNumber', { number: lineIndex + 1 }) }))))
+      .filter((choice) => {
+        if (seen.has(choice.url)) return false
+        seen.add(choice.url)
+        return true
+      })
+  }, [orders, t])
+
+  const saveLocalOrder = (draft: OrderDraft) => {
+    onCreateOrder(sheet.id, draft)
+    setCreateOpen(false)
+    setNotice(t('createOrder.savedNotice'))
+    window.setTimeout(() => setNotice(''), 3000)
+  }
+
+  return (
+    <section className="app-screen home-screen" aria-label={t('screen.sheetOrders')}>
+      <div className="home-scroll-area">
+        <button type="button" className="screen-back-button" onClick={() => navigate('/home')} aria-label={t('nav.backToSheets')}>
+          <ChevronLeft size={18} /> {t('nav.allSheets')}
+        </button>
+        <header className="sales-summary month-summary">
+          <p>{t(`sheets.kind.${sheet.kind}`)}</p>
+          <h1>{t(sheet.titleKey)}</h1>
+          <p className="sales-growth">{loading && !sheetData ? t('sheet.loadingShort') : t('sheets.monthSummary', { orders: orders.length, total: formatMoney(sheetTotal(orders), language) })}</p>
+        </header>
+
+        <div className="order-list-heading">
+          <div><h2>{t('orders.title')}</h2><span>{t('sheets.orderCount', { count: filteredOrders.length })}</span></div>
+          <button type="button" className="view-all" onClick={onRefresh} disabled={loading}><RefreshCw size={13} className={loading ? 'refreshing-icon' : ''} />{loading ? t('orders.refreshing') : t('orders.refresh')}</button>
+        </div>
+
+        <label className="order-search">
+          <Search size={16} />
+          <span className="sr-only">{t('orders.search')}</span>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('orders.search')} />
+        </label>
+        <button type="button" className="create-order-list-button" onClick={() => setCreateOpen(true)}><Plus size={17} /> {t('createOrder.open')}</button>
+
+        {sheetData?.error && <div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div>}
+        {!sheetData && loading && <p className="sheet-message">{t('sheet.loading')}</p>}
+        {sheetData && !sheetData.error && orders.length === 0 && <p className="sheet-message">{t('sheet.empty')}</p>}
+        {query && filteredOrders.length === 0 && <p className="sheet-message">{t('orders.noMatch')}</p>}
+
+        <div className="order-list-table">
+          {filteredOrders.map((order) => <OrderListRow key={order.id} order={order} sheet={sheet} />)}
+        </div>
+      </div>
+      <BottomNavigation />
+      {createOpen && <CreateOrderDialog sheet={sheet} imageChoices={imageChoices} onClose={() => setCreateOpen(false)} onSave={saveLocalOrder} />}
+      {notice && <p className="app-toast" role="status">{notice}</p>}
+    </section>
+  )
+}
+
+function OrderDetailsPage({ sheet, sheetData, loading, onRefresh }: { sheet: SheetDefinition; sheetData?: SheetDataState; loading: boolean; onRefresh: () => void }) {
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { orderId } = useParams()
-  const order = orders.find((item) => item.id === Number(orderId))
-  const [showMessage, setShowMessage] = useState(false)
+  const language = i18n.resolvedLanguage ?? 'en'
+  const order = sheetData?.orders.find((item) => item.id === orderId)
+  if (loading && !sheetData) return <section className="app-screen detail-screen"><p className="sheet-message">{t('sheet.loading')}</p></section>
+  if (sheetData?.error) return <section className="app-screen detail-screen"><div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div></section>
+  if (!order) return <Navigate to={`/sheets/${sheet.id}`} replace />
 
-  useEffect(() => {
-    if (!showMessage) return
-    const timeoutId = window.setTimeout(() => setShowMessage(false), 2200)
-    return () => window.clearTimeout(timeoutId)
-  }, [showMessage])
-
-  if (!order) return <Navigate to="/home" replace />
+  const heroImage = order.lines.flatMap((line) => line.images)[0]
 
   return (
     <section className="app-screen detail-screen" aria-label={t('screen.detail')}>
       <div className="detail-scroll-area">
-        <div className="detail-hero">
-          <button type="button" className="back-button" onClick={() => navigate('/home')} aria-label={t('nav.back')}>
-            <ChevronLeft size={20} />
-          </button>
+        <div className={`detail-hero${heroImage ? ' has-product-image' : ''}`}>
+          {heroImage && <img src={heroImage} alt="" />}
+          <button type="button" className="back-button" onClick={() => navigate(`/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ChevronLeft size={20} /></button>
           <div className="hero-label">
-            <h1>{t('orders.sale')}, {order.month}</h1>
-            <p>{order.amount} <b>{order.change}</b></p>
+            <h1>{order.customerName || order.lineName}</h1>
+            <p>{t(sheet.titleKey)} · {formatOrderDate(order.day, sheet, language)} · {formatMoney(order.totalSales, language)} THB</p>
           </div>
         </div>
 
         <div className="detail-body">
-          <h2>{t('details.title')}</h2>
-          <div className="order-stats" aria-label={t('details.summary')}>
-            <span><UserRound size={14} fill="currentColor" /> {t('details.ordersCount')}</span>
-            <span><Clock3 size={14} fill="currentColor" /> {t('details.successCount')}</span>
-            <span><Clock3 size={14} fill="currentColor" /> {t('details.ongoingCount')}</span>
+          <div className="detail-title-row">
+            <h2>{t('details.title')}</h2>
+            <span className="sheet-row-number">{order.isLocal ? t('orders.deviceOnly') : `#${order.sheetRow}`}</span>
           </div>
 
-          <div className="customer-list">
-            {Array.from({ length: 4 }, (_, index) => (
-              <article className="customer-row" key={index}>
-                <span className="customer-avatar"><UserRound size={17} fill="#d5d0c4" /><i>x1</i></span>
-                <div className="customer-name">
-                  <strong>{t('details.customer')}</strong>
-                  <span>{t('details.person')}</span>
-                </div>
-                <div className="customer-amount">
-                  <strong>550.00 THB</strong>
-                  <span>+ 550.00 THB</span>
-                </div>
-              </article>
-            ))}
+          <div className="order-stats" aria-label={t('details.summary')}>
+            <StatusBadge type="quantity" label={t('detail.quantity', { count: order.quantity, unit: order.quantity === 1 ? t('detail.piece') : t('detail.pieces') })} />
+            <StatusBadge type="payment" status={order.paymentStatus} />
+            <StatusBadge type="shipping" status={order.shippingStatus} />
           </div>
+
+          <section className="detail-card customer-card">
+            <div><span>{t('detail.lineName')}</span><strong>{order.lineName || t('detail.notSet')}</strong></div>
+            <div><span>{t('detail.customer')}</span><strong>{order.customerName || t('detail.notSet')}</strong></div>
+          </section>
+
+          <section className="detail-section">
+            <h3>{t('detail.items')}</h3>
+            <div className="item-list">
+              {order.lines.map((line, index) => (
+                <article className="item-row" key={`${order.id}-${line.row || index}`}>
+                  {line.images.length > 0
+                    ? <div className="item-images">{line.images.slice(0, 3).map((image, imageIndex) => <img key={`${image.slice(0, 48)}-${imageIndex}`} src={image} alt={t('detail.itemImage', { number: index + 1, image: imageIndex + 1 })} loading="lazy" />)}{line.images.length > 3 && <span>+{line.images.length - 3}</span>}</div>
+                    : <span className="item-index"><Package size={15} /></span>}
+                  <div className="item-description">
+                    <strong>{line.itemName || t('detail.itemNumber', { number: index + 1 })}</strong>
+                    <span>{t('detail.quantity', { count: line.quantity, unit: line.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</span>
+                    {line.attributes.length > 0 && <div className="item-attributes">{line.attributes.slice(0, 3).map((attribute) => <span key={`${attribute.key}-${attribute.value}`}>{fieldLabel(attribute.key, t)}: {attribute.value}</span>)}</div>}
+                  </div>
+                  <strong className="item-price">{line.salePrice ? `${formatMoney(line.salePrice, language)} THB` : '—'}</strong>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="detail-card payment-card">
+            <div><span>{t('detail.totalSales')}</span><strong>{formatMoney(order.totalSales, language)} THB</strong></div>
+            {order.bankTotal > 0 && <div><span>{t('detail.bank')}</span><strong>{formatMoney(order.bankTotal, language)} THB</strong></div>}
+            {order.depositTotal > 0 && <div><span>{t('detail.deposit')}</span><strong>{formatMoney(order.depositTotal, language)} THB</strong></div>}
+          </section>
         </div>
       </div>
+    </section>
+  )
+}
 
-      {showMessage && <p className="app-toast" role="status">{t('details.comingSoon')}</p>}
-      <button type="button" className="create-order-button" onClick={() => setShowMessage(true)}>
-        {t('details.createOrder')} <Send size={19} />
-      </button>
+function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, SheetDataState>; loading: boolean }) {
+  const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
+  const currentSheet = getCurrentMonthSheet(dataBySheet)
+  const currentOrders = dataBySheet[currentSheet.id]?.orders ?? []
+  const language = i18n.resolvedLanguage ?? 'en'
+  const shipped = currentOrders.filter((order) => order.shippingStatus === 'ส่งแล้ว').length
+  const inbound = currentOrders.filter((order) => order.shippingStatus === 'รอเข้าไทย').length
+  const paid = currentOrders.filter((order) => order.paymentStatus === 'จ่ายเต็ม').length
+  const deposits = currentOrders.filter((order) => order.paymentStatus === 'มัดจำ').length
+  const salesSheets = SHEETS.filter((sheet) => sheet.kind === 'sales')
+  const maximum = Math.max(1, ...salesSheets.map((sheet) => sheetTotal(dataBySheet[sheet.id]?.orders ?? [])))
+
+  return (
+    <section className="app-screen home-screen analytics-screen" aria-label={t('screen.analytics')}>
+      <div className="home-scroll-area">
+        <header className="sales-summary analytics-summary">
+          <p>{t('sheets.kind.sales')} · {t(currentSheet.titleKey)}</p>
+          <h1>{t('analytics.title')}</h1>
+          <p className="sales-growth">{loading ? t('sheet.loadingShort') : t('analytics.currentMonth')}</p>
+        </header>
+
+        <div className="analytics-metrics">
+          <article className="metric-card featured"><span>{t('analytics.sales')}</span><strong>{formatMoney(sheetTotal(currentOrders), language)} <small>THB</small></strong></article>
+          <article className="metric-card"><span>{t('analytics.orders')}</span><strong>{currentOrders.length}</strong></article>
+          <article className="metric-card"><span>{t('analytics.items')}</span><strong>{currentOrders.reduce((sum, order) => sum + order.quantity, 0)}</strong></article>
+          <article className="metric-card"><span>{t('analytics.shipped')}</span><strong>{shipped}</strong></article>
+        </div>
+
+        <section className="analytics-section">
+          <h2>{t('analytics.statusTitle')}</h2>
+          <div className="status-summary-row"><span className="status-badge paid">{t('detail.paymentFull')}</span><strong>{paid}</strong></div>
+          <div className="status-summary-row"><span className="status-badge deposit">{t('detail.paymentDeposit')}</span><strong>{deposits}</strong></div>
+          <div className="status-summary-row"><span className="status-badge shipped">{t('detail.shippingSent')}</span><strong>{shipped}</strong></div>
+          <div className="status-summary-row"><span className="status-badge inbound">{t('detail.shippingInbound')}</span><strong>{inbound}</strong></div>
+        </section>
+
+        <section className="analytics-section sales-by-month">
+          <div className="analytics-heading"><h2>{t('analytics.monthlySales')}</h2><button type="button" onClick={() => navigate('/home')}>{t('analytics.allSheets')}</button></div>
+          {salesSheets.map((sheet) => {
+            const amount = sheetTotal(dataBySheet[sheet.id]?.orders ?? [])
+            const width = Math.max(amount > 0 ? 5 : 0, Math.round((amount / maximum) * 100))
+            return <button type="button" className="monthly-bar-row" key={sheet.id} onClick={() => navigate(`/sheets/${sheet.id}`)}><span>{t(sheet.titleKey)}</span><span className="monthly-bar"><i style={{ width: `${width}%` }} /></span><strong>{formatMoney(amount, language)}</strong></button>
+          })}
+        </section>
+      </div>
+      <BottomNavigation />
     </section>
   )
 }
 
 function App() {
+  const [dataBySheet, setDataBySheet] = useState<Record<string, SheetDataState>>({})
+  const [localOrdersBySheet, setLocalOrdersBySheet] = useState<Record<string, SheetOrder[]>>(loadLocalOrders)
+  const [loading, setLoading] = useState(true)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchAllSheets(controller.signal)
+      .then((result) => setDataBySheet(result))
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setLoading(false)
+      })
+    return () => controller.abort()
+  }, [refreshKey])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(localOrdersBySheet))
+    } catch {
+      // The current session remains usable if browser storage is full or disabled.
+    }
+  }, [localOrdersBySheet])
+
+  const mergedDataBySheet = useMemo(() => Object.fromEntries(SHEETS.map((sheet) => {
+    const remote = dataBySheet[sheet.id] ?? { orders: [] }
+    return [sheet.id, {
+      ...remote,
+      orders: [...(localOrdersBySheet[sheet.id] ?? []), ...remote.orders],
+    }]
+  })), [dataBySheet, localOrdersBySheet])
+
+  const refresh = useCallback(() => {
+    setLoading(true)
+    setRefreshKey((key) => key + 1)
+  }, [])
+
+  const createLocalOrder = (sheetId: string, draft: OrderDraft) => {
+    const lines: SheetOrderLine[] = draft.lines.map((line) => ({
+      row: 0,
+      itemName: line.itemName.trim(),
+      quantity: Number(line.quantity) || 1,
+      salePrice: Number(line.salePrice) || 0,
+      bankAmount: Number(line.bankAmount) || 0,
+      depositAmount: Number(line.depositAmount) || 0,
+      images: line.image ? [line.image] : [],
+      attributes: [],
+    }))
+    const order: SheetOrder = {
+      id: `local-${Date.now()}`,
+      sheetRow: 0,
+      day: draft.day,
+      lineName: draft.lineName.trim(),
+      customerName: draft.customerName.trim(),
+      paymentStatus: draft.paymentStatus,
+      shippingStatus: draft.shippingStatus,
+      lines,
+      totalSales: lines.reduce((sum, line) => sum + line.salePrice, 0),
+      bankTotal: lines.reduce((sum, line) => sum + line.bankAmount, 0),
+      depositTotal: lines.reduce((sum, line) => sum + line.depositAmount, 0),
+      quantity: lines.reduce((sum, line) => sum + line.quantity, 0),
+      isLocal: true,
+    }
+    setLocalOrdersBySheet((current) => ({ ...current, [sheetId]: [order, ...(current[sheetId] ?? [])] }))
+  }
+
+  const currentMonthSheet = getCurrentMonthSheet(mergedDataBySheet)
+
   return (
     <main className="app-stage">
       <div className="app-shell">
         <LanguageToggle />
         <Routes>
           <Route path="/" element={<SplashScreen />} />
-          <Route path="/home" element={<HomeScreen />} />
-          <Route path="/orders/:orderId" element={<OrderDetailsScreen />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/home" element={<HomePage dataBySheet={mergedDataBySheet} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} />} />
+          <Route path="/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} />} />
+          <Route path="/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} />} />
+          <Route path="/sheets/:sheetId/orders/:orderId" element={<OrderDetailsRoute dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} />} />
+          <Route path="/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} loading={loading} />} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </div>
     </main>
   )
+}
+
+function SheetRouteView({
+  sheet: explicitSheet,
+  dataBySheet,
+  loading,
+  onRefresh,
+  onCreateOrder,
+}: {
+  sheet?: SheetDefinition
+  dataBySheet: Record<string, SheetDataState>
+  loading: boolean
+  onRefresh: () => void
+  onCreateOrder: (sheetId: string, draft: OrderDraft) => void
+}) {
+  const { sheetId } = useParams()
+  const sheet = explicitSheet ?? SHEETS.find((item) => item.id === sheetId)
+  if (!sheet) return <Navigate to="/home" replace />
+  return <SheetOrdersPage sheet={sheet} sheetData={dataBySheet[sheet.id]} loading={loading} onRefresh={onRefresh} onCreateOrder={onCreateOrder} />
+}
+
+function OrderDetailsRoute({ dataBySheet, loading, onRefresh }: { dataBySheet: Record<string, SheetDataState>; loading: boolean; onRefresh: () => void }) {
+  const { sheetId } = useParams()
+  const sheet = SHEETS.find((item) => item.id === sheetId)
+  if (!sheet) return <Navigate to="/home" replace />
+  return <OrderDetailsPage sheet={sheet} sheetData={dataBySheet[sheet.id]} loading={loading} onRefresh={onRefresh} />
 }
 
 export default App
