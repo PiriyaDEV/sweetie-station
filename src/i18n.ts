@@ -5,7 +5,7 @@ const resources = {
   en: {
     translation: {
       language: 'Language',
-      screen: { splash: 'Loading splash screen', home: 'Sheets home', sheetOrders: 'Orders in sheet', detail: 'Order details', analytics: 'Analytics' },
+      screen: { splash: 'Loading splash screen', home: 'Sheets home', sheetOrders: 'Orders in sheet', detail: 'Order details', analytics: 'Analytics', admin: 'Admin sign in' },
       splash: { tagline: 'Find Your Dream\nDestination With Us', continue: 'Skip loading and open home', logoAlt: 'Sweetie Station logo' },
       sheets: {
         kicker: 'Sweetie order book', chooseMonth: 'Choose a month', sheetCount: '{{count}} sheets · tap one to view its orders',
@@ -19,6 +19,7 @@ const resources = {
         item: 'item', items: 'items', oneItem: '1 item', manyItems: '{{count}} items', itemCount: '{{count}} items', resultCount: '{{shown}} of {{total}} orders', search: 'Search customer or item', searchItems: 'Search items', noMatch: 'No matching orders', deviceOnly: 'On this device', loadingMore: 'Loading more orders…', endOfList: 'You’re all caught up.', profit: 'Profit', profitUnavailable: '—',
       },
       details: { title: 'Order details', summary: 'Order summary' },
+      auth: { kicker: 'Sweetie admin', title: 'Admin sign in', username: 'Username', password: 'Password', signIn: 'Sign in', logout: 'Log out', invalid: 'Incorrect username or password.', temporary: 'Temporary demo login only — not secure access control.' },
       detail: {
         orderDay: '{{day}}', quantity: '{{count}} {{unit}}', piece: 'pc', pieces: 'pcs', paymentFull: 'Paid in full', paymentDeposit: 'Deposit',
         shippingInbound: 'Waiting for Thailand', shippingSent: 'Shipped', notSet: 'Not listed', lineName: 'LINE name', customer: 'Customer',
@@ -50,7 +51,7 @@ const resources = {
         error: 'Could not load this sheet.', errorShort: 'Unavailable', retry: 'Retry',
       },
       nav: {
-        label: 'Main navigation', home: 'Home', orders: 'Orders', analytics: 'Analytics', backToSheets: 'Back to all sheets',
+        logout: 'Log out', label: 'Main navigation', home: 'Home', orders: 'Orders', analytics: 'Analytics', backToSheets: 'Back to all sheets',
         allSheets: 'All sheets', backToOrders: 'Back to orders',
       },
     },
@@ -58,7 +59,7 @@ const resources = {
   th: {
     translation: {
       language: 'ภาษา',
-      screen: { splash: 'หน้าจอเริ่มต้น', home: 'หน้ารวมชีต', sheetOrders: 'รายการคำสั่งซื้อในชีต', detail: 'รายละเอียดคำสั่งซื้อ', analytics: 'วิเคราะห์ข้อมูล' },
+      screen: { splash: 'หน้าจอเริ่มต้น', home: 'หน้ารวมชีต', sheetOrders: 'รายการคำสั่งซื้อในชีต', detail: 'รายละเอียดคำสั่งซื้อ', analytics: 'วิเคราะห์ข้อมูล', admin: 'เข้าสู่ระบบผู้ดูแล' },
       splash: { tagline: 'ค้นหาจุดหมายในฝัน\nไปกับเรา', continue: 'ข้ามหน้ารอและไปหน้าหลัก', logoAlt: 'โลโก้ Sweetie Station' },
       sheets: {
         kicker: 'สมุดออเดอร์ Sweetie', chooseMonth: 'เลือกเดือน', sheetCount: '{{count}} ชีต · แตะเพื่อดูคำสั่งซื้อ',
@@ -72,6 +73,7 @@ const resources = {
         item: 'ชิ้น', items: 'ชิ้น', oneItem: '1 ชิ้น', manyItems: '{{count}} ชิ้น', itemCount: '{{count}} รายการ', resultCount: 'แสดง {{shown}} จาก {{total}} ออเดอร์', search: 'ค้นหาลูกค้าหรือสินค้า', searchItems: 'ค้นหารายการสินค้า', noMatch: 'ไม่พบออเดอร์ที่ตรงกัน', deviceOnly: 'บันทึกในเครื่อง', loadingMore: 'กำลังโหลดออเดอร์เพิ่ม…', endOfList: 'แสดงครบแล้ว', profit: 'กำไร', profitUnavailable: '—',
       },
       details: { title: 'รายละเอียดคำสั่งซื้อ', summary: 'สรุปคำสั่งซื้อ' },
+      auth: { kicker: 'ผู้ดูแล Sweetie', title: 'เข้าสู่ระบบผู้ดูแล', username: 'ชื่อผู้ใช้', password: 'รหัสผ่าน', signIn: 'เข้าสู่ระบบ', logout: 'ออกจากระบบ', invalid: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', temporary: 'ล็อกอินชั่วคราวสำหรับตัวอย่าง — ยังไม่ใช่ระบบรักษาความปลอดภัย' },
       detail: {
         orderDay: '{{day}}', quantity: '{{count}} {{unit}}', piece: 'ชิ้น', pieces: 'ชิ้น', paymentFull: 'จ่ายเต็มแล้ว', paymentDeposit: 'มัดจำ',
         shippingInbound: 'รอเข้าไทย', shippingSent: 'ส่งแล้ว', notSet: 'ไม่มีข้อมูล', lineName: 'ชื่อไลน์', customer: 'ชื่อลูกค้า',
@@ -103,7 +105,7 @@ const resources = {
         error: 'โหลดชีตนี้ไม่สำเร็จ', errorShort: 'โหลดไม่ได้', retry: 'ลองอีกครั้ง',
       },
       nav: {
-        label: 'เมนูหลัก', home: 'หน้าหลัก', orders: 'ออเดอร์', analytics: 'วิเคราะห์ข้อมูล', backToSheets: 'กลับไปชีตทั้งหมด',
+        logout: 'ออกจากระบบ', label: 'เมนูหลัก', home: 'หน้าหลัก', orders: 'ออเดอร์', analytics: 'วิเคราะห์ข้อมูล', backToSheets: 'กลับไปชีตทั้งหมด',
         allSheets: 'ชีตทั้งหมด', backToOrders: 'กลับไปยังคำสั่งซื้อ',
       },
     },

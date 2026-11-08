@@ -461,3 +461,16 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .profit-badge.negative, .profit-text.negative { background: #ffe5e7; color: #b73545; }
 .profit-badge.unknown { color: #8e8785; }
 .profit-text { border-radius: 999px; padding: 3px 7px; font-size: 10px; font-weight: 700; }
+
+.admin-login-screen { display: grid; place-items: center; padding: 74px 22px 32px; background: linear-gradient(160deg,#fffafb,#fff4f7 60%,#fff); }
+.admin-login-card { width: 100%; max-width: 350px; border: 1px solid #f2e6e9; border-radius: 24px; padding: 25px 22px; background: #fff; box-shadow: 0 14px 32px rgb(108 57 74 / 8%); }
+.admin-login-card > img { display: block; width: 104px; height: 94px; margin: 0 auto 12px; object-fit: contain; }
+.admin-login-card > p { margin: 0; color: #a26378; text-align: center; font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.admin-login-card h1 { margin: 6px 0 19px; color: #392f31; text-align: center; font-size: 23px; font-weight: 700; }
+.admin-login-card form { display: grid; gap: 12px; }
+.admin-login-card label { display: grid; gap: 6px; color: #6f6264; font-size: 10px; font-weight: 700; }
+.admin-login-card .input { width: 100%; height: 44px; border-color: #eddfe3; background: #fff; font-size: 13px; }
+.admin-login-card .btn { width: 100%; min-height: 46px; margin-top: 3px; border-radius: 12px; font-size: 13px; }
+.admin-login-card small { color: #998e8f; text-align: center; font-size: 8px; line-height: 1.4; }
+.login-error { margin: -3px 0 0; color: #b73545; text-align: center; font-size: 10px; }
+.admin-logout { position: absolute; z-index: 6; top: 14px; right: 92px; min-height: 28px; padding-inline: 8px; border-radius: 999px; background: rgb(255 255 255 / 88%); color: #876572; font-size: 9px; }

@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ClipboardList,
   Home,
+  LogOut,
   ImagePlus,
   Package,
   Plus,
@@ -136,7 +137,7 @@ function LanguageToggle() {
   )
 }
 
-function SplashScreen() {
+function SplashScreen({ showLoading = true }: { showLoading?: boolean }) {
   const { t } = useTranslation()
 
   return (
@@ -145,7 +146,7 @@ function SplashScreen() {
         <img className="sweetie-mark-image" src={sweetieLogo} alt={t('splash.logoAlt')} />
         <p className="splash-tagline">{t('splash.tagline')}</p>
       </div>
-      <span className="splash-loading" aria-hidden="true"><i /></span>
+      {showLoading && <span className="splash-loading" aria-hidden="true"><i /></span>}
     </section>
   )
 }
@@ -154,14 +155,14 @@ function BottomNavigation() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
-  const isHome = location.pathname === '/home'
-  const isAnalytics = location.pathname === '/analytics'
+  const isHome = location.pathname === '/admin/home'
+  const isAnalytics = location.pathname === '/admin/analytics'
 
   return (
     <nav className="bottom-nav" aria-label={t('nav.label')}>
-      <button type="button" className={`nav-item${isHome ? ' active' : ''}`} aria-label={t('nav.home')} onClick={() => navigate('/home')}><Home size={22} fill={isHome ? 'currentColor' : 'none'} /></button>
-      <button type="button" className={`nav-item${!isHome && !isAnalytics ? ' active' : ''}`} aria-label={t('nav.orders')} onClick={() => navigate('/orders')}><ClipboardList size={22} /></button>
-      <button type="button" className={`nav-item${isAnalytics ? ' active' : ''}`} aria-label={t('nav.analytics')} onClick={() => navigate('/analytics')}><BarChart3 size={22} /></button>
+      <button type="button" className={`nav-item${isHome ? ' active' : ''}`} aria-label={t('nav.home')} onClick={() => navigate('/admin/home')}><Home size={22} fill={isHome ? 'currentColor' : 'none'} /></button>
+      <button type="button" className={`nav-item${!isHome && !isAnalytics ? ' active' : ''}`} aria-label={t('nav.orders')} onClick={() => navigate('/admin/orders')}><ClipboardList size={22} /></button>
+      <button type="button" className={`nav-item${isAnalytics ? ' active' : ''}`} aria-label={t('nav.analytics')} onClick={() => navigate('/admin/analytics')}><BarChart3 size={22} /></button>
     </nav>
   )
 }
@@ -258,7 +259,7 @@ function HomePage({
                   type="button"
                   className="sheet-card"
                   key={sheet.id}
-                  onClick={() => navigate(`/sheets/${sheet.id}`)}
+                  onClick={() => navigate(`/admin/sheets/${sheet.id}`)}
                   aria-label={`${t(sheet.titleKey)} · ${orders.length} ${t('orders.orders')}`}
                 >
                   {image
@@ -304,7 +305,7 @@ function OrderListRow({ order, sheet }: { order: SheetOrder; sheet: SheetDefinit
     <button
       type="button"
       className="order-list-row"
-      onClick={() => navigate(`/sheets/${sheet.id}/orders/${order.id}`)}
+      onClick={() => navigate(`/admin/sheets/${sheet.id}/orders/${order.id}`)}
       aria-label={`${t('orders.open')} ${order.customerName || order.lineName}`}
     >
       <span className="order-row-photo">
@@ -558,7 +559,7 @@ function SheetOrdersPage({
   return (
     <section className="app-screen home-screen orders-screen" aria-label={t('screen.sheetOrders')}>
       <div className="home-scroll-area" ref={scrollRootRef}>
-        <button type="button" className="screen-back-button" onClick={() => navigate('/home')} aria-label={t('nav.backToSheets')}>
+        <button type="button" className="screen-back-button" onClick={() => navigate('/admin/home')} aria-label={t('nav.backToSheets')}>
           <ChevronLeft size={18} /> {t('nav.allSheets')}
         </button>
         <header className="sales-summary month-summary">
@@ -611,7 +612,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh }: { sheet: She
   const order = sheetData?.orders.find((item) => item.id === orderId)
   if (loading && !sheetData) return <section className="app-screen detail-screen"><div className="detail-scroll-area"><div className="detail-skeleton-hero" /><div className="detail-skeleton-block" /><div className="detail-skeleton-block" /></div></section>
   if (sheetData?.error) return <section className="app-screen detail-screen"><div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div></section>
-  if (!order) return <Navigate to={`/sheets/${sheet.id}`} replace />
+  if (!order) return <Navigate to={`/admin/sheets/${sheet.id}`} replace />
 
   const heroImage = order.lines.flatMap((line) => line.images)[0]
   const visibleLines = order.lines.filter((line) => `${line.itemName} ${line.imageName ?? ''}`.toLocaleLowerCase().includes(itemQuery.toLocaleLowerCase())).sort((a, b) => {
@@ -625,7 +626,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh }: { sheet: She
       <div className="detail-scroll-area">
         <div className={`detail-hero${heroImage ? ' has-product-image' : ''}`}>
           {heroImage && <img src={heroImage} alt="" />}
-          <button type="button" className="back-button" onClick={() => navigate(`/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ChevronLeft size={20} /></button>
+          <button type="button" className="back-button" onClick={() => navigate(`/admin/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ChevronLeft size={20} /></button>
           <div className="hero-label">
             <h1>{order.customerName || order.lineName}</h1>
             <p>{t(sheet.titleKey)} · {formatOrderDate(order.day, sheet, language)} · {formatMoney(order.totalSales, language)} THB</p>
@@ -684,6 +685,56 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh }: { sheet: She
       </div>
     </section>
   )
+}
+
+const ADMIN_SESSION_KEY = 'sweetie-admin-session'
+const ADMIN_USERNAME = 'admin'
+const ADMIN_PASSWORD = '1234'
+
+function readAdminSession() {
+  try {
+    return sessionStorage.getItem(ADMIN_SESSION_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: string) => boolean }) {
+  const { t } = useTranslation()
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (onLogin(username, password)) {
+      setError('')
+      return
+    }
+    setError(t('auth.invalid'))
+  }
+
+  return (
+    <section className="app-screen admin-login-screen" aria-label={t('auth.title')}>
+      <div className="admin-login-card">
+        <img src={sweetieLogo} alt={t('splash.logoAlt')} />
+        <p>{t('auth.kicker')}</p>
+        <h1>{t('auth.title')}</h1>
+        <form onSubmit={submit}>
+          <label>{t('auth.username')}<input className="input input-bordered" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></label>
+          <label>{t('auth.password')}<input className="input input-bordered" autoComplete="current-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
+          {error && <p className="login-error" role="alert">{error}</p>}
+          <button type="submit" className="btn btn-primary">{t('auth.signIn')}</button>
+          <small>{t('auth.temporary')}</small>
+        </form>
+      </div>
+    </section>
+  )
+}
+
+function AdminLogoutButton({ onLogout }: { onLogout: () => void }) {
+  const { t } = useTranslation()
+  return <button type="button" className="admin-logout btn btn-ghost btn-xs" onClick={onLogout}><LogOut size={13} /> {t('auth.logout')}</button>
 }
 
 function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, SheetDataState>; loading: boolean }) {
@@ -758,7 +809,7 @@ function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, S
           {sortedSalesSheets.map((sheet) => {
             const amount = sheetTotal(dataBySheet[sheet.id]?.orders ?? [])
             const width = Math.max(amount > 0 ? 5 : 0, Math.round((amount / maximum) * 100))
-            return <button type="button" className="monthly-bar-row" key={sheet.id} onClick={() => navigate(`/sheets/${sheet.id}`)}><span>{t(sheet.titleKey)}</span><span className="monthly-bar"><i style={{ width: `${width}%` }} /></span><strong>{formatMoney(amount, language)}</strong></button>
+            return <button type="button" className="monthly-bar-row" key={sheet.id} onClick={() => navigate(`/admin/sheets/${sheet.id}`)}><span>{t(sheet.titleKey)}</span><span className="monthly-bar"><i style={{ width: `${width}%` }} /></span><strong>{formatMoney(amount, language)}</strong></button>
           })}
         </section>
       </div>
@@ -768,12 +819,16 @@ function AnalyticsPage({ dataBySheet, loading }: { dataBySheet: Record<string, S
 }
 
 function App() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(readAdminSession)
   const [dataBySheet, setDataBySheet] = useState<Record<string, SheetDataState>>({})
   const [localOrdersBySheet, setLocalOrdersBySheet] = useState<Record<string, SheetOrder[]>>(loadLocalOrders)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(readAdminSession)
   const [initialDataReady, setInitialDataReady] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [bootReady, setBootReady] = useState(false)
+  const isAdminPath = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => setBootReady(true), 1000)
@@ -781,6 +836,7 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (!isAdminAuthenticated || !isAdminPath) return
     const controller = new AbortController()
     fetchAllSheets(controller.signal)
       .then((result) => setDataBySheet(result))
@@ -797,7 +853,7 @@ function App() {
         }
       })
     return () => controller.abort()
-  }, [refreshKey])
+  }, [refreshKey, isAdminAuthenticated, isAdminPath])
 
   useEffect(() => {
     try {
@@ -819,6 +875,33 @@ function App() {
     setLoading(true)
     setRefreshKey((key) => key + 1)
   }, [])
+
+  const login = (username: string, password: string) => {
+    if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) return false
+    try {
+      sessionStorage.setItem(ADMIN_SESSION_KEY, '1')
+    } catch {
+      // Authentication remains active for this app session if storage is blocked.
+    }
+    setInitialDataReady(false)
+    setLoading(true)
+    setIsAdminAuthenticated(true)
+    navigate('/admin/home', { replace: true })
+    return true
+  }
+
+  const logout = () => {
+    try {
+      sessionStorage.removeItem(ADMIN_SESSION_KEY)
+    } catch {
+      // Ignore storage restrictions; the in-memory gate still closes.
+    }
+    setIsAdminAuthenticated(false)
+    setDataBySheet({})
+    setInitialDataReady(false)
+    setLoading(false)
+    navigate('/', { replace: true })
+  }
 
   const createLocalOrder = (sheetId: string, draft: OrderDraft) => {
     const lines: SheetOrderLine[] = draft.lines.map((line) => ({
@@ -856,19 +939,30 @@ function App() {
 
   const currentMonthSheet = getCurrentMonthSheet(mergedDataBySheet)
 
+  if (!isAdminPath) {
+    return <main className="app-stage"><div className="app-shell"><LanguageToggle /><SplashScreen showLoading={false} /></div></main>
+  }
+  if (!isAdminAuthenticated) {
+    return <main className="app-stage"><div className="app-shell"><LanguageToggle /><AdminLoginPage onLogin={login} /></div></main>
+  }
+  if (location.pathname === '/admin') return <Navigate to="/admin/home" replace />
+  if (!bootReady || !initialDataReady) {
+    return <main className="app-stage"><div className="app-shell"><LanguageToggle /><SplashScreen /></div></main>
+  }
+
   return (
     <main className="app-stage">
       <div className="app-shell">
         <LanguageToggle />
-        {!bootReady || !initialDataReady ? <SplashScreen /> : <Routes>
-          <Route path="/" element={<Navigate to="/home" replace />} />
-          <Route path="/home" element={<HomePage dataBySheet={mergedDataBySheet} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} />} />
-          <Route path="/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} />} />
-          <Route path="/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} />} />
-          <Route path="/sheets/:sheetId/orders/:orderId" element={<OrderDetailsRoute dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} />} />
-          <Route path="/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} loading={loading} />} />
-          <Route path="*" element={<Navigate to="/home" replace />} />
-        </Routes>}
+        <AdminLogoutButton onLogout={logout} />
+        <Routes>
+          <Route path="/admin/home" element={<HomePage dataBySheet={mergedDataBySheet} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} />} />
+          <Route path="/admin/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} />} />
+          <Route path="/admin/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} />} />
+          <Route path="/admin/sheets/:sheetId/orders/:orderId" element={<OrderDetailsRoute dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} />} />
+          <Route path="/admin/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} loading={loading} />} />
+          <Route path="*" element={<Navigate to="/admin/home" replace />} />
+        </Routes>
       </div>
     </main>
   )
@@ -889,14 +983,14 @@ function SheetRouteView({
 }) {
   const { sheetId } = useParams()
   const sheet = explicitSheet ?? SHEETS.find((item) => item.id === sheetId)
-  if (!sheet) return <Navigate to="/home" replace />
+  if (!sheet) return <Navigate to="/admin/home" replace />
   return <SheetOrdersPage key={sheet.id} sheet={sheet} sheetData={dataBySheet[sheet.id]} loading={loading} onRefresh={onRefresh} onCreateOrder={onCreateOrder} />
 }
 
 function OrderDetailsRoute({ dataBySheet, loading, onRefresh }: { dataBySheet: Record<string, SheetDataState>; loading: boolean; onRefresh: () => void }) {
   const { sheetId } = useParams()
   const sheet = SHEETS.find((item) => item.id === sheetId)
-  if (!sheet) return <Navigate to="/home" replace />
+  if (!sheet) return <Navigate to="/admin/home" replace />
   return <OrderDetailsPage sheet={sheet} sheetData={dataBySheet[sheet.id]} loading={loading} onRefresh={onRefresh} />
 }
 
