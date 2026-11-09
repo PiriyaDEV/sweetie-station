@@ -4,6 +4,7 @@ import {
   BarChart3,
   CalendarDays,
   Check,
+  ChevronDown,
   ChevronLeft,
   ClipboardList,
   Download,
@@ -275,7 +276,7 @@ function fieldLabel(key: string, t: (key: string) => string) {
 }
 
 
-function AnalyticsSettings({ onExportBackup, backupLoading, backupMessage, syncStatus, onSyncNow, onLogout }: { onExportBackup: () => void; backupLoading: boolean; backupMessage: string; syncStatus: 'idle' | 'syncing' | 'synced' | 'offline'; onSyncNow: () => void; onLogout: () => void }) {
+function AnalyticsUtilities({ onExportBackup, backupLoading, backupMessage, onLogout }: { onExportBackup: () => void; backupLoading: boolean; backupMessage: string; onLogout: () => void }) {
   const { i18n, t } = useTranslation()
   const language = i18n.resolvedLanguage ?? 'en'
 
@@ -291,11 +292,8 @@ function AnalyticsSettings({ onExportBackup, backupLoading, backupMessage, syncS
   }
 
   return (
-    <section className="analytics-settings">
-      <div><h2>{t('settings.title')}</h2><span>{t('settings.displayLanguage')}</span><small className="storage-explanation">{t('sync.storageNote')}</small></div>
-      <div className="analytics-settings-actions">
-        <span className={`sync-status ${syncStatus}`} role="status">{t(`sync.${syncStatus}`)}</span>
-        <button type="button" className="backup-download-button" onClick={() => void onSyncNow()} disabled={syncStatus === 'syncing'}><RefreshCw size={13} />{t('sync.syncNow')}</button>
+    <section className="analytics-utilities" aria-label={t('settings.title')}>
+      <div className="analytics-utility-actions">
         <button type="button" className="backup-download-button" onClick={onExportBackup} disabled={backupLoading}><Download size={14} />{backupLoading ? t('backup.preparing') : t('backup.download')}</button>
         <button type="button" className="logout-button" onClick={() => void onLogout()}>{t('auth.logout')}</button>
         <select className="select select-bordered select-sm select-primary" value={language} onChange={(event) => changeLanguage(event.target.value)} aria-label={t('settings.displayLanguage')}>
@@ -490,17 +488,21 @@ function CreateSheetDialog({ onClose, onCreate }: {
 
 function HomePage({
   dataBySheet,
+  monthlyExpensesBySheet,
   sheets,
   loading,
   refreshing,
   onRefresh,
+  onLoadAllHomeSheets,
   onCreateSheet,
 }: {
   dataBySheet: Record<string, SheetDataState>
+  monthlyExpensesBySheet: Record<string, MonthlyExpense[]>
   sheets: SheetDefinition[]
   loading: boolean
   refreshing: boolean
   onRefresh: () => void
+  onLoadAllHomeSheets: () => Promise<void>
   onCreateSheet: (sheet: Omit<SheetDefinition, 'id' | 'gid' | 'titleKey'>) => Promise<SheetDefinition>
 }) {
   const { t, i18n } = useTranslation()
@@ -510,9 +512,20 @@ function HomePage({
   const [kindFilter, setKindFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('month')
+  const [sheetFiltersOpen, setSheetFiltersOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [createSheetOpen, setCreateSheetOpen] = useState(false)
 
-  const sheetRows = sheets.map((sheet, index) => ({ sheet, index, orders: dataBySheet[sheet.id]?.orders ?? EMPTY_ORDERS, error: dataBySheet[sheet.id]?.error }))
+  useEffect(() => {
+    if (!loading) void onLoadAllHomeSheets()
+  }, [loading, onLoadAllHomeSheets])
+
+  const sheetRows = sheets.map((sheet, index) => {
+    const orders = dataBySheet[sheet.id]?.orders ?? EMPTY_ORDERS
+    const expenses = monthlyExpensesBySheet[sheet.id] ?? []
+    const expenseTotal = expenses.reduce((sum, expense) => sum + expense.amount, 0)
+    return { sheet, index, orders, error: dataBySheet[sheet.id]?.error, profit: getProfitSummary(orders, expenseTotal) }
+  })
   const visibleSheets = sheetRows
     .filter(({ sheet }) => kindFilter === 'all' || sheet.kind === kindFilter)
     .filter(({ sheet }) => sheetTitle(sheet, t).toLocaleLowerCase().includes(query.toLocaleLowerCase()))
@@ -544,36 +557,43 @@ function HomePage({
           <p className="sales-growth">{t('sheets.sheetCount', { count: sheets.length })}</p>
         </header>
         <div className="section-heading">
-          <h2>{t('sheets.allSheets')}</h2>
-          <button type="button" className="view-all" onClick={onRefresh} disabled={refreshing}>
-            <RefreshCw size={13} className={refreshing ? 'refreshing-icon' : ''} />
-            {refreshing ? t('orders.refreshing') : t('orders.refresh')}
+          <button type="button" className="sheet-list-toggle" aria-expanded={sheetFiltersOpen} aria-controls="sheet-list-controls" onClick={() => setSheetFiltersOpen((open) => !open)}>
+            <h2>{t('sheets.allSheets')}</h2><ChevronDown size={16} className={sheetFiltersOpen ? 'is-open' : ''} />
           </button>
+          <div className="sheet-heading-actions">
+            <button type="button" className={`sheet-search-toggle${searchOpen ? ' is-open' : ''}`} aria-label={t('sheets.search')} aria-expanded={searchOpen} aria-controls="sheet-search" onClick={() => setSearchOpen((open) => !open)}>
+              {searchOpen ? <X size={17} /> : <Search size={17} />}
+            </button>
+            <button type="button" className="view-all" onClick={onRefresh} disabled={refreshing}>
+              <RefreshCw size={13} className={refreshing ? 'refreshing-icon' : ''} />
+              {refreshing ? t('orders.refreshing') : t('orders.refresh')}
+            </button>
+          </div>
         </div>
-        <label className="order-search">
+        {searchOpen && <label className="order-search" id="sheet-search">
           <Search size={16} />
           <span className="sr-only">{t('sheets.search')}</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('sheets.search')} />
-        </label>
-        <div className="sheet-filter-row">
+          <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('sheets.search')} />
+        </label>}
+        {sheetFiltersOpen && <div className="sheet-filter-row" id="sheet-list-controls">
           <label><span className="sr-only">{t('filters.sheetType')}</span><select className="select select-bordered select-sm select-primary" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">{t('filters.allSheets')}</option><option value="sales">{t('sheets.kind.sales')}</option><option value="haul">{t('sheets.kind.haul')}</option></select></label>
           <label><span className="sr-only">{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="unpaid">{t('detail.paymentUnpaid')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="not-ordered">{t('detail.shippingNotOrdered')}</option><option value="ordered">{t('detail.shippingOrdered')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
           <label><span className="sr-only">{t('filters.sortSheets')}</span><select className="select select-bordered select-sm select-primary" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="month">{t('filters.monthOrder')}</option><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="orders-desc">{t('filters.ordersHigh')}</option><option value="name">{t('filters.nameAZ')}</option></select></label>
-        </div>
+        </div>}
       </div>
 
       <div className="home-scroll-area sheet-list-scroll">
         {loading && Object.keys(dataBySheet).length === 0 ? <div className="sheet-grid" aria-label={t('sheet.loading')}>
           {Array.from({ length: 6 }, (_, index) => <div className="sheet-card-skeleton" key={index}><i /><b /><b /></div>)}
         </div> : <div className="sheet-grid">
-          {visibleSheets.map(({ sheet, orders, error }) => {
+          {visibleSheets.map(({ sheet, orders, error, profit }) => {
             const image = getPreviewImage(orders)
             return (
               <button
                 type="button"
                 className="sheet-card"
                 key={sheet.id}
-                onClick={() => navigate(`/admin/sheets/${sheet.id}`)}
+                onClick={() => navigate(`/admin/sheets/${sheet.id}`, { state: { from: 'home' } })}
                 aria-label={`${sheetTitle(sheet, t)} · ${orders.length} ${t('orders.orders')}`}
               >
                 {image
@@ -587,7 +607,10 @@ function HomePage({
                   <strong>{sheetTitle(sheet, t)}</strong>
                   <span>{error ? t('sheet.errorShort') : dataBySheet[sheet.id]?.hasMore ? t('sheets.partialOrderCount', { count: orders.length }) : t('sheets.orderCount', { count: orders.length })}</span>
                   <b>{error ? '—' : `${formatMoney(sheetTotal(orders), language)} THB`}</b>
-                  {dataBySheet[sheet.id]?.hasMore && <i className="sheet-card-progress" aria-label={t('sheet.loadingMoreData')} />}
+                  <small className={`sheet-card-profit${profit.amount === null ? ' unavailable' : profit.amount < 0 ? ' negative' : ' positive'}`}>
+                    <span className="sheet-card-profit-label">{t(profit.amount !== null && !profit.complete ? 'sheets.partialProfit' : 'sheets.profit')}: </span>
+                    <strong className="sheet-card-profit-value">{profit.amount === null ? '—' : `${formatMoney(profit.amount, language)} THB`}</strong>
+                  </small>
                 </span>
               </button>
             )
@@ -599,7 +622,7 @@ function HomePage({
         <button type="button" className="create-order-list-button btn btn-primary" onClick={() => setCreateSheetOpen(true)}><Plus size={17} /> {t('createSheet.open')}</button>
       </div>
       <BottomNavigation />
-      {createSheetOpen && <CreateSheetDialog onClose={() => setCreateSheetOpen(false)} onCreate={async (sheet) => { const created = await onCreateSheet(sheet); setCreateSheetOpen(false); navigate(`/admin/sheets/${created.id}`) }} />}
+      {createSheetOpen && <CreateSheetDialog onClose={() => setCreateSheetOpen(false)} onCreate={async (sheet) => { const created = await onCreateSheet(sheet); setCreateSheetOpen(false); navigate(`/admin/sheets/${created.id}`, { state: { from: 'home' } }) }} />}
     </section>
   )
 }
@@ -621,7 +644,7 @@ function OrderListRow({ order, sheet }: { order: SheetOrder; sheet: SheetDefinit
       type="button"
       className="order-list-row order-row-open"
       onClick={() => navigate(`/admin/sheets/${sheet.id}/orders/${order.id}`)}
-      aria-label={`${t('orders.open')} ${order.customerName || order.lineName}`}
+      aria-label={`${t('orders.open')} ${order.customerName || order.lineName} · ${t('orders.profit')}: ${order.profitAmount === null ? '—' : `${formatMoney(order.profitAmount, language)} THB`}`}
     >
       <span className="order-row-photo mock-user-avatar" aria-hidden="true"><UserRound size={22} /></span>
       <span className="order-row-main">
@@ -632,7 +655,12 @@ function OrderListRow({ order, sheet }: { order: SheetOrder; sheet: SheetDefinit
           <StatusBadge type="shipping" status={order.shippingStatus} />
         </span>
       </span>
-      <span className="order-row-total">{formatMoney(order.totalSales, language)}<small>THB</small></span>
+      <span className="order-row-total">
+        {formatMoney(order.totalSales, language)}<small>THB</small>
+        <span className={`order-row-profit${order.profitAmount === null ? ' unavailable' : order.profitAmount < 0 ? ' negative' : ' positive'}`}>
+          <small>{t('orders.profit')}</small><strong>{order.profitAmount === null ? '—' : `${formatMoney(order.profitAmount, language)} THB`}</strong>
+        </span>
+      </span>
       <span className="order-row-items" aria-label={t('detail.items')}>
         {order.lines.map((line, index) => (
           <span className="order-item-preview" key={`${order.id}-${line.row || index}`}>
@@ -977,10 +1005,14 @@ function SheetOrdersPage({
 }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
+  const cameFromHome = (location.state as { from?: string } | null)?.from === 'home'
   const language = i18n.resolvedLanguage ?? 'en'
   const scrollRootRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
   const [visibleCount, setVisibleCount] = useState(10)
@@ -1031,6 +1063,12 @@ function SheetOrdersPage({
     return () => observer.disconnect()
   }, [hasMore, sortedOrders.length, visibleCount, sheetData?.hasMore, sheetData?.loadingMore, sheetData?.loadMoreError, onLoadMoreData, sheet.id])
 
+  const toggleSummary = () => {
+    setSummaryOpen((open) => !open)
+    setSearchOpen(false)
+    setFiltersOpen(false)
+  }
+
   const updateQuery = (value: string) => { setQuery(value); setVisibleCount(10) }
   const updateStatus = (value: string) => { setStatusFilter(value); setVisibleCount(10) }
   const updateSort = (value: string) => { setSortBy(value); setVisibleCount(10) }
@@ -1054,23 +1092,26 @@ function SheetOrdersPage({
   }
 
   return (
-    <section className="app-screen home-screen orders-screen" aria-label={t('screen.sheetOrders')}>
+    <section className={`app-screen home-screen orders-screen${summaryOpen ? ' summary-open' : ''}`} aria-label={t('screen.sheetOrders')}>
       <div className="screen-fixed-header orders-fixed-header">
-        <button type="button" className="screen-back-button" onClick={() => navigate('/admin/home')} aria-label={t('nav.backToSheets')}>
-          <ChevronLeft size={18} /> {t('nav.allSheets')}
-        </button>
+        {cameFromHome && <button type="button" className="screen-back-button" onClick={() => navigate(-1)} aria-label={t('nav.backToSheets')}><ChevronLeft size={18} /> {t('nav.allSheets')}</button>}
         <header className="sales-summary month-summary">
           <p>{t(`sheets.kind.${sheet.kind}`)}</p>
-          <h1>{sheetTitle(sheet, t)}</h1>
-          {loading && !sheetData ? <p className="sales-growth">{t('sheet.loadingShort')}</p> : sheet.kind === 'sales' ? <>
-            <div className="month-sales-summary">
+          <div className="month-title-row">
+            <h1>{sheetTitle(sheet, t)}</h1>
+            <button type="button" className="month-summary-toggle" aria-label={t(summaryOpen ? 'orders.hideSummary' : 'orders.showSummary')} aria-expanded={summaryOpen} aria-controls="month-summary-content order-tools-content" onClick={toggleSummary}>
+              <ChevronDown size={17} className={summaryOpen ? 'is-open' : ''} />
+            </button>
+          </div>
+          {summaryOpen && <div className="month-summary-details" id="month-summary-content">
+            {loading && !sheetData ? <p className="sales-growth">{t('sheet.loadingShort')}</p> : sheet.kind === 'sales' ? <div className="month-sales-summary">
               <div><span>{t('analytics.totalSales')}</span><strong>{formatMoney(sheetTotal(orders), language)} <small>THB</small></strong></div>
               <div><span>{t('analytics.totalProfit')}</span><strong className={sheetData?.hasMore || totalProfit.amount === null ? 'profit-unavailable' : 'profit-summary-value'}>{sheetData?.hasMore || totalProfit.amount === null ? '—' : `${formatMoney(totalProfit.amount, language)} THB`}</strong>{sheetData?.hasMore ? <em className="profit-data-note">{t('sheet.loadingMoreData')}</em> : totalProfit.amount === null ? <em className="profit-data-note">{t('analytics.noPeriodProfitShort')}</em> : !totalProfit.complete ? <em className="profit-data-note">{t('analytics.partialProfitNote', { known: totalProfit.knownLines, total: totalProfit.totalLines })}</em> : <em className="profit-data-note">{t('analytics.netProfitNote', { amount: formatMoney(expenseTotal, language) })}</em>}</div>
-              {sheet.kind === 'sales' && <button type="button" className="month-expense-tile" onClick={() => setExpensesOpen(true)}>
+              <button type="button" className="month-expense-tile" onClick={() => setExpensesOpen(true)}>
                 <span>{t('expenses.open')}</span><strong>{formatMoney(expenseTotal, language)} <small>THB</small></strong>
-              </button>}
-            </div>
-          </> : <p className="sales-growth">{t('sheets.monthSummary', { orders: orders.length, total: formatMoney(sheetTotal(orders), language) })}</p>}
+              </button>
+            </div> : <p className="sales-growth">{t('sheets.monthSummary', { orders: orders.length, total: formatMoney(sheetTotal(orders), language) })}</p>}
+          </div>}
         </header>
 
         <div className="order-list-heading">
@@ -1078,13 +1119,17 @@ function SheetOrdersPage({
           <div className="order-heading-actions"><button type="button" className="view-all" onClick={onRefresh} disabled={loading}><RefreshCw size={13} className={loading ? 'refreshing-icon' : ''} />{loading ? t('orders.refreshing') : t('orders.refresh')}</button></div>
         </div>
 
-        <div className="search-filter-row">
-          <label className="order-search">
+        {summaryOpen && <div className="order-summary-tools" id="order-tools-content">
+        <div className={`search-filter-row${searchOpen ? ' is-search-open' : ' is-search-closed'}`}>
+          {searchOpen && <label className="order-search">
             <Search size={16} />
             <span className="sr-only">{t('orders.search')}</span>
-            <input value={query} onChange={(event) => updateQuery(event.target.value)} placeholder={t('orders.search')} />
-          </label>
+            <input id="order-search-field" autoFocus value={query} onChange={(event) => updateQuery(event.target.value)} placeholder={t('orders.search')} />
+          </label>}
           <div className="search-filter-actions">
+            <button type="button" className={`order-search-toggle${searchOpen ? ' is-open' : ''}`} aria-label={t(searchOpen ? 'orders.closeSearch' : 'orders.search')} aria-expanded={searchOpen} aria-controls="order-search-field" onClick={() => setSearchOpen((open) => !open)}>
+              {searchOpen ? <X size={16} /> : <Search size={16} />}
+            </button>
             {sheet.kind === 'sales' && <button type="button" className="export-report-button" aria-label={t('backup.exportMonthly')} onClick={() => onExportMonthlyReport(sheet.id)} disabled={exportingReport}><Download size={14} /><span>{exportingReport ? t('backup.preparing') : t('backup.exportMonthly')}</span></button>}
             <button type="button" className={`filter-toggle${filtersOpen ? ' is-open' : ''}`} aria-expanded={filtersOpen} aria-controls="order-filters" onClick={() => setFiltersOpen((open) => !open)}>
               <SlidersHorizontal size={15} /> {t(filtersOpen ? 'filters.hide' : 'filters.show')}
@@ -1094,6 +1139,7 @@ function SheetOrdersPage({
         {filtersOpen && <div className="order-filter-row" id="order-filters">
           <label><span className="sr-only">{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => updateStatus(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="unpaid">{t('detail.paymentUnpaid')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="not-ordered">{t('detail.shippingNotOrdered')}</option><option value="ordered">{t('detail.shippingOrdered')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
           <label><span className="sr-only">{t('filters.sort')}</span><select className="select select-bordered select-sm select-primary" value={sortBy} onChange={(event) => updateSort(event.target.value)}><option value="newest">{t('filters.newest')}</option><option value="oldest">{t('filters.oldest')}</option><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="status">{t('filters.statusAZ')}</option></select></label>
+        </div>}
         </div>}
         {sheetData?.error && <div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div>}
       </div>
@@ -1216,7 +1262,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
             <h3>{t('detail.items')}</h3>
             <div className="item-list-controls">
               <input value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder={t('orders.searchItems')} aria-label={t('orders.searchItems')} />
-              <select className="select select-bordered select-sm select-primary" value={itemSort} onChange={(event) => setItemSort(event.target.value)} aria-label={t('filters.sortItems')}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="name">{t('filters.nameAZ')}</option></select>
+              <select className="select select-bordered select-sm select-primary" value={itemSort} onChange={(event) => setItemSort(event.target.value)} aria-label={t('filters.sortItems')}><option value="sales-desc">{t('filters.salesHighShort')}</option><option value="sales-asc">{t('filters.salesLowShort')}</option><option value="name">{t('filters.nameAZShort')}</option></select>
             </div>
             <div className="item-list">
               {visibleLines.map((line, index) => (
@@ -1304,7 +1350,7 @@ function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: str
   )
 }
 
-function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, analyticsDataLoading, onLoadAllSalesSheets, onExportBackup, backupLoading, backupMessage, syncStatus, onSyncNow, onLogout }: { dataBySheet: Record<string, SheetDataState>; monthlyExpensesBySheet: Record<string, MonthlyExpense[]>; sheets: SheetDefinition[]; loading: boolean; analyticsDataLoading: boolean; onLoadAllSalesSheets: () => void; onExportBackup: () => void; backupLoading: boolean; backupMessage: string; syncStatus: 'idle' | 'syncing' | 'synced' | 'offline'; onSyncNow: () => void; onLogout: () => void }) {
+function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, analyticsDataLoading, onLoadAllSalesSheets, onExportBackup, backupLoading, backupMessage, onLogout }: { dataBySheet: Record<string, SheetDataState>; monthlyExpensesBySheet: Record<string, MonthlyExpense[]>; sheets: SheetDefinition[]; loading: boolean; analyticsDataLoading: boolean; onLoadAllSalesSheets: () => void; onExportBackup: () => void; backupLoading: boolean; backupMessage: string; onLogout: () => void }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const currentSheet = getCurrentMonthSheet(dataBySheet, sheets)
@@ -1425,7 +1471,7 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
           </>}
         </section>
 
-        <AnalyticsSettings onExportBackup={onExportBackup} backupLoading={backupLoading} backupMessage={backupMessage} syncStatus={syncStatus} onSyncNow={onSyncNow} onLogout={onLogout} />
+        <AnalyticsUtilities onExportBackup={onExportBackup} backupLoading={backupLoading} backupMessage={backupMessage} onLogout={onLogout} />
 
         <section className="analytics-section analytics-chart-section">
           <h2>{t('analytics.salesProfitGraph')}</h2>
@@ -1468,7 +1514,6 @@ function App() {
   const location = useLocation()
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false)
   const [authChecking, setAuthChecking] = useState(true)
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'offline'>('idle')
   const [dataBySheet, setDataBySheet] = useState<Record<string, SheetDataState>>({})
   const [localOrdersBySheet, setLocalOrdersBySheet] = useState<Record<string, SheetOrder[]>>({})
   const [monthlyExpensesBySheet, setMonthlyExpensesBySheet] = useState<Record<string, MonthlyExpense[]>>({})
@@ -1639,6 +1684,55 @@ function App() {
     }
   }, [allSheets, dataBySheet])
 
+  const homeLoadRef = useRef(false)
+  const loadAllHomeSheets = useCallback(async () => {
+    if (homeLoadRef.current) return
+    homeLoadRef.current = true
+    const currentById = new Map(allSheets
+      .filter((sheet) => dataBySheet[sheet.id]?.hasMore && !dataBySheet[sheet.id]?.loadMoreError)
+      .map((sheet) => [sheet.id, dataBySheet[sheet.id]!]))
+    const queue = allSheets.filter((sheet) => currentById.has(sheet.id))
+
+    const loadWorker = async () => {
+      while (queue.length > 0) {
+        const sheet = queue.shift()
+        if (!sheet) continue
+        let current = currentById.get(sheet.id)
+        if (!current?.hasMore || activePageLoadsRef.current.has(sheet.id)) continue
+        activePageLoadsRef.current.add(sheet.id)
+        setDataBySheet((previous) => ({ ...previous, [sheet.id]: { ...(previous[sheet.id] ?? current!), loadingMore: true, loadMoreError: undefined } }))
+        try {
+          const page = await fetchSheetOrdersPage(sheet, current.nextOffset ?? 0, current.parserState)
+          current = {
+            ...current,
+            orders: [...current.orders, ...page.orders],
+            hasMore: page.hasMore,
+            nextOffset: page.nextOffset ?? undefined,
+            parserState: page.parserState,
+            loadingMore: false,
+            loadMoreError: undefined,
+          }
+          currentById.set(sheet.id, current)
+          setDataBySheet((previous) => ({ ...previous, [sheet.id]: current! }))
+          if (current.hasMore) queue.push(sheet)
+        } catch (cause) {
+          const message = cause instanceof Error ? cause.message : 'Could not load more orders.'
+          current = { ...current, loadingMore: false, loadMoreError: message }
+          currentById.set(sheet.id, current)
+          setDataBySheet((previous) => ({ ...previous, [sheet.id]: current! }))
+        } finally {
+          activePageLoadsRef.current.delete(sheet.id)
+        }
+      }
+    }
+
+    try {
+      await Promise.all(Array.from({ length: Math.min(3, queue.length) }, () => loadWorker()))
+    } finally {
+      homeLoadRef.current = false
+    }
+  }, [allSheets, dataBySheet])
+
   const loadAllSalesSheets = useCallback(async () => {
     if (analyticsLoadRef.current) return
     analyticsLoadRef.current = true
@@ -1696,12 +1790,10 @@ function App() {
   }, [exchangeRate, i18n.resolvedLanguage, localOrdersBySheet, localSheets, monthlyExpensesBySheet, monthlyExpenseRevisionsBySheet])
 
   const syncNow = useCallback(async () => {
-    setSyncStatus('syncing')
     try {
       await syncSnapshot()
-      setSyncStatus('synced')
     } catch {
-      setSyncStatus('offline')
+      // Automatic sync retries on the next local change or app session.
     }
   }, [syncSnapshot])
 
@@ -1863,7 +1955,6 @@ function App() {
     setMonthlyExpenseRevisionsBySheet({})
     setLocalSheets([])
     setLocalOrdersReady(false)
-    setSyncStatus('idle')
     setDataBySheet({})
     setInitialDataReady(false)
     setLoading(false)
@@ -1937,36 +2028,25 @@ function App() {
     }
     const targetSheet = allSheets.find((sheet) => sheet.id === sheetId)
     if (!targetSheet?.gid) throw new Error('This order is not linked to a Google Sheets tab.')
-    setSyncStatus('syncing')
     const isUpdate = Boolean(originalOrder?.sheetRow && originalOrder.sheetRow > 0)
-    let response: Response
-    try {
-      response = await fetch('/api/orders', {
-        method: isUpdate ? 'PUT' : 'POST',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ gid: targetSheet.gid, order }),
-      })
-    } catch (cause) {
-      setSyncStatus('offline')
-      throw cause
-    }
+    const response = await fetch('/api/orders', {
+      method: isUpdate ? 'PUT' : 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ gid: targetSheet.gid, order }),
+    })
     const result = await response.json().catch(() => ({})) as { error?: string }
     if (response.status === 401) {
-      setSyncStatus('offline')
       throw new Error('Your secure session has expired.')
     }
     if (!response.ok) {
-      setSyncStatus('offline')
       throw new Error(result.error || 'Could not save the order to Google Sheets.')
     }
 
-    setSyncStatus('synced')
     try {
       const refreshedOrders = await fetchSheetOrders(targetSheet)
       setDataBySheet((current) => ({ ...current, [sheetId]: { orders: refreshedOrders, hasMore: false } }))
     } catch {
-      setSyncStatus('offline')
       setRefreshKey((key) => key + 1)
     }
     if (originalOrder) {
@@ -1977,7 +2057,6 @@ function App() {
         return next
       })
     }
-    setSyncStatus('synced')
     if (rate !== exchangeRate) setExchangeRate(rate)
   }
 
@@ -2002,10 +2081,10 @@ function App() {
   const currentMonthSheet = getCurrentMonthSheet(mergedDataBySheet, allSheets)
 
   if (authChecking) {
-    return <main className="app-stage"><div className="app-shell"><SplashScreen /></div></main>
+    return <main className="app-stage splash-stage"><div className="app-shell"><SplashScreen /></div></main>
   }
   if (!isAdminPath) {
-    return <main className="app-stage"><div className="app-shell"><SplashScreen showLoading={false} /></div></main>
+    return <main className="app-stage splash-stage"><div className="app-shell"><SplashScreen showLoading={false} /></div></main>
   }
   if (!isAdminAuthenticated && location.pathname !== '/admin') return <Navigate to="/admin" replace />
   if (!isAdminAuthenticated) {
@@ -2013,7 +2092,7 @@ function App() {
   }
   if (location.pathname === '/admin') return <Navigate to="/admin/home" replace />
   if (!bootReady || !initialDataReady) {
-    return <main className="app-stage"><div className="app-shell"><SplashScreen /></div></main>
+    return <main className="app-stage splash-stage"><div className="app-shell"><SplashScreen /></div></main>
   }
 
   return (
@@ -2021,11 +2100,11 @@ function App() {
       <div className="app-shell">
 
         <Routes>
-          <Route path="/admin/home" element={<HomePage dataBySheet={mergedDataBySheet} sheets={allSheets} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} onCreateSheet={createGoogleSheetTab} />} />
+          <Route path="/admin/home" element={<HomePage dataBySheet={mergedDataBySheet} monthlyExpensesBySheet={monthlyExpensesBySheet} sheets={allSheets} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} onLoadAllHomeSheets={loadAllHomeSheets} onCreateSheet={createGoogleSheetTab} />} />
           <Route path="/admin/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={saveOrderToSheet} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} onExportMonthlyReport={exportMonthlyReport} exportingReport={exportingReportId === currentMonthSheet.id} exportMessage={exportMessage} />} />
           <Route path="/admin/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={saveOrderToSheet} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} onExportMonthlyReport={exportMonthlyReport} exportingReport={exportingReportId === (location.pathname.split('/')[3] ?? '')} exportMessage={exportMessage} />} />
           <Route path="/admin/sheets/:sheetId/orders/:orderId" element={<OrderDetailsRoute dataBySheet={mergedDataBySheet} sheets={allSheets} loading={loading} onRefresh={refresh} onSaveOrder={saveOrderToSheet} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} onLoadMoreData={loadMoreSheetData} />} />
-          <Route path="/admin/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} monthlyExpensesBySheet={monthlyExpensesBySheet} sheets={allSheets} loading={loading} analyticsDataLoading={analyticsDataLoading} onLoadAllSalesSheets={loadAllSalesSheets} onExportBackup={exportFullBackup} backupLoading={backupLoading} backupMessage={backupMessage} syncStatus={syncStatus} onSyncNow={syncNow} onLogout={logout} />} />
+          <Route path="/admin/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} monthlyExpensesBySheet={monthlyExpensesBySheet} sheets={allSheets} loading={loading} analyticsDataLoading={analyticsDataLoading} onLoadAllSalesSheets={loadAllSalesSheets} onExportBackup={exportFullBackup} backupLoading={backupLoading} backupMessage={backupMessage} onLogout={logout} />} />
           <Route path="*" element={<Navigate to="/admin/home" replace />} />
         </Routes>
       </div>
