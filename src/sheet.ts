@@ -49,6 +49,7 @@ export type SheetOrder = {
   quantity: number
   isLocal?: boolean
   isOverride?: boolean
+  updatedAt?: number
 }
 
 export type MonthlyExpenseCategory = 'shipping' | 'packaging' | 'ads' | 'other'
@@ -58,6 +59,7 @@ export type MonthlyExpense = {
   category: MonthlyExpenseCategory
   description: string
   amount: number
+  updatedAt?: number
 }
 
 export type SheetOrderParserState = { currentDay: string; currentOrder?: SheetOrder }

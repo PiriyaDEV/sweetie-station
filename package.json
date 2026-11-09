@@ -4,12 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "netlify dev",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:vite": "vite"
   },
   "dependencies": {
+    "@netlify/blobs": "^11.1.8",
     "@tailwindcss/vite": "^4.3.5",
     "i18next": "^27.0.1",
     "lucide-react": "^1.70.0",

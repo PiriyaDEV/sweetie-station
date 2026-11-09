@@ -6,6 +6,7 @@ import {
   Check,
   ChevronLeft,
   ClipboardList,
+  Download,
   Home,
   ImagePlus,
   Package,
@@ -24,6 +25,7 @@ const AnalyticsChart = lazy(() => import('./AnalyticsChart'))
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
 import {
   fetchAllSheets,
+  fetchSheetOrders,
   fetchSheetOrdersPage,
   formatOrderDate,
   SHEETS,
@@ -68,6 +70,7 @@ type OrderDraft = {
 const LOCAL_ORDERS_KEY = 'sweetie-local-orders-v1'
 const LOCAL_SHEETS_KEY = 'sweetie-local-sheets-v1'
 const MONTHLY_EXPENSES_KEY = 'sweetie-monthly-expenses-v1'
+const MONTHLY_EXPENSE_REVISIONS_KEY = 'sweetie-monthly-expense-revisions-v1'
 const EXCHANGE_RATE_KEY = 'sweetie-cny-thb-rate-v1'
 const DEFAULT_CNY_TO_THB = 5.02
 const EMPTY_ORDERS: SheetOrder[] = []
@@ -112,6 +115,23 @@ function formatMoney(value: number, language: string) {
   }).format(value)
 }
 
+function csvCell(value: string | number | null | undefined) {
+  let text = value == null ? '' : String(value)
+  if (typeof value === 'string' && /^[\s]*[=+\-@]/.test(text)) text = `'${text}`
+  return `"${text.replaceAll('"', '""')}"`
+}
+
+function downloadFile(fileName: string, contents: string, mimeType: string) {
+  const url = URL.createObjectURL(new Blob([contents], { type: mimeType }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = fileName
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 function formatProfitPercent(value: number, language: string) {
   const sign = value > 0 ? '+' : value < 0 ? '−' : ''
   return `${sign}${formatMoney(Math.abs(value), language)}%`
@@ -142,6 +162,28 @@ function loadMonthlyExpenses(): Record<string, MonthlyExpense[]> {
   } catch {
     return {}
   }
+}
+
+function loadMonthlyExpenseRevisions(): Record<string, number> {
+  try {
+    const saved = localStorage.getItem(MONTHLY_EXPENSE_REVISIONS_KEY)
+    return saved ? JSON.parse(saved) as Record<string, number> : {}
+  } catch {
+    return {}
+  }
+}
+
+function mergeMonthlyExpensesByRevision(
+  server: Record<string, MonthlyExpense[]>,
+  serverRevisions: Record<string, number>,
+  device: Record<string, MonthlyExpense[]>,
+  deviceRevisions: Record<string, number>,
+) {
+  const sheetIds = new Set([...Object.keys(server), ...Object.keys(device)])
+  return Object.fromEntries([...sheetIds].map((sheetId) => {
+    const useDevice = (deviceRevisions[sheetId] ?? 0) > (serverRevisions[sheetId] ?? 0)
+    return [sheetId, useDevice ? device[sheetId] ?? [] : server[sheetId] ?? device[sheetId] ?? []]
+  }))
 }
 
 function loadExchangeRate() {
@@ -232,7 +274,7 @@ function fieldLabel(key: string, t: (key: string) => string) {
 }
 
 
-function AnalyticsSettings() {
+function AnalyticsSettings({ onExportBackup, backupLoading, backupMessage, syncStatus, onSyncNow, onLogout }: { onExportBackup: () => void; backupLoading: boolean; backupMessage: string; syncStatus: 'idle' | 'syncing' | 'synced' | 'offline'; onSyncNow: () => void; onLogout: () => void }) {
   const { i18n, t } = useTranslation()
   const language = i18n.resolvedLanguage ?? 'en'
 
@@ -249,10 +291,17 @@ function AnalyticsSettings() {
   return (
     <section className="analytics-settings">
       <div><h2>{t('settings.title')}</h2><span>{t('settings.displayLanguage')}</span></div>
-      <select className="select select-bordered select-sm select-primary" value={language} onChange={(event) => changeLanguage(event.target.value)} aria-label={t('settings.displayLanguage')}>
-        <option value="en">English</option>
-        <option value="th">ไทย</option>
-      </select>
+      <div className="analytics-settings-actions">
+        <span className={`sync-status ${syncStatus}`} role="status">{t(`sync.${syncStatus}`)}</span>
+        <button type="button" className="backup-download-button" onClick={() => void onSyncNow()} disabled={syncStatus === 'syncing'}><RefreshCw size={13} />{t('sync.syncNow')}</button>
+        <button type="button" className="backup-download-button" onClick={onExportBackup} disabled={backupLoading}><Download size={14} />{backupLoading ? t('backup.preparing') : t('backup.download')}</button>
+        <button type="button" className="logout-button" onClick={() => void onLogout()}>{t('auth.logout')}</button>
+        <select className="select select-bordered select-sm select-primary" value={language} onChange={(event) => changeLanguage(event.target.value)} aria-label={t('settings.displayLanguage')}>
+          <option value="en">English</option>
+          <option value="th">ไทย</option>
+        </select>
+      </div>
+      {backupMessage && <small className="backup-status" role="status">{backupMessage}</small>}
     </section>
   )
 }
@@ -295,6 +344,32 @@ function getPreviewImage(orders: SheetOrder[]) {
   return orders.flatMap((order) => order.lines).flatMap((line) => line.images)[0]
 }
 
+function mergeOrderOverrides(remoteOrders: SheetOrder[], localOrders: SheetOrder[]) {
+  const localById = new Map(localOrders.map((order) => [order.id, order]))
+  const remoteIds = new Set(remoteOrders.map((order) => order.id))
+  return [
+    ...localOrders.filter((order) => !remoteIds.has(order.id)),
+    ...remoteOrders.map((order) => localById.get(order.id) ?? order),
+  ]
+}
+
+function mergeSyncedOrderMaps(serverOrders: Record<string, SheetOrder[]>, deviceOrders: Record<string, SheetOrder[]>) {
+  const sheetIds = new Set([...Object.keys(serverOrders), ...Object.keys(deviceOrders)])
+  return Object.fromEntries([...sheetIds].map((sheetId) => {
+    const merged = new Map((serverOrders[sheetId] ?? []).map((order) => [order.id, order]))
+    for (const order of deviceOrders[sheetId] ?? []) {
+      const existing = merged.get(order.id)
+      if (!existing || (order.updatedAt ?? 0) > (existing.updatedAt ?? 0)) merged.set(order.id, order)
+    }
+    return [sheetId, [...merged.values()]]
+  }))
+}
+
+function mergeLocalSheets(serverSheets: SheetDefinition[], deviceSheets: SheetDefinition[]) {
+  const merged = new Map(serverSheets.map((sheet) => [sheet.id, sheet]))
+  for (const sheet of deviceSheets) if (!merged.has(sheet.id)) merged.set(sheet.id, sheet)
+  return [...merged.values()]
+}
 
 function getOrderDayNumber(order: SheetOrder) {
   const numericDay = Number(order.day)
@@ -459,7 +534,6 @@ function HomePage({
         </header>
         <div className="section-heading">
           <h2>{t('sheets.allSheets')}</h2>
-          <button type="button" className="create-sheet-trigger btn btn-outline btn-sm" onClick={() => setCreateSheetOpen(true)}><Plus size={14} /> {t('createSheet.open')}</button>
           <button type="button" className="view-all" onClick={onRefresh} disabled={refreshing}>
             <RefreshCw size={13} className={refreshing ? 'refreshing-icon' : ''} />
             {refreshing ? t('orders.refreshing') : t('orders.refresh')}
@@ -509,6 +583,9 @@ function HomePage({
           })}
           {visibleSheets.length === 0 && <p className="sheet-message">{t('sheets.noMatch')}</p>}
         </div>}
+      </div>
+      <div className="create-order-dock create-sheet-dock">
+        <button type="button" className="create-order-list-button btn btn-primary" onClick={() => setCreateSheetOpen(true)}><Plus size={17} /> {t('createSheet.open')}</button>
       </div>
       <BottomNavigation />
       {createSheetOpen && <CreateSheetDialog onClose={() => setCreateSheetOpen(false)} onCreate={(sheet) => { const created = onCreateSheet(sheet); setCreateSheetOpen(false); navigate(`/admin/sheets/${created.id}`) }} />}
@@ -812,11 +889,13 @@ function MonthlyExpensesSection({ expenses, onChange }: { expenses: MonthlyExpen
       <div className="monthly-expenses-list">
         {expenses.map((expense) => (
           <div className="monthly-expense-row" key={expense.id}>
-            <select className="select select-bordered select-sm select-primary" aria-label={t('expenses.category')} value={expense.category} onChange={(event) => update(expense.id, 'category', event.target.value)}>
-              <option value="shipping">{t('expenses.shipping')}</option><option value="packaging">{t('expenses.packaging')}</option><option value="ads">{t('expenses.ads')}</option><option value="other">{t('expenses.other')}</option>
-            </select>
-            <input type="text" aria-label={t('expenses.description')} placeholder={t('expenses.description')} value={expense.description} onChange={(event) => update(expense.id, 'description', event.target.value)} />
-            <NumericInput minValue={0} aria-label={t('expenses.amount')} value={String(expense.amount)} onValueChange={(value) => update(expense.id, 'amount', Number(value) || 0)} />
+            <div className="monthly-expense-fields">
+              <select className="select select-bordered select-sm select-primary" aria-label={t('expenses.category')} value={expense.category} onChange={(event) => update(expense.id, 'category', event.target.value)}>
+                <option value="shipping">{t('expenses.shipping')}</option><option value="packaging">{t('expenses.packaging')}</option><option value="ads">{t('expenses.ads')}</option><option value="other">{t('expenses.other')}</option>
+              </select>
+              <input type="text" aria-label={t('expenses.description')} placeholder={t('expenses.description')} value={expense.description} onChange={(event) => update(expense.id, 'description', event.target.value)} />
+              <NumericInput minValue={0} aria-label={t('expenses.amount')} value={String(expense.amount)} onValueChange={(value) => update(expense.id, 'amount', Number(value) || 0)} />
+            </div>
             <button type="button" className="expense-remove" onClick={() => onChange(expenses.filter((item) => item.id !== expense.id))} aria-label={t('expenses.remove')}><X size={15} /></button>
           </div>
         ))}
@@ -838,6 +917,9 @@ function SheetOrdersPage({
   exchangeRate,
   onExchangeRateChange,
   onLoadMoreData,
+  onExportMonthlyReport,
+  exportingReport,
+  exportMessage,
 }: {
   sheet: SheetDefinition
   sheetData?: SheetDataState
@@ -849,6 +931,9 @@ function SheetOrdersPage({
   exchangeRate: number
   onExchangeRateChange: (value: number) => void
   onLoadMoreData: (sheetId: string) => void
+  onExportMonthlyReport: (sheetId: string) => void
+  exportingReport: boolean
+  exportMessage: string
 }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
@@ -948,7 +1033,7 @@ function SheetOrdersPage({
 
         <div className="order-list-heading">
           <div><h2>{t('orders.title')}</h2><span>{sheetData?.hasMore ? t('orders.resultCountPartial', { shown: visibleOrders.length, total: sortedOrders.length }) : t('orders.resultCount', { shown: visibleOrders.length, total: sortedOrders.length })}</span></div>
-          <button type="button" className="view-all" onClick={onRefresh} disabled={loading}><RefreshCw size={13} className={loading ? 'refreshing-icon' : ''} />{loading ? t('orders.refreshing') : t('orders.refresh')}</button>
+          <div className="order-heading-actions">{sheet.kind === 'sales' && <button type="button" className="export-report-button" onClick={() => onExportMonthlyReport(sheet.id)} disabled={exportingReport}><Download size={13} />{exportingReport ? t('backup.preparing') : t('backup.exportMonthly')}</button>}<button type="button" className="view-all" onClick={onRefresh} disabled={loading}><RefreshCw size={13} className={loading ? 'refreshing-icon' : ''} />{loading ? t('orders.refreshing') : t('orders.refresh')}</button></div>
         </div>
 
         <div className="search-filter-row">
@@ -986,6 +1071,7 @@ function SheetOrdersPage({
       {createOpen && <CreateOrderDialog sheet={sheet} imageChoices={imageChoices} defaultExchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onClose={() => setCreateOpen(false)} onSave={saveLocalOrder} />}
       {expensesOpen && <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setExpensesOpen(false) }}><section className="create-order-modal monthly-expenses-modal" role="dialog" aria-modal="true" aria-labelledby="monthly-expenses-heading"><header className="modal-header"><div><p>{t(sheet.titleKey)}</p><h2 id="monthly-expenses-heading">{t('expenses.settingsTitle')}</h2></div><button type="button" className="modal-close" onClick={() => setExpensesOpen(false)} aria-label={t('expenses.close')}><X size={20} /></button></header><div className="monthly-expenses-modal-body"><MonthlyExpensesSection expenses={monthlyExpenses} onChange={(expenses) => onSaveMonthlyExpenses(sheet.id, expenses)} /></div><footer className="modal-actions"><button type="button" className="save-order-button btn btn-primary" onClick={() => setExpensesOpen(false)}>{t('expenses.done')}</button></footer></section></div>}
       {notice && <p className="app-toast" role="status">{notice}</p>}
+      {exportMessage && <p className="app-toast" role="status">{exportMessage}</p>}
     </section>
   )
 }
@@ -1121,49 +1207,25 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
   )
 }
 
-const ADMIN_SESSION_KEY = 'sweetie-admin-session'
-const ADMIN_USERNAME = 'admin'
-const ADMIN_PASSWORD = '1234'
-const ADMIN_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
-
-function readAdminSessionExpiry() {
-  try {
-    const value = localStorage.getItem(ADMIN_SESSION_KEY)
-    if (!value) return null
-    const session = JSON.parse(value) as { username?: string; expiresAt?: number }
-    if (session.username !== ADMIN_USERNAME) {
-      localStorage.removeItem(ADMIN_SESSION_KEY)
-      return null
-    }
-    const refreshedExpiry = Date.now() + ADMIN_SESSION_TTL_MS
-    if (typeof session.expiresAt !== 'number' || session.expiresAt < refreshedExpiry) {
-      const refreshedSession = { username: ADMIN_USERNAME, expiresAt: refreshedExpiry }
-      localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(refreshedSession))
-      return refreshedExpiry
-    }
-    return session.expiresAt
-  } catch {
-    return null
-  }
-}
-
-function readAdminSession() {
-  return readAdminSessionExpiry() !== null
-}
-
-function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: string) => boolean }) {
+function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: string) => Promise<boolean> }) {
   const { t } = useTranslation()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (onLogin(username, password)) {
-      setError('')
-      return
+    setSubmitting(true)
+    setError('')
+    try {
+      if (await onLogin(username, password)) return
+      setError(t('auth.invalid'))
+    } catch {
+      setError(t('auth.connectionError'))
+    } finally {
+      setSubmitting(false)
     }
-    setError(t('auth.invalid'))
   }
 
   return (
@@ -1176,15 +1238,15 @@ function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: str
           <label>{t('auth.username')}<input className="input input-bordered" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></label>
           <label>{t('auth.password')}<input className="input input-bordered" autoComplete="current-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
           {error && <p className="login-error" role="alert">{error}</p>}
-          <button type="submit" className="btn btn-primary">{t('auth.signIn')}</button>
-          <small>{t('auth.temporary')}</small>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? t('auth.signingIn') : t('auth.signIn')}</button>
+          <small>{t('auth.secureSession')}</small>
         </form>
       </div>
     </section>
   )
 }
 
-function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, analyticsDataLoading, onLoadAllSalesSheets }: { dataBySheet: Record<string, SheetDataState>; monthlyExpensesBySheet: Record<string, MonthlyExpense[]>; sheets: SheetDefinition[]; loading: boolean; analyticsDataLoading: boolean; onLoadAllSalesSheets: () => void }) {
+function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, analyticsDataLoading, onLoadAllSalesSheets, onExportBackup, backupLoading, backupMessage, syncStatus, onSyncNow, onLogout }: { dataBySheet: Record<string, SheetDataState>; monthlyExpensesBySheet: Record<string, MonthlyExpense[]>; sheets: SheetDefinition[]; loading: boolean; analyticsDataLoading: boolean; onLoadAllSalesSheets: () => void; onExportBackup: () => void; backupLoading: boolean; backupMessage: string; syncStatus: 'idle' | 'syncing' | 'synced' | 'offline'; onSyncNow: () => void; onLogout: () => void }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const currentSheet = getCurrentMonthSheet(dataBySheet, sheets)
@@ -1305,7 +1367,7 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
           </>}
         </section>
 
-        <AnalyticsSettings />
+        <AnalyticsSettings onExportBackup={onExportBackup} backupLoading={backupLoading} backupMessage={backupMessage} syncStatus={syncStatus} onSyncNow={onSyncNow} onLogout={onLogout} />
 
         <section className="analytics-section analytics-chart-section">
           <h2>{t('analytics.salesProfitGraph')}</h2>
@@ -1343,21 +1405,90 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
 }
 
 function App() {
+  const { i18n, t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(readAdminSession)
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false)
+  const [authChecking, setAuthChecking] = useState(true)
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'offline'>('idle')
   const [dataBySheet, setDataBySheet] = useState<Record<string, SheetDataState>>({})
-  const [localOrdersBySheet, setLocalOrdersBySheet] = useState<Record<string, SheetOrder[]>>(() => readAdminSession() ? loadLocalOrders() : {})
-  const [monthlyExpensesBySheet, setMonthlyExpensesBySheet] = useState<Record<string, MonthlyExpense[]>>(() => readAdminSession() ? loadMonthlyExpenses() : {})
-  const [localSheets, setLocalSheets] = useState<SheetDefinition[]>(() => readAdminSession() ? loadLocalSheets() : [])
-  const [exchangeRate, setExchangeRate] = useState(loadExchangeRate)
-  const [localOrdersReady, setLocalOrdersReady] = useState(readAdminSession)
-  const [loading, setLoading] = useState(readAdminSession)
+  const [localOrdersBySheet, setLocalOrdersBySheet] = useState<Record<string, SheetOrder[]>>({})
+  const [monthlyExpensesBySheet, setMonthlyExpensesBySheet] = useState<Record<string, MonthlyExpense[]>>({})
+  const [monthlyExpenseRevisionsBySheet, setMonthlyExpenseRevisionsBySheet] = useState<Record<string, number>>({})
+  const [localSheets, setLocalSheets] = useState<SheetDefinition[]>([])
+  const [exchangeRate, setExchangeRate] = useState(DEFAULT_CNY_TO_THB)
+  const [localOrdersReady, setLocalOrdersReady] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [initialDataReady, setInitialDataReady] = useState(false)
   const [analyticsDataLoading, setAnalyticsDataLoading] = useState(false)
+  const [backupLoading, setBackupLoading] = useState(false)
+  const [backupMessage, setBackupMessage] = useState('')
+  const [exportingReportId, setExportingReportId] = useState<string | null>(null)
+  const [exportMessage, setExportMessage] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
   const [bootReady, setBootReady] = useState(false)
   const isAdminPath = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
+
+  const applyServerSnapshot = useCallback((snapshot: Record<string, unknown> | null) => {
+    const deviceOrders = loadLocalOrders()
+    const deviceExpenses = loadMonthlyExpenses()
+    const deviceSheets = loadLocalSheets()
+    if (snapshot) {
+      const serverOrders = snapshot.localOrdersBySheet && typeof snapshot.localOrdersBySheet === 'object' ? snapshot.localOrdersBySheet as Record<string, SheetOrder[]> : {}
+      const serverExpenses = snapshot.monthlyExpensesBySheet && typeof snapshot.monthlyExpensesBySheet === 'object' ? snapshot.monthlyExpensesBySheet as Record<string, MonthlyExpense[]> : {}
+      const serverSheets = Array.isArray(snapshot.localSheets) ? snapshot.localSheets as SheetDefinition[] : []
+      const serverExpenseRevisions = snapshot.monthlyExpenseRevisionsBySheet && typeof snapshot.monthlyExpenseRevisionsBySheet === 'object' ? snapshot.monthlyExpenseRevisionsBySheet as Record<string, number> : {}
+      const deviceExpenseRevisions = loadMonthlyExpenseRevisions()
+      setLocalOrdersBySheet(mergeSyncedOrderMaps(serverOrders, deviceOrders))
+      setMonthlyExpensesBySheet(mergeMonthlyExpensesByRevision(serverExpenses, serverExpenseRevisions, deviceExpenses, deviceExpenseRevisions))
+      const mergedExpenseRevisions = { ...serverExpenseRevisions }
+      for (const [sheetId, updatedAt] of Object.entries(deviceExpenseRevisions)) mergedExpenseRevisions[sheetId] = Math.max(mergedExpenseRevisions[sheetId] ?? 0, updatedAt)
+      setMonthlyExpenseRevisionsBySheet(mergedExpenseRevisions)
+      setLocalSheets(mergeLocalSheets(serverSheets, deviceSheets))
+      setExchangeRate(Number(snapshot.exchangeRate) > 0 ? Number(snapshot.exchangeRate) : loadExchangeRate())
+      const language = snapshot.language === 'th' || snapshot.language === 'en' ? snapshot.language : (() => {
+        try { return localStorage.getItem('sweetie-language') ?? 'en' } catch { return 'en' }
+      })()
+      void i18n.changeLanguage(language)
+      try { localStorage.setItem('sweetie-language', language) } catch { /* Keep the language for this session. */ }
+      document.documentElement.lang = language
+    } else {
+      setLocalOrdersBySheet(deviceOrders)
+      setMonthlyExpensesBySheet(deviceExpenses)
+      setMonthlyExpenseRevisionsBySheet(loadMonthlyExpenseRevisions())
+      setLocalSheets(deviceSheets)
+      setExchangeRate(loadExchangeRate())
+    }
+    setLocalOrdersReady(true)
+    setIsAdminAuthenticated(true)
+    setInitialDataReady(false)
+    setLoading(true)
+  }, [i18n])
+
+  useEffect(() => {
+    let cancelled = false
+    const restoreSession = async () => {
+      try {
+        const authResponse = await fetch('/api/auth', { credentials: 'include', cache: 'no-store' })
+        if (authResponse.ok) {
+          const session = await authResponse.json() as { authenticated?: boolean }
+          if (session.authenticated) {
+            const dataResponse = await fetch('/api/data', { credentials: 'include', cache: 'no-store' })
+            if (dataResponse.status === 401) return
+            if (!dataResponse.ok) throw new Error('Could not load the shared data snapshot.')
+            const data = await dataResponse.json() as { snapshot?: Record<string, unknown> | null }
+            if (!cancelled) applyServerSnapshot(data.snapshot ?? null)
+          }
+        }
+      } catch {
+        // Keep the sign-in screen available if the sync service is offline.
+      } finally {
+        if (!cancelled) setAuthChecking(false)
+      }
+    }
+    void restoreSession()
+    return () => { cancelled = true }
+  }, [applyServerSnapshot])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => setBootReady(true), 1000)
@@ -1397,11 +1528,12 @@ function App() {
     if (!isAdminAuthenticated || !localOrdersReady) return
     try {
       localStorage.setItem(MONTHLY_EXPENSES_KEY, JSON.stringify(monthlyExpensesBySheet))
+      localStorage.setItem(MONTHLY_EXPENSE_REVISIONS_KEY, JSON.stringify(monthlyExpenseRevisionsBySheet))
       localStorage.setItem(EXCHANGE_RATE_KEY, String(exchangeRate))
     } catch {
       // Expense and exchange-rate settings remain active for this app session if storage is unavailable.
     }
-  }, [monthlyExpensesBySheet, exchangeRate, isAdminAuthenticated, localOrdersReady])
+  }, [monthlyExpensesBySheet, monthlyExpenseRevisionsBySheet, exchangeRate, isAdminAuthenticated, localOrdersReady])
   useEffect(() => {
     if (!isAdminAuthenticated || !localOrdersReady) return
     try {
@@ -1483,6 +1615,41 @@ function App() {
     }
   }, [allSheets, dataBySheet])
 
+  const syncSnapshot = useCallback(async () => {
+    const response = await fetch('/api/data', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        version: 1,
+        localOrdersBySheet,
+        monthlyExpensesBySheet,
+        monthlyExpenseRevisionsBySheet,
+        localSheets,
+        exchangeRate,
+        language: i18n.resolvedLanguage === 'th' ? 'th' : 'en',
+      }),
+    })
+    if (response.status === 401) throw new Error('Your secure session has expired.')
+    if (!response.ok) throw new Error(`Sync failed (${response.status}).`)
+  }, [exchangeRate, i18n.resolvedLanguage, localOrdersBySheet, localSheets, monthlyExpensesBySheet, monthlyExpenseRevisionsBySheet])
+
+  const syncNow = useCallback(async () => {
+    setSyncStatus('syncing')
+    try {
+      await syncSnapshot()
+      setSyncStatus('synced')
+    } catch {
+      setSyncStatus('offline')
+    }
+  }, [syncSnapshot])
+
+  useEffect(() => {
+    if (!isAdminAuthenticated || !localOrdersReady) return
+    const timer = window.setTimeout(() => { void syncNow() }, 650)
+    return () => window.clearTimeout(timer)
+  }, [isAdminAuthenticated, localOrdersReady, localOrdersBySheet, monthlyExpensesBySheet, localSheets, exchangeRate, i18n.resolvedLanguage, syncNow])
+
   const mergedDataBySheet = useMemo(() => Object.fromEntries(allSheets.map((sheet) => {
     const remote = dataBySheet[sheet.id] ?? { orders: [] }
     const localOrders = localOrdersBySheet[sheet.id] ?? []
@@ -1493,68 +1660,159 @@ function App() {
     return [sheet.id, { ...remote, orders: [...newLocalOrders, ...overriddenRemote] }]
   })), [allSheets, dataBySheet, localOrdersBySheet])
 
+  const getCompleteOrdersForSheet = useCallback(async (sheetId: string) => {
+    const sheet = allSheets.find((item) => item.id === sheetId)
+    if (!sheet) return []
+    const remoteOrders = sheet.customName ? [] : await fetchSheetOrders(sheet)
+    return mergeOrderOverrides(remoteOrders, localOrdersBySheet[sheetId] ?? [])
+  }, [allSheets, localOrdersBySheet])
+
+  const exportMonthlyReport = useCallback(async (sheetId: string) => {
+    const sheet = allSheets.find((item) => item.id === sheetId)
+    if (!sheet) return
+    setExportingReportId(sheetId)
+    setExportMessage('')
+    try {
+      const orders = await getCompleteOrdersForSheet(sheetId)
+      const expenses = monthlyExpensesBySheet[sheetId] ?? []
+      const expenseTotal = expenses.reduce((sum, expense) => sum + expense.amount, 0)
+      const grossSales = orders.reduce((sum, order) => sum + (order.grossSales ?? order.lines.reduce((lineSum, line) => lineSum + line.salePrice, 0)), 0)
+      const discounts = orders.reduce((sum, order) => sum + (order.campaignDiscount ?? 0), 0)
+      const profit = getProfitSummary(orders, expenseTotal)
+      const rows: Array<Array<string | number | null | undefined>> = [
+        ['Sweetie Station monthly report', sheetTitle(sheet, t)],
+        ['Exported at', new Date().toISOString()],
+        ['Orders', orders.length],
+        ['Gross sales (THB)', grossSales],
+        ['Campaign discounts (THB)', discounts],
+        ['Net sales (THB)', sheetTotal(orders)],
+        ['Monthly expenses (THB)', expenseTotal],
+        ['Net profit (THB)', profit.complete ? profit.amount : 'Incomplete cost data'],
+        [],
+        ['Order date', 'Customer', 'LINE', 'Items', 'Quantity', 'Gross sales (THB)', 'Campaign', 'Discount (THB)', 'Net sales (THB)', 'Paid (THB)', 'Deposit due (THB)', 'Unit cost (CNY)', 'Product cost (THB)', 'Product profit after campaign (THB)', 'FX rate (THB/CNY)', 'Payment status', 'Shipping status'],
+        ...orders.map((order) => {
+          const orderGross = order.grossSales ?? order.lines.reduce((sum, line) => sum + line.salePrice, 0)
+          const unitCostRMB = order.lines.reduce((sum, line) => sum + (line.costRMB ?? 0) * line.quantity, 0)
+          const costTHB = order.lines.reduce((sum, line) => sum + (line.costTHB ?? 0), 0)
+          const orderProfit = getProfitSummary([order])
+          return [
+            formatOrderDate(order.day, sheet, i18n.resolvedLanguage ?? 'en'),
+            order.customerName,
+            order.lineName,
+            order.lines.map((line) => `${line.itemName || 'Item'} × ${line.quantity}`).join('; '),
+            order.quantity,
+            orderGross,
+            order.isCampaign ? 'Yes' : 'No',
+            order.campaignDiscount ?? 0,
+            order.totalSales,
+            getPaidTotal(order),
+            getDepositDue(order, order.totalSales),
+            unitCostRMB,
+            costTHB,
+            orderProfit.amount,
+            order.exchangeRate ?? '',
+            paymentStatusLabel(order.paymentStatus, t),
+            shippingStatusLabel(order.shippingStatus, t),
+          ]
+        }),
+        [],
+        ['Monthly expenses'],
+        ['Category', 'Description', 'Amount (THB)'],
+        ...expenses.map((expense) => [t(`expenses.${expense.category}`), expense.description, expense.amount]),
+      ]
+      const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`
+      downloadFile(`sweetie-${sheet.id}-monthly-report-${getCurrentDate().toISOString().slice(0, 10)}.csv`, csv, 'text/csv;charset=utf-8')
+      setExportMessage(t('backup.reportSuccess'))
+    } catch {
+      setExportMessage(t('backup.reportError'))
+    } finally {
+      setExportingReportId(null)
+      window.setTimeout(() => setExportMessage(''), 4500)
+    }
+  }, [allSheets, getCompleteOrdersForSheet, i18n.resolvedLanguage, monthlyExpensesBySheet, t])
+
+  const exportFullBackup = useCallback(async () => {
+    setBackupLoading(true)
+    setBackupMessage('')
+    try {
+      const remoteOrdersBySheet: Record<string, SheetOrder[]> = {}
+      const remoteSheets = allSheets.filter((sheet) => !sheet.customName)
+      let nextIndex = 0
+      const worker = async () => {
+        while (nextIndex < remoteSheets.length) {
+          const sheet = remoteSheets[nextIndex]
+          nextIndex += 1
+          remoteOrdersBySheet[sheet.id] = await fetchSheetOrders(sheet)
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(3, remoteSheets.length) }, worker))
+      const ordersBySheet = Object.fromEntries(allSheets.map((sheet) => [sheet.id, mergeOrderOverrides(remoteOrdersBySheet[sheet.id] ?? [], localOrdersBySheet[sheet.id] ?? [])]))
+      const backup = {
+        format: 'sweetie-station-backup',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        language: i18n.resolvedLanguage ?? 'en',
+        exchangeRate,
+        sheets: allSheets,
+        ordersBySheet,
+        monthlyExpensesBySheet,
+        monthlyExpenseRevisionsBySheet,
+      }
+      downloadFile(`sweetie-station-backup-${getCurrentDate().toISOString().slice(0, 10)}.json`, JSON.stringify(backup, null, 2), 'application/json;charset=utf-8')
+      setBackupMessage(t('backup.success'))
+    } catch {
+      setBackupMessage(t('backup.error'))
+    } finally {
+      setBackupLoading(false)
+      window.setTimeout(() => setBackupMessage(''), 5000)
+    }
+  }, [allSheets, exchangeRate, i18n.resolvedLanguage, localOrdersBySheet, monthlyExpensesBySheet, monthlyExpenseRevisionsBySheet, t])
+
   const refresh = useCallback(() => {
     setLoading(true)
     setRefreshKey((key) => key + 1)
   }, [])
 
-  const login = (username: string, password: string) => {
-    if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) return false
-    try {
-      localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({ username, expiresAt: Date.now() + ADMIN_SESSION_TTL_MS }))
-    } catch {
-      // Authentication remains active for this app session if storage is blocked.
-    }
-    setLocalOrdersBySheet(loadLocalOrders())
-    setMonthlyExpensesBySheet(loadMonthlyExpenses())
-    setLocalSheets(loadLocalSheets())
-    setExchangeRate(loadExchangeRate())
-    setLocalOrdersReady(true)
-    setInitialDataReady(false)
-    setLoading(true)
-    setIsAdminAuthenticated(true)
+  const login = async (username: string, password: string) => {
+    const response = await fetch('/api/auth', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    })
+    if (response.status === 401) return false
+    if (!response.ok) throw new Error('Secure authentication is unavailable.')
+
+    let snapshot: Record<string, unknown> | null = null
+    const dataResponse = await fetch('/api/data', { credentials: 'include', cache: 'no-store' })
+    if (dataResponse.status === 401) throw new Error('Could not establish the sync session.')
+    if (!dataResponse.ok) throw new Error('Could not load the shared data snapshot.')
+    const data = await dataResponse.json() as { snapshot?: Record<string, unknown> | null }
+    snapshot = data.snapshot ?? null
+    applyServerSnapshot(snapshot)
     navigate('/admin/home', { replace: true })
     return true
   }
 
-  const expireSession = useCallback(() => {
-    try {
-      localStorage.removeItem(ADMIN_SESSION_KEY)
-    } catch {
-      // Ignore storage restrictions; the in-memory guard still closes.
-    }
+  const logout = useCallback(async () => {
+    try { await fetch('/api/auth', { method: 'DELETE', credentials: 'include' }) } catch { /* Local sign out still proceeds. */ }
     setIsAdminAuthenticated(false)
     setLocalOrdersBySheet({})
     setMonthlyExpensesBySheet({})
+    setMonthlyExpenseRevisionsBySheet({})
     setLocalSheets([])
     setLocalOrdersReady(false)
+    setSyncStatus('idle')
     setDataBySheet({})
     setInitialDataReady(false)
     setLoading(false)
     navigate('/admin', { replace: true })
   }, [navigate])
 
-  useEffect(() => {
-    if (!isAdminAuthenticated) return
-    const expiresAt = readAdminSessionExpiry()
-    if (expiresAt === null) {
-      const timeoutId = window.setTimeout(expireSession, 0)
-      return () => window.clearTimeout(timeoutId)
-    }
-    const timeoutId = window.setTimeout(expireSession, Math.max(0, expiresAt - Date.now()))
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === ADMIN_SESSION_KEY && !event.newValue) expireSession()
-    }
-    window.addEventListener('storage', onStorage)
-    return () => {
-      window.clearTimeout(timeoutId)
-      window.removeEventListener('storage', onStorage)
-    }
-  }, [expireSession, isAdminAuthenticated])
-
-
   const saveMonthlyExpenses = (sheetId: string, expenses: MonthlyExpense[]) => {
-    setMonthlyExpensesBySheet((current) => ({ ...current, [sheetId]: expenses }))
+    const updatedAt = Date.now()
+    setMonthlyExpensesBySheet((current) => ({ ...current, [sheetId]: expenses.map((expense) => ({ ...expense, updatedAt })) }))
+    setMonthlyExpenseRevisionsBySheet((current) => ({ ...current, [sheetId]: updatedAt }))
   }
 
   const createLocalOrder = (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => {
@@ -1614,6 +1872,7 @@ function App() {
       quantity: lines.reduce((sum, line) => sum + line.quantity, 0),
       isLocal: true,
       isOverride: originalOrder ? (!originalOrder.isLocal || originalOrder.isOverride) : false,
+      updatedAt: Date.now(),
     }
     setLocalOrdersBySheet((current) => {
       const existing = current[sheetId] ?? []
@@ -1631,6 +1890,9 @@ function App() {
 
   const currentMonthSheet = getCurrentMonthSheet(mergedDataBySheet, allSheets)
 
+  if (authChecking) {
+    return <main className="app-stage"><div className="app-shell"><SplashScreen /></div></main>
+  }
   if (!isAdminPath) {
     return <main className="app-stage"><div className="app-shell"><SplashScreen showLoading={false} /></div></main>
   }
@@ -1649,10 +1911,10 @@ function App() {
 
         <Routes>
           <Route path="/admin/home" element={<HomePage dataBySheet={mergedDataBySheet} sheets={allSheets} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} onCreateSheet={createLocalSheet} />} />
-          <Route path="/admin/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} />} />
-          <Route path="/admin/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} />} />
+          <Route path="/admin/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} onExportMonthlyReport={exportMonthlyReport} exportingReport={exportingReportId === currentMonthSheet.id} exportMessage={exportMessage} />} />
+          <Route path="/admin/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} onExportMonthlyReport={exportMonthlyReport} exportingReport={exportingReportId === (location.pathname.split('/')[3] ?? '')} exportMessage={exportMessage} />} />
           <Route path="/admin/sheets/:sheetId/orders/:orderId" element={<OrderDetailsRoute dataBySheet={mergedDataBySheet} sheets={allSheets} loading={loading} onRefresh={refresh} onSaveOrder={createLocalOrder} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} onLoadMoreData={loadMoreSheetData} />} />
-          <Route path="/admin/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} monthlyExpensesBySheet={monthlyExpensesBySheet} sheets={allSheets} loading={loading} analyticsDataLoading={analyticsDataLoading} onLoadAllSalesSheets={loadAllSalesSheets} />} />
+          <Route path="/admin/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} monthlyExpensesBySheet={monthlyExpensesBySheet} sheets={allSheets} loading={loading} analyticsDataLoading={analyticsDataLoading} onLoadAllSalesSheets={loadAllSalesSheets} onExportBackup={exportFullBackup} backupLoading={backupLoading} backupMessage={backupMessage} syncStatus={syncStatus} onSyncNow={syncNow} onLogout={logout} />} />
           <Route path="*" element={<Navigate to="/admin/home" replace />} />
         </Routes>
       </div>
@@ -1672,6 +1934,9 @@ function SheetRouteView({
   exchangeRate,
   onExchangeRateChange,
   onLoadMoreData,
+  onExportMonthlyReport,
+  exportingReport,
+  exportMessage,
 }: {
   sheet?: SheetDefinition
   sheets: SheetDefinition[]
@@ -1684,11 +1949,14 @@ function SheetRouteView({
   exchangeRate: number
   onExchangeRateChange: (value: number) => void
   onLoadMoreData: (sheetId: string) => void
+  onExportMonthlyReport: (sheetId: string) => void
+  exportingReport: boolean
+  exportMessage: string
 }) {
   const { sheetId } = useParams()
   const sheet = explicitSheet ?? sheets.find((item) => item.id === sheetId)
   if (!sheet) return <Navigate to="/admin/home" replace />
-  return <SheetOrdersPage key={sheet.id} sheet={sheet} sheetData={dataBySheet[sheet.id]} loading={loading} onRefresh={onRefresh} onCreateOrder={onCreateOrder} monthlyExpenses={monthlyExpensesBySheet[sheet.id] ?? []} onSaveMonthlyExpenses={onSaveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onLoadMoreData={onLoadMoreData} />
+  return <SheetOrdersPage key={sheet.id} sheet={sheet} sheetData={dataBySheet[sheet.id]} loading={loading} onRefresh={onRefresh} onCreateOrder={onCreateOrder} monthlyExpenses={monthlyExpensesBySheet[sheet.id] ?? []} onSaveMonthlyExpenses={onSaveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onLoadMoreData={onLoadMoreData} onExportMonthlyReport={onExportMonthlyReport} exportingReport={exportingReport} exportMessage={exportMessage} />
 }
 
 function OrderDetailsRoute({ dataBySheet, sheets, loading, onRefresh, onSaveOrder, exchangeRate, onExchangeRateChange, onLoadMoreData }: { dataBySheet: Record<string, SheetDataState>; sheets: SheetDefinition[]; loading: boolean; onRefresh: () => void; onSaveOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => void; exchangeRate: number; onExchangeRateChange: (value: number) => void; onLoadMoreData: (sheetId: string) => void }) {

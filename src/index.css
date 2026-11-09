@@ -277,6 +277,9 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .order-list-heading > div { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .order-list-heading h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .order-list-heading > div > span { color: #9a9290; font-size: 10px; }
+.order-heading-actions { display: flex; align-items: center; gap: 8px; }
+.export-report-button { display: inline-flex; min-height: 32px; align-items: center; gap: 5px; border: 0; padding: 0 4px; background: transparent; color: #a34e68; font: inherit; font-size: 9px; font-weight: 700; cursor: pointer; }
+.export-report-button:disabled { opacity: .55; cursor: progress; }
 .create-order-list-button { display: flex; width: 100%; height: 44px; align-items: center; justify-content: center; gap: 7px; margin: 0 0 13px; border: 0; border-radius: 13px; background: #f482a3; box-shadow: 0 7px 13px rgb(0 0 0 / 10%); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
 .order-list-table { display: grid; gap: 9px; padding-bottom: 18px; }
 .order-list-row { display: grid; width: 100%; min-width: 0; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: start; gap: 9px 10px; border: 1px solid #f1ecea; border-radius: 15px; padding: 9px; background: #fff; color: #333; box-shadow: 0 4px 12px rgb(0 0 0 / 4%); text-align: left; cursor: pointer; }
@@ -556,10 +559,18 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .login-error { margin: -3px 0 0; color: #b73545; text-align: center; font-size: 10px; }
 .admin-logout { position: absolute; z-index: 6; top: 14px; right: 92px; min-height: 28px; padding-inline: 8px; border-radius: 999px; background: rgb(255 255 255 / 88%); color: #876572; font-size: 9px; }
 
-.analytics-settings { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 16px 0; border: 1px solid #f0e8e6; border-radius: 14px; padding: 12px 13px; background: #fff; }
+.analytics-settings { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 16px 0; border: 1px solid #f0e8e6; border-radius: 14px; padding: 12px 13px; background: #fff; }
 .analytics-settings h2 { margin: 0 0 3px; font-size: 12px; font-weight: 700; }
 .analytics-settings span { color: #918785; font-size: 9px; }
 .analytics-settings .select { width: 128px; min-height: 36px; height: 36px; font-size: 10px; }
+.analytics-settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.sync-status { color: #7b716e; font-size: 8px; font-weight: 700; }
+.sync-status.synced { color: #278253; }
+.sync-status.syncing { color: #a56c21; }
+.sync-status.offline { color: #bd4356; }
+.backup-download-button, .logout-button { display: inline-flex; min-height: 32px; align-items: center; justify-content: center; gap: 5px; border: 1px solid #f0e4e5; border-radius: 9px; padding: 0 8px; background: #fff8fa; color: #9d5269; font: inherit; font-size: 9px; font-weight: 700; cursor: pointer; }
+.backup-download-button:disabled { opacity: .55; cursor: progress; }
+.backup-status { flex-basis: 100%; color: #8b7f7c; font-size: 9px; }
 .admin-logout { right: 15px; }
 .screen-fixed-header { flex: none; min-width: 0; }
 .sheets-home-screen .section-heading { margin: 14px 4px 10px; }
@@ -646,4 +657,102 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
   .analytics-section h2 { font-size: 15px; }
   .monthly-bar-month { font-size: 11px; }
   .monthly-bar-month small { font-size: 9px; }
+}
+
+/* Spacing pass: keep the existing Sweetie design, but give dense controls more room. */
+.order-list-heading { gap: 12px; margin-bottom: 14px; }
+.order-list-heading > div { gap: 10px; }
+.order-heading-actions { gap: 10px; }
+.search-filter-row { gap: 10px; margin-bottom: 14px; }
+.order-list-table { gap: 12px; }
+.order-list-row { padding: 11px; }
+.order-row-items { gap: 8px; padding-top: 9px; }
+.analytics-metrics { gap: 12px; }
+.metric-card { padding: 14px; }
+.analytics-section { margin: 20px 0 24px; padding: 16px; }
+.status-summary-row { padding: 9px 0; }
+.monthly-bar-row { gap: 10px; padding: 10px 2px; }
+.modal-header { padding: 18px 20px 16px; }
+.order-form { padding: 18px 20px 20px; }
+.order-form label { gap: 7px; }
+.form-grid { gap: 12px; }
+.form-section-heading { margin: 22px 0 12px; }
+.draft-line-card { gap: 12px; padding: 14px; }
+
+.create-sheet-dock .create-order-list-button {
+  height: 48px;
+  margin: 0;
+  border-radius: 14px;
+  background: #f482a3;
+  box-shadow: 0 7px 13px rgb(0 0 0 / 10%);
+  color: #fff;
+  font-size: 13px;
+}
+.create-sheet-dock .create-order-list-button:hover { background: #ea7194; }
+@media (min-width: 600px) {
+  .create-sheet-dock {
+    margin-inline: calc(-1 * clamp(22px, 3.5vw, 42px));
+    padding-inline: clamp(22px, 3.5vw, 42px);
+  }
+}
+
+.monthly-expenses-section { gap: 14px; }
+.monthly-expenses-modal-body { padding: 20px 24px 16px; }
+.monthly-expenses-modal-body .monthly-expenses-section { gap: 14px; }
+.monthly-expenses-heading { gap: 12px; }
+.monthly-expenses-heading h3 { font-size: 14px; }
+.monthly-expenses-heading span { display: block; margin-top: 4px; font-size: 11px; line-height: 1.4; }
+.monthly-expenses-heading strong { font-size: 13px; }
+.monthly-expenses-list { gap: 10px; }
+.monthly-expense-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #f0e7e5;
+  border-radius: 12px;
+  padding: 10px;
+  background: #fff;
+}
+.monthly-expense-fields {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(105px, .9fr) minmax(0, 1.4fr) minmax(105px, .7fr);
+  align-items: center;
+  gap: 10px;
+}
+.monthly-expense-fields > * { min-width: 0; }
+.monthly-expense-fields .select, .monthly-expense-fields input {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  height: 42px;
+  border: 1px solid #eee6e4;
+  border-radius: 9px;
+  padding: 0 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+}
+.expense-remove { width: 36px; height: 36px; border-radius: 9px; }
+.expense-add-button { min-height: 40px; gap: 7px; padding: 6px 2px; font-size: 13px; }
+.expenses-empty { padding: 10px 0; font-size: 12px; }
+
+@media (max-width: 600px) {
+  .home-screen { padding-inline: 16px; }
+  .screen-fixed-header { padding-inline: 16px; }
+  .home-scroll-area { padding-inline: 16px; padding-bottom: 20px; }
+  .order-list-heading { margin: 0 0 14px; }
+  .order-list-row { gap: 9px; padding: 10px; }
+  .analytics-section { padding: 15px; }
+  .monthly-expenses-modal-body { padding: 18px 16px 16px; }
+  .monthly-expense-row { align-items: start; gap: 8px; padding: 11px; }
+  .monthly-expense-fields { grid-template-columns: minmax(0, 1fr) minmax(92px, .62fr); gap: 9px; }
+  .monthly-expense-fields .select { grid-column: 1 / -1; }
+  .monthly-expense-fields .select, .monthly-expense-fields input { min-height: 42px; height: 42px; font-size: 13px; }
+  .expense-remove { margin-top: 3px; }
+  .create-sheet-dock { margin-inline: -16px; padding-inline: 16px; }
+  .modal-header { padding: 17px 18px 15px; }
+  .order-form { padding: 17px 18px 20px; }
+  .form-grid { gap: 10px; }
 }

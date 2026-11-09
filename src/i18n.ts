@@ -20,7 +20,9 @@ const resources = {
       },
       details: { title: 'Order details', summary: 'Order summary' },
       settings: { title: 'Settings', displayLanguage: 'Display language' },
-      auth: { kicker: 'Sweetie Station admin', title: 'Admin sign in', username: 'Username', password: 'Password', signIn: 'Sign in', logout: 'Log out', invalid: 'Incorrect username or password.', temporary: 'Temporary demo login only — not secure access control.' },
+      sync: { idle: 'Not synced yet', syncing: 'Syncing to cloud…', synced: 'Synced to all devices', offline: 'Sync unavailable — saved on this device', syncNow: 'Sync now' },
+      backup: { download: 'Download full backup', preparing: 'Preparing download…', success: 'Full backup downloaded.', error: 'Could not download the full backup.', exportMonthly: 'Export', reportSuccess: 'Monthly report downloaded.', reportError: 'Could not export the monthly report.' },
+      auth: { kicker: 'Sweetie Station admin', title: 'Admin sign in', username: 'Username', password: 'Password', signIn: 'Sign in', logout: 'Log out', invalid: 'Incorrect username or password.' },
       detail: {
         orderDay: '{{day}}', quantity: '{{count}} {{unit}}', piece: 'pc', pieces: 'pcs', paymentFull: 'Paid in full', paymentDeposit: 'Deposit', paymentUnpaid: 'Unpaid',
         shippingNotOrdered: 'Not ordered', shippingOrdered: 'Ordered', shippingInbound: 'Waiting for Thailand', shippingSent: 'Shipped', notSet: 'Not listed', lineName: 'LINE name', customer: 'Customer', mockCustomerImage: 'Mock customer avatar',
@@ -77,7 +79,9 @@ const resources = {
       },
       details: { title: 'รายละเอียดคำสั่งซื้อ', summary: 'สรุปคำสั่งซื้อ' },
       settings: { title: 'ตั้งค่า', displayLanguage: 'ภาษาที่แสดง' },
-      auth: { kicker: 'ผู้ดูแล Sweetie Station', title: 'เข้าสู่ระบบผู้ดูแล', username: 'ชื่อผู้ใช้', password: 'รหัสผ่าน', signIn: 'เข้าสู่ระบบ', logout: 'ออกจากระบบ', invalid: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', temporary: 'ล็อกอินชั่วคราวสำหรับตัวอย่าง — ยังไม่ใช่ระบบรักษาความปลอดภัย' },
+      sync: { idle: 'ยังไม่ได้ซิงก์', syncing: 'กำลังซิงก์ขึ้นคลาวด์…', synced: 'ซิงก์แล้วทุกอุปกรณ์', offline: 'ซิงก์ไม่ได้ — บันทึกในอุปกรณ์นี้แล้ว', syncNow: 'ซิงก์ตอนนี้' },
+      backup: { download: 'ดาวน์โหลดข้อมูลสำรองทั้งหมด', preparing: 'กำลังเตรียมไฟล์…', success: 'ดาวน์โหลดข้อมูลสำรองแล้ว', error: 'ดาวน์โหลดข้อมูลสำรองไม่สำเร็จ', exportMonthly: 'ส่งออก', reportSuccess: 'ดาวน์โหลดรายงานรายเดือนแล้ว', reportError: 'ส่งออกรายงานรายเดือนไม่สำเร็จ' },
+      auth: { kicker: 'ผู้ดูแล Sweetie Station', title: 'เข้าสู่ระบบผู้ดูแล', username: 'ชื่อผู้ใช้', password: 'รหัสผ่าน', signIn: 'เข้าสู่ระบบ', logout: 'ออกจากระบบ', invalid: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' },
       detail: {
         orderDay: '{{day}}', quantity: '{{count}} {{unit}}', piece: 'ชิ้น', pieces: 'ชิ้น', paymentFull: 'จ่ายเต็มแล้ว', paymentDeposit: 'มัดจำ', paymentUnpaid: 'ยังไม่ได้ชำระ',
         shippingNotOrdered: 'ยังไม่ได้สั่ง', shippingOrdered: 'สั่งแล้ว', shippingInbound: 'รอเข้าไทย', shippingSent: 'ส่งแล้ว', notSet: 'ไม่มีข้อมูล', lineName: 'ชื่อไลน์', customer: 'ชื่อลูกค้า', mockCustomerImage: 'รูปโปรไฟล์ตัวอย่าง',
