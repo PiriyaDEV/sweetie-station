@@ -58,7 +58,7 @@ export function LineContactPicker({ onPick, label }: { onPick: (contact: LineCon
             <li key={contact.lineUserId}>
               <button type="button" onClick={() => { onPick(contact); setQuery('') }}>
                 <span className="line-picker-avatar">{contact.pictureUrl ? <img src={contact.pictureUrl} alt="" referrerPolicy="no-referrer" /> : <UserRound size={16} />}</span>
-                {contact.displayName}
+                <span className="line-picker-name">{contact.displayName}</span>
               </button>
             </li>
           ))}
