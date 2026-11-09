@@ -4,11 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "netlify dev",
+    "dev": "npm run build && netlify dev --dir dist",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "dev:vite": "vite"
+    "dev:vite": "vite",
+    "test:flows": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@netlify/blobs": "^11.1.8",

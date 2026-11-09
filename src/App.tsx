@@ -12,6 +12,7 @@ import {
   Package,
   Pencil,
   Plus,
+  Receipt,
   RefreshCw,
   Search,
   SlidersHorizontal,
@@ -283,6 +284,7 @@ function AnalyticsSettings({ onExportBackup, backupLoading, backupMessage, syncS
     document.documentElement.lang = nextLanguage
     try {
       localStorage.setItem('sweetie-language', nextLanguage)
+      localStorage.setItem('sweetie-language-user-selected', '1')
     } catch {
       // Language remains active for this app session if storage is unavailable.
     }
@@ -290,7 +292,7 @@ function AnalyticsSettings({ onExportBackup, backupLoading, backupMessage, syncS
 
   return (
     <section className="analytics-settings">
-      <div><h2>{t('settings.title')}</h2><span>{t('settings.displayLanguage')}</span></div>
+      <div><h2>{t('settings.title')}</h2><span>{t('settings.displayLanguage')}</span><small className="storage-explanation">{t('sync.storageNote')}</small></div>
       <div className="analytics-settings-actions">
         <span className={`sync-status ${syncStatus}`} role="status">{t(`sync.${syncStatus}`)}</span>
         <button type="button" className="backup-download-button" onClick={() => void onSyncNow()} disabled={syncStatus === 'syncing'}><RefreshCw size={13} />{t('sync.syncNow')}</button>
@@ -431,7 +433,7 @@ function formatSignedPercent(value: number | null, language: string) {
 
 function CreateSheetDialog({ onClose, onCreate }: {
   onClose: () => void
-  onCreate: (sheet: Omit<SheetDefinition, 'id' | 'gid' | 'titleKey'>) => void
+  onCreate: (sheet: Omit<SheetDefinition, 'id' | 'gid' | 'titleKey'>) => Promise<void>
 }) {
   const { t } = useTranslation()
   const now = getCurrentDate()
@@ -440,15 +442,24 @@ function CreateSheetDialog({ onClose, onCreate }: {
   const [monthKey, setMonthKey] = useState(Object.keys(MONTH_INDEX)[now.getMonth()])
   const [year, setYear] = useState(String(now.getFullYear()))
   const [error, setError] = useState('')
+  const [creating, setCreating] = useState(false)
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const yearValue = Number(year)
     if (!name.trim() || !Number.isInteger(yearValue) || yearValue < 2000 || yearValue > 2100) {
       setError(t('createSheet.validation'))
       return
     }
-    onCreate({ customName: name.trim(), kind, monthKey, year: yearValue })
+    setCreating(true)
+    setError('')
+    try {
+      await onCreate({ customName: name.trim(), kind, monthKey, year: yearValue })
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t('createSheet.createError'))
+    } finally {
+      setCreating(false)
+    }
   }
 
   return (
@@ -456,20 +467,20 @@ function CreateSheetDialog({ onClose, onCreate }: {
       <section className="create-order-modal create-sheet-modal" role="dialog" aria-modal="true" aria-labelledby="create-sheet-heading">
         <header className="modal-header">
           <div><p>{t('sheets.kicker')}</p><h2 id="create-sheet-heading">{t('createSheet.title')}</h2></div>
-          <button type="button" className="modal-close" onClick={onClose} aria-label={t('createSheet.close')}><X size={20} /></button>
+          <button type="button" className="modal-close" onClick={onClose} aria-label={t('createSheet.close')} disabled={creating}><X size={20} /></button>
         </header>
         <form className="order-form" onSubmit={submit}>
-          <label>{t('createSheet.name')} <span className="required-star">*</span><input value={name} onChange={(event) => { setName(event.target.value); setError('') }} required autoFocus placeholder={t('createSheet.namePlaceholder')} /></label>
+          <label><span className="field-label">{t('createSheet.name')} <span className="required-star">*</span></span><input value={name} onChange={(event) => { setName(event.target.value); setError('') }} required autoFocus placeholder={t('createSheet.namePlaceholder')} /></label>
           <div className="form-grid two-columns">
             <label>{t('filters.sheetType')}<select className="select select-bordered select-sm select-primary" value={kind} onChange={(event) => setKind(event.target.value as SheetDefinition['kind'])}><option value="sales">{t('sheets.kind.sales')}</option><option value="haul">{t('sheets.kind.haul')}</option></select></label>
             <label>{t('createSheet.month')}<select className="select select-bordered select-sm select-primary" value={monthKey} onChange={(event) => setMonthKey(event.target.value)}>{Object.keys(MONTH_INDEX).map((key) => <option key={key} value={key}>{t(`sheets.${key}`)}</option>)}</select></label>
           </div>
-          <label className="year-field">{t('createSheet.year')} <span className="required-star">*</span><NumericInput integer minValue={2000} maxValue={2100} value={year} onValueChange={setYear} required /></label>
+          <label className="year-field"><span className="field-label">{t('createSheet.year')} <span className="required-star">*</span></span><NumericInput integer minValue={2000} maxValue={2100} value={year} onValueChange={setYear} required /></label>
           <p className="local-save-note">{t('createSheet.localOnly')}</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <footer className="modal-actions">
-            <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose}>{t('createOrder.cancel')}</button>
-            <button type="submit" className="save-order-button btn btn-primary"><Check size={16} /> {t('createSheet.create')}</button>
+            <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose} disabled={creating}>{t('createOrder.cancel')}</button>
+            <button type="submit" className="save-order-button btn btn-primary" disabled={creating}><Check size={16} /> {creating ? t('createSheet.creating') : t('createSheet.create')}</button>
           </footer>
         </form>
       </section>
@@ -490,7 +501,7 @@ function HomePage({
   loading: boolean
   refreshing: boolean
   onRefresh: () => void
-  onCreateSheet: (sheet: Omit<SheetDefinition, 'id' | 'gid' | 'titleKey'>) => SheetDefinition
+  onCreateSheet: (sheet: Omit<SheetDefinition, 'id' | 'gid' | 'titleKey'>) => Promise<SheetDefinition>
 }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
@@ -575,7 +586,7 @@ function HomePage({
                 <span className="sheet-card-caption">
                   <strong>{sheetTitle(sheet, t)}</strong>
                   <span>{error ? t('sheet.errorShort') : dataBySheet[sheet.id]?.hasMore ? t('sheets.partialOrderCount', { count: orders.length }) : t('sheets.orderCount', { count: orders.length })}</span>
-                  <b>{error ? '—' : `${dataBySheet[sheet.id]?.hasMore ? '≥ ' : ''}${formatMoney(sheetTotal(orders), language)} THB`}</b>
+                  <b>{error ? '—' : `${formatMoney(sheetTotal(orders), language)} THB`}</b>
                   {dataBySheet[sheet.id]?.hasMore && <i className="sheet-card-progress" aria-label={t('sheet.loadingMoreData')} />}
                 </span>
               </button>
@@ -588,7 +599,7 @@ function HomePage({
         <button type="button" className="create-order-list-button btn btn-primary" onClick={() => setCreateSheetOpen(true)}><Plus size={17} /> {t('createSheet.open')}</button>
       </div>
       <BottomNavigation />
-      {createSheetOpen && <CreateSheetDialog onClose={() => setCreateSheetOpen(false)} onCreate={(sheet) => { const created = onCreateSheet(sheet); setCreateSheetOpen(false); navigate(`/admin/sheets/${created.id}`) }} />}
+      {createSheetOpen && <CreateSheetDialog onClose={() => setCreateSheetOpen(false)} onCreate={async (sheet) => { const created = await onCreateSheet(sheet); setCreateSheetOpen(false); navigate(`/admin/sheets/${created.id}`) }} />}
     </section>
   )
 }
@@ -619,7 +630,6 @@ function OrderListRow({ order, sheet }: { order: SheetOrder; sheet: SheetDefinit
         <span className="order-row-badges">
           <StatusBadge type="payment" status={order.paymentStatus} />
           <StatusBadge type="shipping" status={order.shippingStatus} />
-          {order.isLocal && <span className="status-badge local">{order.isOverride ? t('orders.editedLocally') : t('orders.deviceOnly')}</span>}
         </span>
       </span>
       <span className="order-row-total">{formatMoney(order.totalSales, language)}<small>THB</small></span>
@@ -701,15 +711,30 @@ function draftFromOrder(order: SheetOrder, defaultExchangeRate: number, sheet: S
 
 async function imageToDataUrl(file: File) {
   const bitmap = await createImageBitmap(file)
-  const scale = Math.min(1, 720 / Math.max(bitmap.width, bitmap.height))
   const canvas = document.createElement('canvas')
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
-  const context = canvas.getContext('2d')
-  if (!context) throw new Error('Image processing is unavailable.')
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  bitmap.close()
-  return canvas.toDataURL('image/webp', 0.76)
+  let maxDimension = 720
+  let quality = 0.76
+  try {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height))
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+      const context = canvas.getContext('2d')
+      if (!context) throw new Error('Image processing is unavailable.')
+      context.clearRect(0, 0, canvas.width, canvas.height)
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+      const dataUrl = canvas.toDataURL('image/webp', quality)
+      if (dataUrl.length <= 44_000) return dataUrl
+      if (quality > 0.46) quality = Math.max(0.46, quality - 0.1)
+      else {
+        maxDimension = Math.max(96, Math.floor(maxDimension * 0.78))
+        quality = 0.72
+      }
+    }
+  } finally {
+    bitmap.close()
+  }
+  throw new Error('This image cannot be compressed enough to save in Google Sheets.')
 }
 
 function CreateOrderDialog({
@@ -727,7 +752,7 @@ function CreateOrderDialog({
   defaultExchangeRate: number
   onExchangeRateChange: (value: number) => void
   onClose: () => void
-  onSave: (draft: OrderDraft) => void
+  onSave: (draft: OrderDraft) => Promise<void>
 }) {
   const { t, i18n } = useTranslation()
   const language = i18n.resolvedLanguage ?? 'en'
@@ -735,6 +760,8 @@ function CreateOrderDialog({
   const [openPicker, setOpenPicker] = useState<number | null>(null)
   const [imageQuery, setImageQuery] = useState('')
   const [imageError, setImageError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const exchangeRate = Number(draft.exchangeRate) || defaultExchangeRate
   const grossSales = draft.lines.reduce((sum, line) => sum + (Number(line.salePrice) || 0), 0)
   const campaignDiscount = draft.isCampaign ? Math.min(grossSales, Math.max(0, Number(draft.campaignDiscount) || 0)) : 0
@@ -769,9 +796,18 @@ function CreateOrderDialog({
 
   const filteredImages = imageChoices.filter((choice) => `${choice.label} ${choice.itemName}`.toLocaleLowerCase().includes(imageQuery.toLocaleLowerCase()))
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    onSave(draft)
+    if (saving) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      await onSave(draft)
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : t('createOrder.saveError'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -787,13 +823,13 @@ function CreateOrderDialog({
 
         <form className="order-form" onSubmit={submit}>
           <div className="form-grid two-columns">
-            <label>{t('detail.lineName')}<input value={draft.lineName} onChange={(event) => updateField('lineName', event.target.value)} placeholder={t('createOrder.linePlaceholder')} /></label>
-            <label>{t('detail.customer')} <span className="required-star">*</span><input value={draft.customerName} onChange={(event) => updateField('customerName', event.target.value)} required placeholder={t('createOrder.customerPlaceholder')} /></label>
+            <label><span className="field-label">{t('detail.lineName')}</span><input value={draft.lineName} onChange={(event) => updateField('lineName', event.target.value)} placeholder={t('createOrder.linePlaceholder')} /></label>
+            <label><span className="field-label">{t('detail.customer')} <span className="required-star">*</span></span><input value={draft.customerName} onChange={(event) => updateField('customerName', event.target.value)} required placeholder={t('createOrder.customerPlaceholder')} /></label>
           </div>
-          <label className="day-field">{t('createOrder.day')} <span className="required-star">*</span><input type="date" value={draft.day} onChange={(event) => updateField('day', event.target.value)} required /></label>
+          <label className="day-field"><span className="field-label">{t('createOrder.day')} <span className="required-star">*</span></span><input type="date" value={draft.day} onChange={(event) => updateField('day', event.target.value)} required /></label>
 
           <div className="exchange-rate-field">
-            <label>{t('createOrder.exchangeRate')} <span className="required-star">*</span><NumericInput minValue={0.01} value={draft.exchangeRate} onValueChange={(value) => { updateField('exchangeRate', value); const nextRate = Number(value); if (nextRate > 0) onExchangeRateChange(nextRate) }} required /></label>
+            <label><span className="field-label">{t('createOrder.exchangeRate')} <span className="required-star">*</span></span><NumericInput minValue={0.01} value={draft.exchangeRate} onValueChange={(value) => { updateField('exchangeRate', value); const nextRate = Number(value); if (nextRate > 0) onExchangeRateChange(nextRate) }} required /></label>
             <small>{t('createOrder.exchangeRateHint')}</small>
           </div>
 
@@ -813,16 +849,16 @@ function CreateOrderDialog({
                 <div className="draft-item-main">
                   <div className="draft-item-photo">{line.image ? <img src={line.image} alt={line.itemName || t('createOrder.selectedImage')} /> : <Package size={22} />}</div>
                   <div className="draft-item-fields">
-                    <label>{t('createOrder.itemName')} <span className="required-star">*</span><input value={line.itemName} onChange={(event) => updateLine(index, 'itemName', event.target.value)} required /></label>
+                    <label><span className="field-label">{t('createOrder.itemName')} <span className="required-star">*</span></span><input value={line.itemName} onChange={(event) => updateLine(index, 'itemName', event.target.value)} required /></label>
                     <div className="form-grid two-columns">
-                      <label>{t('createOrder.price')} <span className="required-star">*</span><NumericInput minValue={0} value={line.salePrice} onValueChange={(value) => updateLine(index, 'salePrice', value)} required /></label>
-                      <label>{t('createOrder.quantity')} <span className="required-star">*</span><NumericInput integer minValue={1} value={line.quantity} onValueChange={(value) => updateLine(index, 'quantity', value)} required /></label>
+                      <label><span className="field-label">{t('createOrder.price')} <span className="required-star">*</span></span><NumericInput minValue={0} value={line.salePrice} onValueChange={(value) => updateLine(index, 'salePrice', value)} required /></label>
+                      <label><span className="field-label">{t('createOrder.quantity')} <span className="required-star">*</span></span><NumericInput integer minValue={1} value={line.quantity} onValueChange={(value) => updateLine(index, 'quantity', value)} required /></label>
                     </div>
                   </div>
                 </div>
                 <div className="form-grid two-columns financial-fields">
-                  <label>{t('createOrder.bank')}<NumericInput minValue={0} value={line.bankAmount} onValueChange={(value) => updateLine(index, 'bankAmount', value)} /></label>
-                  <label>{t('createOrder.costRMB')} {costRequired && <span className="required-star">*</span>}<NumericInput minValue={0} value={line.costRMB} onValueChange={(value) => updateLine(index, 'costRMB', value)} required={costRequired} /></label>
+                  <label><span className="field-label">{t('createOrder.bank')}</span><NumericInput minValue={0} value={line.bankAmount} onValueChange={(value) => updateLine(index, 'bankAmount', value)} /></label>
+                  <label><span className="field-label">{t('createOrder.costRMB')} {costRequired && <span className="required-star">*</span>}</span><NumericInput minValue={0} value={line.costRMB} onValueChange={(value) => updateLine(index, 'costRMB', value)} required={costRequired} /></label>
                 </div>
                 <div className="line-calculation-summary">
                   <span>{t('createOrder.depositDue')} <strong>{formatMoney(depositDue, language)} THB</strong></span>
@@ -858,17 +894,21 @@ function CreateOrderDialog({
 
           <section className="campaign-form-card">
             <label className="campaign-toggle"><input type="checkbox" checked={draft.isCampaign} onChange={(event) => { updateField('isCampaign', event.target.checked); updateField('paymentStatus', ''); if (!event.target.checked) updateField('campaignDiscount', '') }} />{t('createOrder.isCampaign')}</label>
-            {draft.isCampaign && <label>{t('createOrder.campaignDiscount')} <span className="required-star">*</span><NumericInput minValue={0} maxValue={grossSales} value={draft.campaignDiscount} onValueChange={(value) => { updateField('campaignDiscount', value); updateField('paymentStatus', '') }} required /></label>}
+            {draft.isCampaign && <label className="campaign-discount-field">
+              <span className="field-label">{t('createOrder.campaignDiscount')} <span className="required-star">*</span></span>
+              <span className="campaign-discount-control"><NumericInput className="input input-bordered campaign-discount-input" minValue={0} maxValue={grossSales} value={draft.campaignDiscount} onValueChange={(value) => { updateField('campaignDiscount', value); updateField('paymentStatus', '') }} required /><span className="campaign-currency">THB</span></span>
+            </label>}
             <div className="campaign-net-total"><span>{t('createOrder.afterDiscount')}</span><strong>{formatMoney(netSales, language)} THB</strong></div>
             <div className="campaign-net-total"><span>{t('createOrder.orderDepositDue')}</span><strong>{formatMoney(orderDepositDue, language)} THB</strong></div>
             <div className="campaign-net-total"><span>{t('createOrder.paymentStatusPreview')}</span><strong>{t((draft.paymentStatus || automaticPaymentStatus) === 'จ่ายเต็ม' ? 'detail.paymentFull' : (draft.paymentStatus || automaticPaymentStatus) === 'มัดจำ' ? 'detail.paymentDeposit' : 'detail.paymentUnpaid')}</strong></div>
           </section>
 
           {imageError && <p className="form-error" role="alert">{imageError}</p>}
+          {saveError && <p className="form-error" role="alert">{saveError}</p>}
           <p className="local-save-note">{t('createOrder.localOnly')}</p>
           <footer className="modal-actions">
-            <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose}>{t('createOrder.cancel')}</button>
-            <button type="submit" className="save-order-button btn btn-primary"><Check size={16} /> {t(initialOrder ? 'createOrder.update' : 'createOrder.save')}</button>
+            <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose} disabled={saving}>{t('createOrder.cancel')}</button>
+            <button type="submit" className="save-order-button btn btn-primary" disabled={saving}><Check size={16} /> {saving ? t('createOrder.saving') : t(initialOrder ? 'createOrder.update' : 'createOrder.save')}</button>
           </footer>
         </form>
       </section>
@@ -885,7 +925,7 @@ function MonthlyExpensesSection({ expenses, onChange }: { expenses: MonthlyExpen
 
   return (
     <section className="monthly-expenses-section">
-      <div className="monthly-expenses-heading"><div><h3>{t('expenses.title')}</h3><span>{t('expenses.note')}</span></div><strong>{formatMoney(total, language)} THB</strong></div>
+      <div className="monthly-expenses-heading"><span>{t('expenses.note')}</span><strong>{formatMoney(total, language)} <small>THB</small></strong></div>
       <div className="monthly-expenses-list">
         {expenses.map((expense) => (
           <div className="monthly-expense-row" key={expense.id}>
@@ -899,7 +939,7 @@ function MonthlyExpensesSection({ expenses, onChange }: { expenses: MonthlyExpen
             <button type="button" className="expense-remove" onClick={() => onChange(expenses.filter((item) => item.id !== expense.id))} aria-label={t('expenses.remove')}><X size={15} /></button>
           </div>
         ))}
-        {expenses.length === 0 && <p className="expenses-empty">{t('expenses.empty')}</p>}
+        {expenses.length === 0 && <div className="expenses-empty-state"><span className="expenses-empty-icon"><Receipt size={19} /></span><p className="expenses-empty">{t('expenses.empty')}</p></div>}
       </div>
       <button type="button" className="expense-add-button" onClick={add}><Plus size={14} /> {t('expenses.add')}</button>
     </section>
@@ -925,7 +965,7 @@ function SheetOrdersPage({
   sheetData?: SheetDataState
   loading: boolean
   onRefresh: () => void
-  onCreateOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => void
+  onCreateOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => Promise<void>
   monthlyExpenses: MonthlyExpense[]
   onSaveMonthlyExpenses: (sheetId: string, expenses: MonthlyExpense[]) => void
   exchangeRate: number
@@ -1006,8 +1046,8 @@ function SheetOrdersPage({
       })
   }, [orders, t])
 
-  const saveLocalOrder = (draft: OrderDraft) => {
-    onCreateOrder(sheet.id, draft)
+  const saveOrder = async (draft: OrderDraft) => {
+    await onCreateOrder(sheet.id, draft)
     setCreateOpen(false)
     setNotice(t('createOrder.savedNotice'))
     window.setTimeout(() => setNotice(''), 3000)
@@ -1024,16 +1064,18 @@ function SheetOrdersPage({
           <h1>{sheetTitle(sheet, t)}</h1>
           {loading && !sheetData ? <p className="sales-growth">{t('sheet.loadingShort')}</p> : sheet.kind === 'sales' ? <>
             <div className="month-sales-summary">
-              <div><span>{t('analytics.totalSales')}</span><strong>{sheetData?.hasMore ? '≥ ' : ''}{formatMoney(sheetTotal(orders), language)} <small>THB</small></strong></div>
-              <div><span>{t('analytics.totalProfit')}</span><strong className={sheetData?.hasMore || totalProfit.amount === null ? 'profit-unavailable' : 'profit-summary-value'}>{sheetData?.hasMore || totalProfit.amount === null ? '—' : `${formatMoney(totalProfit.amount, language)} THB`}</strong>{sheetData?.hasMore ? <em className="profit-data-note">{t('sheet.loadingMoreData')}</em> : totalProfit.amount === null ? <em className="profit-data-note">{t('analytics.noPeriodProfit')}</em> : !totalProfit.complete ? <em className="profit-data-note">{t('analytics.partialProfitNote', { known: totalProfit.knownLines, total: totalProfit.totalLines })}</em> : <em className="profit-data-note">{t('analytics.netProfitNote', { amount: formatMoney(expenseTotal, language) })}</em>}</div>
+              <div><span>{t('analytics.totalSales')}</span><strong>{formatMoney(sheetTotal(orders), language)} <small>THB</small></strong></div>
+              <div><span>{t('analytics.totalProfit')}</span><strong className={sheetData?.hasMore || totalProfit.amount === null ? 'profit-unavailable' : 'profit-summary-value'}>{sheetData?.hasMore || totalProfit.amount === null ? '—' : `${formatMoney(totalProfit.amount, language)} THB`}</strong>{sheetData?.hasMore ? <em className="profit-data-note">{t('sheet.loadingMoreData')}</em> : totalProfit.amount === null ? <em className="profit-data-note">{t('analytics.noPeriodProfitShort')}</em> : !totalProfit.complete ? <em className="profit-data-note">{t('analytics.partialProfitNote', { known: totalProfit.knownLines, total: totalProfit.totalLines })}</em> : <em className="profit-data-note">{t('analytics.netProfitNote', { amount: formatMoney(expenseTotal, language) })}</em>}</div>
+              {sheet.kind === 'sales' && <button type="button" className="month-expense-tile" onClick={() => setExpensesOpen(true)}>
+                <span>{t('expenses.open')}</span><strong>{formatMoney(expenseTotal, language)} <small>THB</small></strong>
+              </button>}
             </div>
-            <div className="month-order-actions"><p className="month-order-count">{sheetData?.hasMore ? t('sheets.partialOrderCount', { count: orders.length }) : t('sheets.orderCount', { count: orders.length })}</p>{sheet.kind === 'sales' && <button type="button" className="monthly-expenses-trigger" onClick={() => setExpensesOpen(true)}>{t('expenses.open')} · {formatMoney(expenseTotal, language)} THB</button>}</div>
           </> : <p className="sales-growth">{t('sheets.monthSummary', { orders: orders.length, total: formatMoney(sheetTotal(orders), language) })}</p>}
         </header>
 
         <div className="order-list-heading">
           <div><h2>{t('orders.title')}</h2><span>{sheetData?.hasMore ? t('orders.resultCountPartial', { shown: visibleOrders.length, total: sortedOrders.length }) : t('orders.resultCount', { shown: visibleOrders.length, total: sortedOrders.length })}</span></div>
-          <div className="order-heading-actions">{sheet.kind === 'sales' && <button type="button" className="export-report-button" onClick={() => onExportMonthlyReport(sheet.id)} disabled={exportingReport}><Download size={13} />{exportingReport ? t('backup.preparing') : t('backup.exportMonthly')}</button>}<button type="button" className="view-all" onClick={onRefresh} disabled={loading}><RefreshCw size={13} className={loading ? 'refreshing-icon' : ''} />{loading ? t('orders.refreshing') : t('orders.refresh')}</button></div>
+          <div className="order-heading-actions"><button type="button" className="view-all" onClick={onRefresh} disabled={loading}><RefreshCw size={13} className={loading ? 'refreshing-icon' : ''} />{loading ? t('orders.refreshing') : t('orders.refresh')}</button></div>
         </div>
 
         <div className="search-filter-row">
@@ -1042,9 +1084,12 @@ function SheetOrdersPage({
             <span className="sr-only">{t('orders.search')}</span>
             <input value={query} onChange={(event) => updateQuery(event.target.value)} placeholder={t('orders.search')} />
           </label>
-          <button type="button" className={`filter-toggle${filtersOpen ? ' is-open' : ''}`} aria-expanded={filtersOpen} aria-controls="order-filters" onClick={() => setFiltersOpen((open) => !open)}>
-            <SlidersHorizontal size={15} /> {t(filtersOpen ? 'filters.hide' : 'filters.show')}
-          </button>
+          <div className="search-filter-actions">
+            {sheet.kind === 'sales' && <button type="button" className="export-report-button" aria-label={t('backup.exportMonthly')} onClick={() => onExportMonthlyReport(sheet.id)} disabled={exportingReport}><Download size={14} /><span>{exportingReport ? t('backup.preparing') : t('backup.exportMonthly')}</span></button>}
+            <button type="button" className={`filter-toggle${filtersOpen ? ' is-open' : ''}`} aria-expanded={filtersOpen} aria-controls="order-filters" onClick={() => setFiltersOpen((open) => !open)}>
+              <SlidersHorizontal size={15} /> {t(filtersOpen ? 'filters.hide' : 'filters.show')}
+            </button>
+          </div>
         </div>
         {filtersOpen && <div className="order-filter-row" id="order-filters">
           <label><span className="sr-only">{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => updateStatus(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="unpaid">{t('detail.paymentUnpaid')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="not-ordered">{t('detail.shippingNotOrdered')}</option><option value="ordered">{t('detail.shippingOrdered')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
@@ -1068,15 +1113,15 @@ function SheetOrdersPage({
 
       <div className="create-order-dock"><button type="button" className="create-order-list-button btn btn-primary" onClick={() => setCreateOpen(true)}><Plus size={17} /> {t('createOrder.open')}</button></div>
       <BottomNavigation />
-      {createOpen && <CreateOrderDialog sheet={sheet} imageChoices={imageChoices} defaultExchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onClose={() => setCreateOpen(false)} onSave={saveLocalOrder} />}
-      {expensesOpen && <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setExpensesOpen(false) }}><section className="create-order-modal monthly-expenses-modal" role="dialog" aria-modal="true" aria-labelledby="monthly-expenses-heading"><header className="modal-header"><div><p>{t(sheet.titleKey)}</p><h2 id="monthly-expenses-heading">{t('expenses.settingsTitle')}</h2></div><button type="button" className="modal-close" onClick={() => setExpensesOpen(false)} aria-label={t('expenses.close')}><X size={20} /></button></header><div className="monthly-expenses-modal-body"><MonthlyExpensesSection expenses={monthlyExpenses} onChange={(expenses) => onSaveMonthlyExpenses(sheet.id, expenses)} /></div><footer className="modal-actions"><button type="button" className="save-order-button btn btn-primary" onClick={() => setExpensesOpen(false)}>{t('expenses.done')}</button></footer></section></div>}
+      {createOpen && <CreateOrderDialog sheet={sheet} imageChoices={imageChoices} defaultExchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onClose={() => setCreateOpen(false)} onSave={saveOrder} />}
+      {expensesOpen && <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setExpensesOpen(false) }}><section className="create-order-modal monthly-expenses-modal" role="dialog" aria-modal="true" aria-labelledby="monthly-expenses-heading"><header className="modal-header"><div><p>{t(sheet.titleKey)}</p><h2 id="monthly-expenses-heading">{t('expenses.title')}</h2></div><button type="button" className="modal-close" onClick={() => setExpensesOpen(false)} aria-label={t('expenses.close')}><X size={20} /></button></header><div className="monthly-expenses-modal-body"><MonthlyExpensesSection expenses={monthlyExpenses} onChange={(expenses) => onSaveMonthlyExpenses(sheet.id, expenses)} /></div><footer className="modal-actions"><button type="button" className="save-order-button btn btn-primary" onClick={() => setExpensesOpen(false)}>{t('expenses.done')}</button></footer></section></div>}
       {notice && <p className="app-toast" role="status">{notice}</p>}
       {exportMessage && <p className="app-toast" role="status">{exportMessage}</p>}
     </section>
   )
 }
 
-function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, exchangeRate, onExchangeRateChange, onLoadMoreData }: { sheet: SheetDefinition; sheetData?: SheetDataState; loading: boolean; onRefresh: () => void; onSaveOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => void; exchangeRate: number; onExchangeRateChange: (value: number) => void; onLoadMoreData: (sheetId: string) => void }) {
+function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, exchangeRate, onExchangeRateChange, onLoadMoreData }: { sheet: SheetDefinition; sheetData?: SheetDataState; loading: boolean; onRefresh: () => void; onSaveOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => Promise<void>; exchangeRate: number; onExchangeRateChange: (value: number) => void; onLoadMoreData: (sheetId: string) => void }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { orderId } = useParams()
@@ -1105,15 +1150,25 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
   const discountAmount = campaignEnabled ? Math.min(grossSales, Math.max(0, Number(campaignDiscount) || 0)) : 0
   const netSales = Math.max(0, grossSales - discountAmount)
   const depositDue = getDepositDue(order, netSales)
-  const saveStatus = (key: 'paymentStatus' | 'shippingStatus', value: string) => {
-    onSaveOrder(sheet.id, { ...draftFromOrder(order, exchangeRate, sheet), [key]: value }, order)
-    setEditNotice(t('orders.editSaved'))
+  const showEditNotice = (message: string) => {
+    setEditNotice(message)
     window.setTimeout(() => setEditNotice(''), 2500)
   }
-  const saveCampaign = () => {
-    onSaveOrder(sheet.id, { ...draftFromOrder(order, exchangeRate, sheet), isCampaign: campaignEnabled, campaignDiscount: campaignEnabled ? String(discountAmount) : '0' }, order)
-    setEditNotice(t('orders.editSaved'))
-    window.setTimeout(() => setEditNotice(''), 2500)
+  const saveStatus = async (key: 'paymentStatus' | 'shippingStatus', value: string) => {
+    try {
+      await onSaveOrder(sheet.id, { ...draftFromOrder(order, exchangeRate, sheet), [key]: value }, order)
+      showEditNotice(t('orders.editSaved'))
+    } catch {
+      showEditNotice(t('createOrder.saveError'))
+    }
+  }
+  const saveCampaign = async () => {
+    try {
+      await onSaveOrder(sheet.id, { ...draftFromOrder(order, exchangeRate, sheet), isCampaign: campaignEnabled, campaignDiscount: campaignEnabled ? String(discountAmount) : '0' }, order)
+      showEditNotice(t('orders.editSaved'))
+    } catch {
+      showEditNotice(t('createOrder.saveError'))
+    }
   }
   const visibleLines = order.lines.filter((line) => `${line.itemName} ${line.imageName ?? ''}`.toLocaleLowerCase().includes(itemQuery.toLocaleLowerCase())).sort((a, b) => {
     if (itemSort === 'sales-asc') return a.salePrice - b.salePrice
@@ -1124,7 +1179,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
   return (
     <section className="app-screen detail-screen" aria-label={t('screen.detail')}>
       <div className="detail-hero">
-        <div className="detail-avatar-mock" aria-label={t('detail.mockCustomerImage')}><UserRound size={56} /></div>
+        <div className="detail-avatar-mock" aria-label={t('detail.mockCustomerImage')}><UserRound size={40} /></div>
         <button type="button" className="back-button" onClick={() => navigate(`/admin/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ChevronLeft size={20} /></button>
         <div className="hero-label">
           <h1>{order.customerName || order.lineName}</h1>
@@ -1136,7 +1191,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
           <div className="detail-title-row">
             <h2>{t('details.title')}</h2>
             <div className="detail-title-actions">
-              <span className="sheet-row-number">{order.isOverride ? t('orders.editedLocally') : order.isLocal ? t('orders.deviceOnly') : `#${order.sheetRow}`}</span>
+              {order.sheetRow > 0 && <span className="sheet-row-number">#{order.sheetRow}</span>}
               <button type="button" className="edit-order-button btn btn-outline btn-sm" onClick={() => setEditOpen(true)}><Pencil size={14} /> {t('orders.edit')}</button>
             </div>
           </div>
@@ -1193,7 +1248,10 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
 
           <section className="campaign-detail-card">
             <label className="campaign-toggle"><input type="checkbox" checked={campaignEnabled} onChange={(event) => setCampaignEnabled(event.target.checked)} />{t('detail.campaign')}</label>
-            {campaignEnabled && <label>{t('detail.discount')} <span className="required-star">*</span><NumericInput minValue={0} maxValue={grossSales} value={campaignDiscount} onValueChange={setCampaignDiscount} /></label>}
+            {campaignEnabled && <label className="campaign-discount-field">
+              <span className="field-label">{t('detail.discount')} <span className="required-star">*</span></span>
+              <span className="campaign-discount-control"><NumericInput className="input input-bordered campaign-discount-input" minValue={0} maxValue={grossSales} value={campaignDiscount} onValueChange={setCampaignDiscount} /><span className="campaign-currency">THB</span></span>
+            </label>}
             <div className="campaign-net-total"><span>{t('detail.totalBeforeDiscount')}</span><strong>{formatMoney(grossSales, language)} THB</strong></div>
             {campaignEnabled && <div className="campaign-net-total"><span>{t('detail.discount')}</span><strong>−{formatMoney(discountAmount, language)} THB</strong></div>}
             <div className="campaign-net-total campaign-final-total"><span>{t('detail.totalAfterDiscount')}</span><strong>{formatMoney(netSales, language)} THB</strong></div>
@@ -1201,7 +1259,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
           </section>
         </div>
       </div>
-      {editOpen && order && <CreateOrderDialog sheet={sheet} initialOrder={order} imageChoices={imageChoices} defaultExchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onClose={() => setEditOpen(false)} onSave={(draft) => { onSaveOrder(sheet.id, draft, order); setEditOpen(false); setEditNotice(t('orders.editSaved')) }} />}
+      {editOpen && order && <CreateOrderDialog sheet={sheet} initialOrder={order} imageChoices={imageChoices} defaultExchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onClose={() => setEditOpen(false)} onSave={async (draft) => { await onSaveOrder(sheet.id, draft, order); setEditOpen(false); showEditNotice(t('orders.editSaved')) }} />}
       {editNotice && <p className="app-toast" role="status">{editNotice}</p>}
     </section>
   )
@@ -1428,6 +1486,7 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [bootReady, setBootReady] = useState(false)
   const isAdminPath = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
+  const allSheets = useMemo(() => [...SHEETS, ...localSheets], [localSheets])
 
   const applyServerSnapshot = useCallback((snapshot: Record<string, unknown> | null) => {
     const deviceOrders = loadLocalOrders()
@@ -1446,9 +1505,12 @@ function App() {
       setMonthlyExpenseRevisionsBySheet(mergedExpenseRevisions)
       setLocalSheets(mergeLocalSheets(serverSheets, deviceSheets))
       setExchangeRate(Number(snapshot.exchangeRate) > 0 ? Number(snapshot.exchangeRate) : loadExchangeRate())
-      const language = snapshot.language === 'th' || snapshot.language === 'en' ? snapshot.language : (() => {
-        try { return localStorage.getItem('sweetie-language') ?? 'en' } catch { return 'en' }
+      const localLanguage = (() => {
+        try { return localStorage.getItem('sweetie-language') } catch { return null }
       })()
+      const language = localLanguage === 'th' || localLanguage === 'en'
+        ? localLanguage
+        : snapshot.language === 'th' || snapshot.language === 'en' ? snapshot.language : 'th'
       void i18n.changeLanguage(language)
       try { localStorage.setItem('sweetie-language', language) } catch { /* Keep the language for this session. */ }
       document.documentElement.lang = language
@@ -1498,7 +1560,7 @@ function App() {
   useEffect(() => {
     if (!isAdminAuthenticated || !isAdminPath) return
     const controller = new AbortController()
-    fetchAllSheets(controller.signal)
+    fetchAllSheets(controller.signal, allSheets)
       .then((result) => setDataBySheet(result))
       .finally(() => {
         if (!controller.signal.aborted) {
@@ -1513,7 +1575,7 @@ function App() {
         }
       })
     return () => controller.abort()
-  }, [refreshKey, isAdminAuthenticated, isAdminPath])
+  }, [refreshKey, isAdminAuthenticated, isAdminPath, allSheets])
 
   useEffect(() => {
     if (!isAdminAuthenticated || !localOrdersReady) return
@@ -1543,7 +1605,6 @@ function App() {
     }
   }, [localSheets, isAdminAuthenticated, localOrdersReady])
 
-  const allSheets = useMemo(() => [...SHEETS, ...localSheets], [localSheets])
   const activePageLoadsRef = useRef(new Set<string>())
   const analyticsLoadRef = useRef(false)
 
@@ -1815,9 +1876,9 @@ function App() {
     setMonthlyExpenseRevisionsBySheet((current) => ({ ...current, [sheetId]: updatedAt }))
   }
 
-  const createLocalOrder = (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => {
+  const saveOrderToSheet = async (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => {
     const rate = Number(draft.exchangeRate) > 0 ? Number(draft.exchangeRate) : exchangeRate
-    const lines: SheetOrderLine[] = draft.lines.map((line) => {
+    const lines: SheetOrderLine[] = draft.lines.map((line, lineIndex) => {
       const salePrice = Number(line.salePrice) || 0
       const bankAmount = Number(line.bankAmount) || 0
       const costRMB = line.costRMB.trim() === '' ? null : Number(line.costRMB) || 0
@@ -1830,7 +1891,7 @@ function App() {
         ? line.originalProfitAmount ?? null
         : costTHB === null ? null : salePrice - costTHB
       return {
-        row: 0,
+        row: originalOrder?.lines[lineIndex]?.row ?? 0,
         itemName: line.itemName.trim(),
         imageName: line.imageName.trim() || undefined,
         quantity: Number(line.quantity) || 1,
@@ -1852,7 +1913,7 @@ function App() {
     const profitIsComplete = lines.length > 0 && lines.every((line) => line.profitAmount != null)
     const profitAmount = profitIsComplete ? lines.reduce((sum, line) => sum + (line.profitAmount ?? 0), 0) - campaignDiscount : null
     const order: SheetOrder = {
-      id: originalOrder?.id ?? `local-${Date.now()}`,
+      id: originalOrder?.id ?? `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       sheetRow: originalOrder?.sheetRow ?? 0,
       day: draft.day,
       lineName: draft.lineName.trim(),
@@ -1874,17 +1935,67 @@ function App() {
       isOverride: originalOrder ? (!originalOrder.isLocal || originalOrder.isOverride) : false,
       updatedAt: Date.now(),
     }
-    setLocalOrdersBySheet((current) => {
-      const existing = current[sheetId] ?? []
-      const alreadySaved = existing.some((item) => item.id === order.id)
-      return { ...current, [sheetId]: alreadySaved ? existing.map((item) => item.id === order.id ? order : item) : [order, ...existing] }
-    })
+    const targetSheet = allSheets.find((sheet) => sheet.id === sheetId)
+    if (!targetSheet?.gid) throw new Error('This order is not linked to a Google Sheets tab.')
+    setSyncStatus('syncing')
+    const isUpdate = Boolean(originalOrder?.sheetRow && originalOrder.sheetRow > 0)
+    let response: Response
+    try {
+      response = await fetch('/api/orders', {
+        method: isUpdate ? 'PUT' : 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ gid: targetSheet.gid, order }),
+      })
+    } catch (cause) {
+      setSyncStatus('offline')
+      throw cause
+    }
+    const result = await response.json().catch(() => ({})) as { error?: string }
+    if (response.status === 401) {
+      setSyncStatus('offline')
+      throw new Error('Your secure session has expired.')
+    }
+    if (!response.ok) {
+      setSyncStatus('offline')
+      throw new Error(result.error || 'Could not save the order to Google Sheets.')
+    }
+
+    setSyncStatus('synced')
+    try {
+      const refreshedOrders = await fetchSheetOrders(targetSheet)
+      setDataBySheet((current) => ({ ...current, [sheetId]: { orders: refreshedOrders, hasMore: false } }))
+    } catch {
+      setSyncStatus('offline')
+      setRefreshKey((key) => key + 1)
+    }
+    if (originalOrder) {
+      setLocalOrdersBySheet((current) => {
+        const next = { ...current }
+        next[sheetId] = (next[sheetId] ?? []).filter((item) => item.id !== originalOrder.id)
+        if (next[sheetId].length === 0) delete next[sheetId]
+        return next
+      })
+    }
+    setSyncStatus('synced')
     if (rate !== exchangeRate) setExchangeRate(rate)
   }
 
-  const createLocalSheet = (sheet: Omit<SheetDefinition, 'id' | 'gid' | 'titleKey'>) => {
-    const created: SheetDefinition = { ...sheet, id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, gid: '', titleKey: '' }
+  const createGoogleSheetTab = async (sheet: Omit<SheetDefinition, 'id' | 'gid' | 'titleKey'>) => {
+    const template = SHEETS.find((item) => item.kind === sheet.kind)
+    if (!template) throw new Error('Could not find a matching sheet template.')
+    const response = await fetch('/api/sheets', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: sheet.customName, templateGid: template.gid }),
+    })
+    const result = await response.json().catch(() => ({})) as { error?: string; sheet?: { sheetId: string; title: string } }
+    if (response.status === 401) throw new Error('Your secure session has expired.')
+    if (!response.ok || !result.sheet) throw new Error(result.error || 'Could not create the sheet in Google Sheets.')
+    const created: SheetDefinition = { ...sheet, id: `sheet-${result.sheet.sheetId}`, gid: result.sheet.sheetId, titleKey: '' }
     setLocalSheets((current) => [...current, created])
+    setDataBySheet((current) => ({ ...current, [created.id]: { orders: [], hasMore: false } }))
     return created
   }
 
@@ -1910,10 +2021,10 @@ function App() {
       <div className="app-shell">
 
         <Routes>
-          <Route path="/admin/home" element={<HomePage dataBySheet={mergedDataBySheet} sheets={allSheets} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} onCreateSheet={createLocalSheet} />} />
-          <Route path="/admin/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} onExportMonthlyReport={exportMonthlyReport} exportingReport={exportingReportId === currentMonthSheet.id} exportMessage={exportMessage} />} />
-          <Route path="/admin/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={createLocalOrder} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} onExportMonthlyReport={exportMonthlyReport} exportingReport={exportingReportId === (location.pathname.split('/')[3] ?? '')} exportMessage={exportMessage} />} />
-          <Route path="/admin/sheets/:sheetId/orders/:orderId" element={<OrderDetailsRoute dataBySheet={mergedDataBySheet} sheets={allSheets} loading={loading} onRefresh={refresh} onSaveOrder={createLocalOrder} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} onLoadMoreData={loadMoreSheetData} />} />
+          <Route path="/admin/home" element={<HomePage dataBySheet={mergedDataBySheet} sheets={allSheets} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} onCreateSheet={createGoogleSheetTab} />} />
+          <Route path="/admin/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={saveOrderToSheet} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} onExportMonthlyReport={exportMonthlyReport} exportingReport={exportingReportId === currentMonthSheet.id} exportMessage={exportMessage} />} />
+          <Route path="/admin/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={saveOrderToSheet} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} onExportMonthlyReport={exportMonthlyReport} exportingReport={exportingReportId === (location.pathname.split('/')[3] ?? '')} exportMessage={exportMessage} />} />
+          <Route path="/admin/sheets/:sheetId/orders/:orderId" element={<OrderDetailsRoute dataBySheet={mergedDataBySheet} sheets={allSheets} loading={loading} onRefresh={refresh} onSaveOrder={saveOrderToSheet} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} onLoadMoreData={loadMoreSheetData} />} />
           <Route path="/admin/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} monthlyExpensesBySheet={monthlyExpensesBySheet} sheets={allSheets} loading={loading} analyticsDataLoading={analyticsDataLoading} onLoadAllSalesSheets={loadAllSalesSheets} onExportBackup={exportFullBackup} backupLoading={backupLoading} backupMessage={backupMessage} syncStatus={syncStatus} onSyncNow={syncNow} onLogout={logout} />} />
           <Route path="*" element={<Navigate to="/admin/home" replace />} />
         </Routes>
@@ -1943,7 +2054,7 @@ function SheetRouteView({
   dataBySheet: Record<string, SheetDataState>
   loading: boolean
   onRefresh: () => void
-  onCreateOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => void
+  onCreateOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => Promise<void>
   monthlyExpensesBySheet: Record<string, MonthlyExpense[]>
   onSaveMonthlyExpenses: (sheetId: string, expenses: MonthlyExpense[]) => void
   exchangeRate: number
@@ -1959,7 +2070,7 @@ function SheetRouteView({
   return <SheetOrdersPage key={sheet.id} sheet={sheet} sheetData={dataBySheet[sheet.id]} loading={loading} onRefresh={onRefresh} onCreateOrder={onCreateOrder} monthlyExpenses={monthlyExpensesBySheet[sheet.id] ?? []} onSaveMonthlyExpenses={onSaveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onLoadMoreData={onLoadMoreData} onExportMonthlyReport={onExportMonthlyReport} exportingReport={exportingReport} exportMessage={exportMessage} />
 }
 
-function OrderDetailsRoute({ dataBySheet, sheets, loading, onRefresh, onSaveOrder, exchangeRate, onExchangeRateChange, onLoadMoreData }: { dataBySheet: Record<string, SheetDataState>; sheets: SheetDefinition[]; loading: boolean; onRefresh: () => void; onSaveOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => void; exchangeRate: number; onExchangeRateChange: (value: number) => void; onLoadMoreData: (sheetId: string) => void }) {
+function OrderDetailsRoute({ dataBySheet, sheets, loading, onRefresh, onSaveOrder, exchangeRate, onExchangeRateChange, onLoadMoreData }: { dataBySheet: Record<string, SheetDataState>; sheets: SheetDefinition[]; loading: boolean; onRefresh: () => void; onSaveOrder: (sheetId: string, draft: OrderDraft, originalOrder?: SheetOrder) => Promise<void>; exchangeRate: number; onExchangeRateChange: (value: number) => void; onLoadMoreData: (sheetId: string) => void }) {
   const { sheetId } = useParams()
   const sheet = sheets.find((item) => item.id === sheetId)
   if (!sheet) return <Navigate to="/admin/home" replace />

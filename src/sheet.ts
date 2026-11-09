@@ -81,8 +81,6 @@ export type SheetDataState = {
   loadMoreError?: string
 }
 
-const SHEET_ID = '1Y5z_jWtQd5-dxG_hWQlHYWNWtR4giR6k8tAwpmqRF5w'
-
 export const SHEETS: SheetDefinition[] = [
   { id: 'may', gid: '246786947', titleKey: 'sheets.may', kind: 'sales', monthKey: 'may', year: 2026 },
   { id: 'june', gid: '2065480441', titleKey: 'sheets.june', kind: 'sales', monthKey: 'june', year: 2026 },
@@ -161,10 +159,23 @@ function cell(row: string[], index: number) {
 }
 
 function finalizeOrder(order: SheetOrder) {
+  order.grossSales = order.lines.reduce((sum, line) => sum + line.salePrice, 0)
+  order.totalSales = Math.max(0, order.grossSales - (order.campaignDiscount ?? 0))
   const hasProfitForEveryLine = order.lines.length > 0 && order.lines.every((line) => line.profitAmount !== null)
-  order.profitAmount = hasProfitForEveryLine ? order.lines.reduce((sum, line) => sum + (line.profitAmount ?? 0), 0) : null
+  order.profitAmount = hasProfitForEveryLine ? order.lines.reduce((sum, line) => sum + (line.profitAmount ?? 0), 0) - (order.campaignDiscount ?? 0) : null
   order.profitPercent = hasProfitForEveryLine && order.totalSales > 0 ? ((order.profitAmount ?? 0) / order.totalSales) * 100 : null
   return order
+}
+
+function imagesFromCell(value: string) {
+  if (!value) return []
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (Array.isArray(parsed)) return parsed.filter((image): image is string => typeof image === 'string')
+  } catch {
+    // Older image values may be a single URL or data URL rather than JSON.
+  }
+  return [value]
 }
 
 export function parseOrdersPage(csv: string, sheet: SheetDefinition, offset = 0, parserState?: SheetOrderParserState, pageSize = 120): SheetOrderPage {
@@ -184,6 +195,14 @@ export function parseOrdersPage(csv: string, sheet: SheetDefinition, offset = 0,
     profit: findHeaderIndex(headers, ['กำไรสุทธิ', 'กำไร']),
     costTHB: findHeaderIndex(headers, ['ต้นทุน(บาท)', 'ต้นทุน(THB)']),
     costRMB: findHeaderIndex(headers, ['ต้นทุน(RMB)', 'ต้นทุน(หยวน)', 'ค่าสินค้า(Y)', 'ราคาจีน']),
+    orderId: findHeaderIndex(headers, ['Sweetie Order ID']),
+    imageData: findHeaderIndex(headers, ['Sweetie Image Data']),
+    imageName: findHeaderIndex(headers, ['Sweetie Image Name']),
+    exchangeRate: findHeaderIndex(headers, ['Sweetie Exchange Rate']),
+    campaign: findHeaderIndex(headers, ['Sweetie Campaign']),
+    campaignDiscount: findHeaderIndex(headers, ['Sweetie Campaign Discount']),
+    sweetiePaymentStatus: findHeaderIndex(headers, ['Sweetie Payment Status']),
+    sweetieShippingStatus: findHeaderIndex(headers, ['Sweetie Shipping Status']),
   }
   const baseColumns = new Set(Object.values(column).filter((index) => index >= 0))
   const orders: SheetOrder[] = []
@@ -208,11 +227,14 @@ export function parseOrdersPage(csv: string, sheet: SheetDefinition, offset = 0,
     if (lineName) {
       if (currentOrder?.lines.length) orders.push(finalizeOrder(currentOrder))
       currentOrder = {
-        id: String(rowNumber),
+        id: cell(row, column.orderId) || String(rowNumber),
         sheetRow: rowNumber,
         day: currentDay,
         lineName,
         customerName,
+        exchangeRate: numberFromCell(cell(row, column.exchangeRate)) || undefined,
+        isCampaign: ['true', 'yes', '1'].includes(cell(row, column.campaign).toLocaleLowerCase()),
+        campaignDiscount: numberFromCell(cell(row, column.campaignDiscount)),
         paymentStatus: '',
         shippingStatus: '',
         lines: [],
@@ -227,8 +249,8 @@ export function parseOrdersPage(csv: string, sheet: SheetDefinition, offset = 0,
 
     if (!currentOrder) return
 
-    const paymentStatus = row.find((value) => ['จ่ายเต็ม', 'มัดจำ', 'ยังไม่ได้ชำระ'].includes(value.trim()))?.trim() ?? ''
-    const shippingStatus = row.find((value) => ['ยังไม่ได้สั่ง', 'สั่งแล้ว', 'รอเข้าไทย', 'ส่งแล้ว'].includes(value.trim()))?.trim() ?? ''
+    const paymentStatus = cell(row, column.sweetiePaymentStatus) || (row.find((value) => ['จ่ายเต็ม', 'มัดจำ', 'ยังไม่ได้ชำระ'].includes(value.trim()))?.trim() ?? '')
+    const shippingStatus = cell(row, column.sweetieShippingStatus) || (row.find((value) => ['ยังไม่ได้สั่ง', 'สั่งแล้ว', 'รอเข้าไทย', 'ส่งแล้ว'].includes(value.trim()))?.trim() ?? '')
     if (paymentStatus) currentOrder.paymentStatus = paymentStatus
     if (shippingStatus) currentOrder.shippingStatus = shippingStatus
 
@@ -255,7 +277,10 @@ export function parseOrdersPage(csv: string, sheet: SheetDefinition, offset = 0,
       profitPercent: profitAmount !== null && saleValue > 0 ? (profitAmount / saleValue) * 100 : null,
       costRMB: costRMBText ? numberFromCell(costRMBText) : null,
       costTHB: costText ? numberFromCell(costText) : null,
-      images: orderImages[sheet.id]?.[String(rowNumber)] ?? [],
+      imageName: cell(row, column.imageName) || undefined,
+      images: cell(row, column.imageData)
+        ? imagesFromCell(cell(row, column.imageData))
+        : orderImages[sheet.id]?.[String(rowNumber)] ?? [],
       attributes,
     }
     currentOrder.lines.push(line)
@@ -308,8 +333,8 @@ export async function fetchSheetOrdersPage(
   signal?: AbortSignal,
   pageSize = 120,
 ): Promise<SheetOrderPage> {
-  const query = encodeURIComponent(`select * limit ${pageSize} offset ${offset}`)
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${sheet.gid}&tq=${query}`
+  const params = new URLSearchParams({ gid: sheet.gid, offset: String(offset), limit: String(pageSize) })
+  const url = `/api/sheets?${params.toString()}`
   return parseOrdersPage(await fetchCsvWithRetry(url, signal), sheet, offset, parserState, pageSize)
 }
 
@@ -328,12 +353,12 @@ export async function fetchSheetOrders(sheet: SheetDefinition, signal?: AbortSig
   return orders
 }
 
-export async function fetchAllSheets(signal?: AbortSignal): Promise<Record<string, SheetDataState>> {
+export async function fetchAllSheets(signal?: AbortSignal, sheets: SheetDefinition[] = SHEETS): Promise<Record<string, SheetDataState>> {
   const results: Record<string, SheetDataState> = {}
   let nextIndex = 0
   const worker = async () => {
-    while (nextIndex < SHEETS.length) {
-      const sheet = SHEETS[nextIndex]
+    while (nextIndex < sheets.length) {
+      const sheet = sheets[nextIndex]
       nextIndex += 1
       try {
         const page = await fetchSheetOrdersPage(sheet, 0, undefined, signal)
@@ -349,7 +374,7 @@ export async function fetchAllSheets(signal?: AbortSignal): Promise<Record<strin
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(3, SHEETS.length) }, worker))
+  await Promise.all(Array.from({ length: Math.min(3, sheets.length) }, worker))
   return results
 }
 
