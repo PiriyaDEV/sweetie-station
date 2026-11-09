@@ -1270,3 +1270,47 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .line-picker-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .detail-avatar-mock { overflow: hidden; }
 .line-picker-name { min-width: 0; overflow: hidden; color: #3b2f33; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A little more breathing room for sheet and order summary cards. */
+.sheet-card-caption { min-height: 84px; gap: 4px; padding: 10px 11px; }
+.sheet-card-caption strong { font-size: 12px; }
+.sheet-card-caption span { font-size: 10px; }
+.sheet-card-caption b { font-size: 10px; }
+.sheet-card-caption .sheet-card-profit { font-size: 9px; }
+.sheet-card-caption .sheet-card-profit-value { font-size: 8px; }
+.order-row-total { gap: 2px; }
+.order-row-profit { margin-top: 5px; border-radius: 8px; padding: 4px 7px; background: #f2f8e9; }
+.order-row-profit > small { color: #728260; font-size: 8px; }
+.order-row-profit > strong { color: var(--profit-positive); font-size: 9px; }
+.order-row-profit.negative > strong { color: #bd4356; }
+.order-row-profit.unavailable > strong { color: #908785; }
+
+/* Consistent inset spacing across the app's dialogs and their contents. */
+.modal-backdrop { padding: clamp(14px, 3vw, 26px); }
+.create-order-modal { max-height: min(calc(100dvh - 32px), 840px); border-radius: 22px; }
+.modal-header { gap: 14px; padding: 20px 22px 17px; }
+.modal-header > div { min-width: 0; }
+.modal-close { flex: none; }
+.order-form { padding: 18px 22px 24px; }
+.modal-actions { margin: 0 -22px -24px; padding: 14px 22px max(16px, env(safe-area-inset-bottom)); }
+.draft-line-card { gap: 10px; margin-bottom: 10px; padding: 12px; }
+.exchange-rate-field { padding: 12px; }
+.campaign-form-card, .campaign-detail-card { padding: 14px; }
+.month-image-picker { padding: 9px; }
+.line-picker-list { padding: 7px; }
+.line-picker-list button { gap: 10px; padding: 9px 10px; }
+.monthly-expenses-modal { max-height: min(calc(100dvh - 32px), 680px); }
+.monthly-expenses-modal .modal-header { padding: 19px 22px 16px; }
+.monthly-expenses-modal-body { padding: 18px 22px 16px; }
+.monthly-expenses-modal .modal-actions { padding: 14px 22px max(16px, env(safe-area-inset-bottom)); }
+@media (max-width: 600px) {
+  .modal-backdrop { padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+  .create-order-modal { width: 100%; max-height: calc(100dvh - 28px); border-radius: 20px; }
+  .modal-header { padding: 19px 20px 16px; }
+  .order-form { padding: 18px 20px 24px; }
+  .modal-actions { margin: 0 -20px -24px; padding: 14px 20px max(16px, env(safe-area-inset-bottom)); }
+  .monthly-expenses-modal { max-height: calc(100dvh - 28px); }
+  .monthly-expenses-modal .modal-header { padding: 18px 20px 15px; }
+  .monthly-expenses-modal-body { padding: 17px 20px 16px; }
+  .monthly-expenses-modal .modal-actions { padding: 14px 20px max(16px, env(safe-area-inset-bottom)); }
+}
