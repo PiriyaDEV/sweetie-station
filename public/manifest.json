@@ -1,7 +1,7 @@
 {
   "id": "/admin",
-  "name": "Sweetie — Order Management",
-  "short_name": "Sweetie",
+  "name": "Sweetie Station",
+  "short_name": "Sweetie Station",
   "description": "Sweetie Station order management and sales analytics.",
   "start_url": "/admin",
   "scope": "/",

@@ -134,7 +134,8 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .nav-item:disabled { cursor: default; }
 .detail-screen { padding: 23px 23px 45px; }
 .detail-scroll-area { padding-bottom: 20px; }
-.detail-hero { position: relative; flex: none; height: 247px; border-radius: 22px; background: #c6c6c6; box-shadow: 0 15px 20px rgb(0 0 0 / 13%); }
+.detail-hero { position: relative; display: grid; flex: none; height: 247px; place-items: center; border-radius: 22px; background: linear-gradient(145deg,#fff3f7,#f7d8e4 58%,#f1b7ca); box-shadow: 0 15px 20px rgb(0 0 0 / 13%); }
+.detail-avatar-mock { display: grid; width: 104px; height: 104px; place-items: center; border: 4px solid rgb(255 255 255 / 80%); border-radius: 50%; background: #fff9fb; color: #d17b97; box-shadow: 0 10px 24px rgb(131 71 91 / 14%); }
 .back-button { position: absolute; top: 15px; left: 14px; display: grid; width: 37px; height: 37px; place-items: center; border: 0; border-radius: 999px; background: #8c8c8c; color: #fff; cursor: pointer; }
 .hero-label { position: absolute; right: 18px; bottom: 15px; left: 18px; border-radius: 14px; padding: 9px 13px; background: rgb(103 103 103 / 55%); color: #fff; }
 .hero-label h1 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
@@ -182,6 +183,9 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .sheet-error { margin: 0 0 12px; border: 1px solid #f4c4ce; border-radius: 12px; padding: 10px 12px; background: #fff3f5; color: #9d4155; font-size: 11px; line-height: 1.45; }
 .sheet-error button { display: inline; border: 0; padding: 0 0 0 5px; background: transparent; color: #823348; font-size: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .detail-title-row { display: flex; align-items: center; justify-content: space-between; }
+.detail-title-actions { display: flex; align-items: center; gap: 8px; }
+.edit-order-button { display: inline-flex; min-height: 40px; height: 40px; align-items: center; justify-content: center; gap: 7px; border: 1px solid #f0d8e0; border-radius: 12px; padding: 0 13px; background: #fff4f7; color: #a34e68; font-size: 12px; font-weight: 750; box-shadow: 0 3px 9px rgb(163 78 104 / 8%); }
+.edit-order-button:hover { border-color: #e8b5c4; background: #ffedf2; }
 .sheet-row-number { border-radius: 999px; padding: 4px 8px; background: #f3f3f3; color: #898989; font-size: 10px; font-weight: 600; }
 .order-stats > span { min-width: 0; flex: 1; overflow: hidden; font-size: 9px; text-overflow: ellipsis; }
 .detail-card { display: grid; gap: 12px; border-radius: 15px; padding: 14px; background: #fafafa; }
@@ -233,6 +237,7 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .sheet-card-caption strong { overflow: hidden; font-size: 12px; font-weight: 700; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .sheet-card-caption span { color: rgb(255 255 255 / 82%); font-size: 9px; }
 .sheet-card-caption b { color: #a6e24d; font-size: 9px; font-weight: 600; }
+.sheet-card-progress { display: block; width: 58%; height: 3px; border-radius: 999px; background: linear-gradient(90deg,rgb(255 255 255 / 30%) 0%,rgb(255 255 255 / 85%) 50%,rgb(255 255 255 / 30%) 100%); background-size: 220% 100%; animation: skeleton-shimmer 1.3s linear infinite; }
 .screen-back-button { display: inline-flex; width: max-content; align-items: center; gap: 4px; margin: 0 0 7px -6px; border: 0; padding: 4px 6px; background: transparent; color: #777; font-size: 11px; font-weight: 600; cursor: pointer; }
 .month-summary { margin-top: 2px; }
 .month-summary h1 { max-width: 100%; overflow: hidden; font-size: clamp(23px, 7vw, 31px); text-overflow: ellipsis; }
@@ -243,6 +248,8 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .month-sales-summary small { color: #7e7471; font-size: 8px; }
 .month-sales-summary em { color: #9a9290; font-size: 7px; font-style: normal; line-height: 1.2; }
 .month-order-count { margin: 5px 0 6px; color: #8c8280; font-size: 9px; }
+.month-order-actions { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.monthly-expenses-trigger { border: 1px solid #f0e3e6; border-radius: 999px; padding: 5px 9px; background: #fff8fa; color: #a34e68; font: inherit; font-size: 8px; font-weight: 700; cursor: pointer; }
 .order-search { display: flex; height: 38px; flex: none; align-items: center; gap: 8px; margin: 0 0 14px; border: 1px solid #eee8e6; border-radius: 12px; padding: 0 11px; background: #fff; color: #999; }
 .order-search input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; color: #333; font: inherit; font-size: 11px; }
 .order-search input::placeholder { color: #aaa; }
@@ -253,10 +260,6 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .order-placeholder { position: absolute; inset: 0; display: grid; place-items: center; background: linear-gradient(145deg,#eee5e5,#c6c6c6); color: rgb(255 255 255 / 90%); }
 .status-dot { background: rgb(72 72 72 / 52%); }
 .status-dot span { width: 8px; height: 8px; border-radius: 50%; background: #92cf27; }
-.detail-hero.has-product-image > img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
-.detail-hero.has-product-image::after { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(180deg, rgb(0 0 0 / 5%) 45%, rgb(0 0 0 / 24%) 100%); content: ''; }
-.detail-hero.has-product-image .back-button, .detail-hero.has-product-image .hero-label { z-index: 1; }
-.detail-hero.has-product-image .hero-label { background: rgb(55 55 55 / 70%); }
 .item-images { display: flex; width: 42px; height: 42px; flex: none; align-items: center; justify-content: flex-start; overflow: hidden; border-radius: 10px; background: #f4f0ee; }
 .item-images img { width: 42px; height: 42px; flex: none; border-radius: 8px; object-fit: cover; }
 .item-images span { display: grid; width: 42px; height: 42px; flex: none; place-items: center; background: #f5edf0; color: #8d6675; font-size: 9px; font-weight: 700; }
@@ -288,6 +291,7 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .order-item-preview-price { color: #574c49; font-size: 9px; white-space: nowrap; }
 .order-row-photo { display: grid; width: 48px; height: 48px; overflow: hidden; place-items: center; border-radius: 12px; background: #f3e9e9; color: #c18d9e; }
 .order-row-photo img { width: 100%; height: 100%; object-fit: cover; }
+.mock-user-avatar { border-radius: 50%; border: 2px solid #fff; background: linear-gradient(145deg,#fff3f7,#f1c3d2); color: #b86c86; }
 .order-row-main { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
 .order-row-title { overflow: hidden; color: #363030; font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .order-row-subtitle { overflow: hidden; color: #8a8180; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
@@ -305,9 +309,9 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .order-row-total { display: flex; flex-direction: column; align-items: flex-end; color: #383333; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .order-row-total small { margin-top: 2px; color: #9a9290; font-size: 8px; font-weight: 500; }
 .detail-screen { padding-bottom: 22px; }
-.detail-hero.has-product-image .hero-label { color: #fff; }
-.detail-hero.has-product-image .hero-label h1,
-.detail-hero.has-product-image .hero-label p { color: #fff; }
+.detail-hero .hero-label { background: rgb(255 255 255 / 80%); color: #403538; }
+.detail-hero .hero-label h1 { color: #403538; }
+.detail-hero .hero-label p { color: #796c70; }
 
 .modal-backdrop { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 12px; background: rgb(25 19 22 / 52%); backdrop-filter: blur(3px); }
 .create-order-modal { display: flex; width: min(100%, 390px); max-height: min(94%, 820px); flex-direction: column; overflow: hidden; border-radius: 23px; background: #fff; box-shadow: 0 24px 65px rgb(0 0 0 / 25%); }
@@ -337,7 +341,8 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .financial-fields { margin-top: 4px; }
 .line-calculation-summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 5px; border-radius: 8px; padding: 7px 8px; background: #fff; color: #8b7f7c; font-size: 9px; }
 .line-calculation-summary strong { color: #544845; }
-.campaign-form-card, .campaign-detail-card { display: grid; gap: 9px; margin: 12px 0; border: 1px solid #f2e0e6; border-radius: 13px; padding: 11px; background: #fff8fa; }
+.campaign-form-card, .campaign-detail-card { display: grid; gap: 9px; margin: 12px 0; border: 1px solid #eee6e4; border-radius: 13px; padding: 11px; background: #fff; }
+.campaign-form-card { margin-top: 18px; background: #fffcfb; }
 .campaign-toggle { display: flex !important; flex-direction: row !important; align-items: center; gap: 8px !important; }
 .campaign-toggle input[type=checkbox] { width: 18px; height: 18px; accent-color: #e9799a; }
 .campaign-net-total { display: flex; justify-content: space-between; gap: 10px; color: #837773; font-size: 9px; }
@@ -388,6 +393,12 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .metric-card small { color: #7e7471; font-size: 9px; font-weight: 600; }
 .analytics-section { margin: 18px 0 22px; border: 1px solid #f0eae8; border-radius: 16px; padding: 13px; background: #fff; }
 .analytics-section h2 { margin: 0 0 12px; font-size: 13px; font-weight: 700; }
+.analytics-chart-container { width: 100%; height: 230px; min-height: 220px; }
+.analytics-chart-loading { width: 100%; height: 100%; border-radius: 12px; background: linear-gradient(110deg,#eee9e8 8%,#faf8f7 18%,#eee9e8 33%); background-size: 220% 100%; animation: skeleton-shimmer 1.5s linear infinite; }
+.analytics-section-skeleton { display: grid; gap: 9px; }
+.analytics-section-skeleton i, .monthly-row-skeleton { display: block; height: 25px; border-radius: 8px; background: linear-gradient(110deg,#eee9e8 8%,#faf8f7 18%,#eee9e8 33%); background-size: 220% 100%; animation: skeleton-shimmer 1.5s linear infinite; }
+.monthly-row-skeleton { height: 31px; margin-top: 6px; }
+.chart-data-note { margin: 8px 0 0; color: #a19591; font-size: 8px; line-height: 1.35; }
 .status-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid #f4f0ef; }
 .status-summary-row strong { color: #403a38; font-size: 11px; }
 .analytics-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -408,6 +419,7 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
   .order-item-preview-photo { width: 32px; height: 32px; }
   .monthly-expense-row { grid-template-columns: 80px minmax(0,1fr) 70px 25px; gap: 4px; }
   .monthly-expense-row .select, .monthly-expense-row input { font-size: 8px; padding-inline: 5px; }
+  .analytics-chart-container { height: 205px; min-height: 195px; }
   .order-row-photo { width: 42px; height: 42px; }
 }
 
@@ -447,7 +459,12 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 .list-end-note { margin: 8px 0 16px; color: #aaa; text-align: center; font-size: 9px; }
 .detail-status-controls { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 10px 0; }
 .detail-status-controls label { display: grid; gap: 5px; color: #756b69; font-size: 9px; font-weight: 700; }
-.detail-status-controls .select { width: 100%; min-height: 38px; height: 38px; font-size: 10px; }
+.detail-status-controls .select { width: 100%; min-height: 38px; height: 38px; font-size: 10px; border-width: 1px; font-weight: 700; }
+.detail-status-select.payment-paid { border-color: #cfe9ae; background: #e9f6d8; color: #4d7c11; }
+.detail-status-select.payment-deposit, .detail-status-select.shipping-ordered { border-color: #f0d7a8; background: #fff0d6; color: #946015; }
+.detail-status-select.payment-unpaid, .detail-status-select.shipping-not-ordered, .detail-status-select.payment-neutral, .detail-status-select.shipping-neutral { border-color: #e4dddd; background: #f3f0f0; color: #706766; }
+.detail-status-select.shipping-inbound { border-color: #c9dfee; background: #e6f2fb; color: #3f7194; }
+.detail-status-select.shipping-shipped { border-color: #cbe7d6; background: #e4f3eb; color: #31734a; }
 .item-cost-line { color: #8d7e79 !important; font-size: 8px !important; }
 .item-list-controls { display: grid; grid-template-columns: minmax(0,1fr) 120px; gap: 7px; margin: 0 0 9px; }
 .item-list-controls input, .item-list-controls select { min-width: 0; height: 32px; border: 1px solid #eee7e5; border-radius: 9px; padding: 0 8px; background: #fff; color: #766d6b; font: inherit; font-size: 9px; }
@@ -493,7 +510,10 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
   .modal-actions { margin: 0 -18px -20px; padding: 11px 18px 14px; }
 }
 
-.monthly-expenses-section { display: grid; gap: 8px; margin: 0 0 12px; border: 1px solid #f0e7e5; border-radius: 14px; padding: 10px; background: #fffdfc; }
+.monthly-expenses-section { display: grid; gap: 8px; margin: 0; border: 1px solid #f0e7e5; border-radius: 14px; padding: 10px; background: #fffdfc; }
+.monthly-expenses-modal { width: min(100%, 560px); }
+.monthly-expenses-modal-body { min-height: 0; overflow-y: auto; padding: 16px 24px 8px; }
+.monthly-expenses-modal-body .monthly-expenses-section { border: 0; padding: 0; background: transparent; }
 .monthly-expenses-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .monthly-expenses-heading h3 { margin: 0; color: #534745; font-size: 11px; }
 .monthly-expenses-heading span { color: #a19591; font-size: 8px; }
@@ -573,4 +593,57 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
   .app-shell { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; }
   .home-screen { padding-bottom: env(safe-area-inset-bottom); }
   .create-order-dock, .bottom-nav { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+}
+
+/* Readable sizing for compact phones and unfolded screens. */
+@media (max-width: 600px) {
+  .order-list-heading h2 { font-size: 18px; }
+  .order-list-heading > div > span { font-size: 11px; }
+  .order-row-title { font-size: 13px; }
+  .order-row-subtitle { font-size: 11px; }
+  .order-row-total { font-size: 12px; }
+  .order-row-badges .status-badge { min-height: 22px; font-size: 9px; }
+  .order-item-preview-name strong { font-size: 11px; }
+  .order-item-preview-name small { font-size: 9px; }
+  .order-item-preview-price { font-size: 10px; }
+  .order-search { height: 44px; }
+  .order-search input { font-size: 16px; }
+  .filter-toggle { height: 44px; font-size: 12px; }
+  .sheet-filter-row .select, .order-filter-row .select { min-height: 42px; height: 42px; font-size: 12px; }
+  .status-badge { font-size: 9px; }
+  .detail-card span { font-size: 12px; }
+  .detail-card strong { font-size: 14px; }
+  .detail-status-controls label { font-size: 11px; }
+  .detail-status-controls .select { min-height: 42px; height: 42px; font-size: 13px; }
+  .item-description strong { font-size: 13px; }
+  .item-description > span { font-size: 11px; }
+  .item-price { font-size: 12px; }
+  .analytics-section h2 { font-size: 15px; }
+  .metric-card span { font-size: 10px; }
+  .metric-card strong { font-size: 21px; }
+  .analytics-status-filter { font-size: 11px; }
+  .analytics-status-filter .select { min-height: 40px; height: 40px; font-size: 12px; }
+  .monthly-expenses-heading h3 { font-size: 13px; }
+  .monthly-expenses-heading span { font-size: 9px; }
+  .monthly-expense-row .select, .monthly-expense-row input { min-height: 38px; height: 38px; font-size: 12px; }
+  .expense-add-button { min-height: 36px; font-size: 11px; }
+  .order-form label { font-size: 12px; }
+  .order-form input:not([type=file]) { font-size: 16px; }
+  .order-form select.select { font-size: 14px; }
+  .form-section-heading h3 { font-size: 14px; }
+  .local-save-note { font-size: 10px; }
+}
+
+@media (min-width: 600px) {
+  .order-row-title { font-size: 13px; }
+  .order-row-subtitle { font-size: 11px; }
+  .order-row-badges .status-badge { font-size: 9px; }
+  .order-item-preview-name strong { font-size: 12px; }
+  .order-item-preview-name small { font-size: 10px; }
+  .order-item-preview-price { font-size: 11px; }
+  .metric-card span { font-size: 11px; }
+  .metric-card strong { font-size: 22px; }
+  .analytics-section h2 { font-size: 15px; }
+  .monthly-bar-month { font-size: 11px; }
+  .monthly-bar-month small { font-size: 9px; }
 }

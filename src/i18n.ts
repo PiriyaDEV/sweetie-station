@@ -9,21 +9,21 @@ const resources = {
       splash: { tagline: 'Find Your Dream\nDestination With Us', continue: 'Skip loading and open home', logoAlt: 'Sweetie Station logo' },
       sheets: {
         kicker: 'Sweetie order book', chooseMonth: 'Choose a month', sheetCount: '{{count}} sheets · tap one to view its orders',
-        allSheets: 'All sheets', orderCount: '{{count}} orders', monthSummary: '{{orders}} orders · {{total}} THB', search: 'Search sheets', noMatch: 'No sheets match this search.',
+        allSheets: 'All sheets', orderCount: '{{count}} orders', partialOrderCount: '{{count}}+ orders loaded', monthSummary: '{{orders}} orders · {{total}} THB', search: 'Search sheets', noMatch: 'No sheets match this search.',
         kind: { sales: 'SALES', haul: 'HAUL' },
-        may: 'May', june: 'June', haulJul: 'Guangzhou · 4–18 Jul', july: 'July', aug: 'August', sep: 'September',
+        jan: 'January', feb: 'February', mar: 'March', apr: 'April', may: 'May', june: 'June', haulJul: 'Guangzhou · 4–18 Jul', july: 'July', aug: 'August', sep: 'September',
         haulSep: 'Guangzhou · 16–23 Sep', oct: 'October', nov: 'November', dec: 'December',
       },
       orders: {
         title: 'Orders', orders: 'orders', refresh: 'Refresh', refreshing: 'Updating', open: 'Open order',
-        item: 'item', items: 'items', oneItem: '1 item', manyItems: '{{count}} items', itemCount: '{{count}} items', resultCount: '{{shown}} of {{total}} orders', search: 'Search customer or item', searchItems: 'Search items', noMatch: 'No matching orders', deviceOnly: 'On this device', editedLocally: 'Edited on this device', edit: 'Edit', editSaved: 'Order changes saved on this device.', loadingMore: 'Loading more orders…', endOfList: 'You’re all caught up.', profit: 'Profit', profitUnavailable: '—',
+        item: 'item', items: 'items', oneItem: '1 item', manyItems: '{{count}} items', itemCount: '{{count}} items', resultCount: '{{shown}} of {{total}} orders', resultCountPartial: '{{shown}} shown · {{total}}+ loaded', search: 'Search customer or item', searchItems: 'Search items', noMatch: 'No matching orders', deviceOnly: 'On this device', editedLocally: 'Edited on this device', edit: 'Edit', editSaved: 'Order changes saved on this device.', loadingMore: 'Loading more orders…', endOfList: 'You’re all caught up.', profit: 'Profit', profitUnavailable: '—',
       },
       details: { title: 'Order details', summary: 'Order summary' },
       settings: { title: 'Settings', displayLanguage: 'Display language' },
-      auth: { kicker: 'Sweetie admin', title: 'Admin sign in', username: 'Username', password: 'Password', signIn: 'Sign in', logout: 'Log out', invalid: 'Incorrect username or password.', temporary: 'Temporary demo login only — not secure access control.' },
+      auth: { kicker: 'Sweetie Station admin', title: 'Admin sign in', username: 'Username', password: 'Password', signIn: 'Sign in', logout: 'Log out', invalid: 'Incorrect username or password.', temporary: 'Temporary demo login only — not secure access control.' },
       detail: {
         orderDay: '{{day}}', quantity: '{{count}} {{unit}}', piece: 'pc', pieces: 'pcs', paymentFull: 'Paid in full', paymentDeposit: 'Deposit', paymentUnpaid: 'Unpaid',
-        shippingNotOrdered: 'Not ordered', shippingOrdered: 'Ordered', shippingInbound: 'Waiting for Thailand', shippingSent: 'Shipped', notSet: 'Not listed', lineName: 'LINE name', customer: 'Customer',
+        shippingNotOrdered: 'Not ordered', shippingOrdered: 'Ordered', shippingInbound: 'Waiting for Thailand', shippingSent: 'Shipped', notSet: 'Not listed', lineName: 'LINE name', customer: 'Customer', mockCustomerImage: 'Mock customer avatar',
         items: 'Items', itemNumber: 'Order item {{number}}', itemImage: 'Order item {{number}}, photo {{image}}', photoName: 'Photo name', profitMargin: 'Profit margin', campaign: 'Campaign', discount: 'Campaign discount', saveCampaign: 'Save campaign', totalBeforeDiscount: 'Before discount', totalAfterDiscount: 'After discount',
         totalSales: 'Sales total', totalProfit: 'Total profit', bank: 'Paid so far', deposit: 'Deposit due',
       },
@@ -42,14 +42,15 @@ const resources = {
         cancel: 'Cancel', save: 'Save order', localOnly: 'Saved on this device only; it will not write back to Google Sheets.',
         savedNotice: 'Order saved on this device.', imageTypeError: 'Choose an image file.', imageReadError: 'This image could not be prepared.',
       },
-      expenses: { title: 'Monthly expenses', note: 'Outside product costs · saved only on this device', add: 'Add expense', remove: 'Remove expense', category: 'Expense category', description: 'Description / note', amount: 'Amount (THB)', empty: 'No monthly expenses yet.', shipping: 'Shipping', packaging: 'Packaging', ads: 'Ads', other: 'Other' },
+      expenses: { title: 'Monthly expenses', settingsTitle: 'Monthly expenses settings', open: 'Expenses', close: 'Close monthly expenses', done: 'Done', note: 'Outside product costs · saved only on this device', add: 'Add expense', remove: 'Remove expense', category: 'Expense category', description: 'Description / note', amount: 'Amount (THB)', empty: 'No monthly expenses yet.', shipping: 'Shipping', packaging: 'Packaging', ads: 'Ads', other: 'Other' },
+      createSheet: { open: 'Create sheet', title: 'Create a sheet', close: 'Close create sheet', name: 'Sheet name', namePlaceholder: 'e.g. Special orders', month: 'Month', year: 'Year', create: 'Create sheet', localOnly: 'This sheet is saved on this device only and is not created in Google Sheets.', validation: 'Enter a sheet name and a year between 2000 and 2100.' },
       analytics: {
         title: 'Analytics', currentMonth: 'Current month overview', sales: 'Sales', orders: 'Orders', items: 'Items', shipped: 'Shipped', totalSales: 'Total sales', totalProfit: 'Net profit', currentScopeProfit: 'For this month', filteredScopeProfit: 'Filtered order profit before monthly expenses', netProfitNote: 'After {{amount}} THB monthly expenses', partialProfitNote: 'Partial profit from {{known}}/{{total}} items; monthly expenses not deducted', monthlyChange: 'Monthly sales change', yearlyChange: 'Year-over-year sales change', changeContext: 'Compared with {{month}} for the same period and status filter', yearlyContext: 'Compared with {{year}} (full-month sales)', noComparison: 'No comparable previous-month baseline', noYearlyComparison: 'No same-month prior-year data', noPeriodProfit: 'No profit data for this period',
-        statusTitle: 'Order status', monthlySales: 'Sales by month', allSheets: 'All sheets', thisMonth: 'Sales this month', filteredSales: 'Sales matching status', averageSales: 'Average monthly sales', averageProfit: 'Average profit / item', averageMonths: 'Across {{count}} populated months', profitSample: 'From {{count}} items with cost or profit data', profitCoverage: '{{known}} of {{total}} items have profit data', noProfitData: 'No profit data in linked sheets',
+        salesProfitGraph: 'Monthly sales & net profit', chartProfitNote: 'Net profit is plotted only when all item costs are recorded for that month.', partialDataNote: 'Some monthly sheets could not be fully loaded; graph values may be partial.', statusTitle: 'Order status', monthlySales: 'Sales by month', allSheets: 'All sheets', thisMonth: 'Sales this month', filteredSales: 'Sales matching status', averageSales: 'Average monthly sales', averageProfit: 'Average profit / item', averageMonths: 'Across {{count}} populated months', profitSample: 'From {{count}} items with cost or profit data', profitCoverage: '{{known}} of {{total}} items have profit data', noProfitData: 'No profit data in linked sheets',
       },
       filters: { sheetType: 'Sheet type', allSheets: 'All types', sortSheets: 'Sort sheets', monthOrder: 'Month order', salesHigh: 'Sales: high to low', salesLow: 'Sales: low to high', ordersHigh: 'Orders: most first', nameAZ: 'Name: A to Z', status: 'Filter by status', allStatuses: 'All statuses', sort: 'Sort by', statusAZ: 'Status', newest: 'Newest first', oldest: 'Oldest first', unlisted: 'Status not listed', sortItems: 'Sort items', show: 'Filter', hide: 'Hide' },
       sheet: {
-        loading: 'Loading workbook sheets…', loadingShort: 'Loading…', empty: 'No orders in this sheet yet.',
+        loading: 'Loading workbook sheets…', loadingShort: 'Loading…', loadingMoreData: 'Downloading more orders…', loadMoreError: 'Could not download the next batch.', empty: 'No orders in this sheet yet.',
         error: 'Could not load this sheet.', errorShort: 'Unavailable', retry: 'Retry',
       },
       nav: {
@@ -65,21 +66,21 @@ const resources = {
       splash: { tagline: 'ค้นหาจุดหมายในฝัน\nไปกับเรา', continue: 'ข้ามหน้ารอและไปหน้าหลัก', logoAlt: 'โลโก้ Sweetie Station' },
       sheets: {
         kicker: 'สมุดออเดอร์ Sweetie', chooseMonth: 'เลือกเดือน', sheetCount: '{{count}} ชีต · แตะเพื่อดูคำสั่งซื้อ',
-        allSheets: 'ชีตทั้งหมด', orderCount: '{{count}} ออเดอร์', monthSummary: '{{orders}} ออเดอร์ · {{total}} THB', search: 'ค้นหาชีต', noMatch: 'ไม่พบชีตที่ตรงกับคำค้นหา',
+        allSheets: 'ชีตทั้งหมด', orderCount: '{{count}} ออเดอร์', partialOrderCount: 'โหลดแล้วอย่างน้อย {{count}} ออเดอร์', monthSummary: '{{orders}} ออเดอร์ · {{total}} THB', search: 'ค้นหาชีต', noMatch: 'ไม่พบชีตที่ตรงกับคำค้นหา',
         kind: { sales: 'ยอดขาย', haul: 'หิ้วสินค้า' },
-        may: 'พฤษภาคม', june: 'มิถุนายน', haulJul: 'กวางโจว · 4–18 ก.ค.', july: 'กรกฎาคม', aug: 'สิงหาคม', sep: 'กันยายน',
+        jan: 'มกราคม', feb: 'กุมภาพันธ์', mar: 'มีนาคม', apr: 'เมษายน', may: 'พฤษภาคม', june: 'มิถุนายน', haulJul: 'กวางโจว · 4–18 ก.ค.', july: 'กรกฎาคม', aug: 'สิงหาคม', sep: 'กันยายน',
         haulSep: 'กวางโจว · 16–23 ก.ย.', oct: 'ตุลาคม', nov: 'พฤศจิกายน', dec: 'ธันวาคม',
       },
       orders: {
         title: 'รายการคำสั่งซื้อ', orders: 'ออเดอร์', refresh: 'รีเฟรช', refreshing: 'กำลังอัปเดต', open: 'เปิดคำสั่งซื้อ',
-        item: 'ชิ้น', items: 'ชิ้น', oneItem: '1 ชิ้น', manyItems: '{{count}} ชิ้น', itemCount: '{{count}} รายการ', resultCount: 'แสดง {{shown}} จาก {{total}} ออเดอร์', search: 'ค้นหาลูกค้าหรือสินค้า', searchItems: 'ค้นหารายการสินค้า', noMatch: 'ไม่พบออเดอร์ที่ตรงกัน', deviceOnly: 'บันทึกในเครื่อง', editedLocally: 'แก้ไขในเครื่อง', edit: 'แก้ไข', editSaved: 'บันทึกการแก้ไขออเดอร์ไว้ในเครื่องแล้ว', loadingMore: 'กำลังโหลดออเดอร์เพิ่ม…', endOfList: 'แสดงครบแล้ว', profit: 'กำไร', profitUnavailable: '—',
+        item: 'ชิ้น', items: 'ชิ้น', oneItem: '1 ชิ้น', manyItems: '{{count}} ชิ้น', itemCount: '{{count}} รายการ', resultCount: 'แสดง {{shown}} จาก {{total}} ออเดอร์', resultCountPartial: 'แสดง {{shown}} · โหลดแล้ว {{total}}+ ออเดอร์', search: 'ค้นหาลูกค้าหรือสินค้า', searchItems: 'ค้นหารายการสินค้า', noMatch: 'ไม่พบออเดอร์ที่ตรงกัน', deviceOnly: 'บันทึกในเครื่อง', editedLocally: 'แก้ไขในเครื่อง', edit: 'แก้ไข', editSaved: 'บันทึกการแก้ไขออเดอร์ไว้ในเครื่องแล้ว', loadingMore: 'กำลังโหลดออเดอร์เพิ่ม…', endOfList: 'แสดงครบแล้ว', profit: 'กำไร', profitUnavailable: '—',
       },
       details: { title: 'รายละเอียดคำสั่งซื้อ', summary: 'สรุปคำสั่งซื้อ' },
       settings: { title: 'ตั้งค่า', displayLanguage: 'ภาษาที่แสดง' },
-      auth: { kicker: 'ผู้ดูแล Sweetie', title: 'เข้าสู่ระบบผู้ดูแล', username: 'ชื่อผู้ใช้', password: 'รหัสผ่าน', signIn: 'เข้าสู่ระบบ', logout: 'ออกจากระบบ', invalid: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', temporary: 'ล็อกอินชั่วคราวสำหรับตัวอย่าง — ยังไม่ใช่ระบบรักษาความปลอดภัย' },
+      auth: { kicker: 'ผู้ดูแล Sweetie Station', title: 'เข้าสู่ระบบผู้ดูแล', username: 'ชื่อผู้ใช้', password: 'รหัสผ่าน', signIn: 'เข้าสู่ระบบ', logout: 'ออกจากระบบ', invalid: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', temporary: 'ล็อกอินชั่วคราวสำหรับตัวอย่าง — ยังไม่ใช่ระบบรักษาความปลอดภัย' },
       detail: {
         orderDay: '{{day}}', quantity: '{{count}} {{unit}}', piece: 'ชิ้น', pieces: 'ชิ้น', paymentFull: 'จ่ายเต็มแล้ว', paymentDeposit: 'มัดจำ', paymentUnpaid: 'ยังไม่ได้ชำระ',
-        shippingNotOrdered: 'ยังไม่ได้สั่ง', shippingOrdered: 'สั่งแล้ว', shippingInbound: 'รอเข้าไทย', shippingSent: 'ส่งแล้ว', notSet: 'ไม่มีข้อมูล', lineName: 'ชื่อไลน์', customer: 'ชื่อลูกค้า',
+        shippingNotOrdered: 'ยังไม่ได้สั่ง', shippingOrdered: 'สั่งแล้ว', shippingInbound: 'รอเข้าไทย', shippingSent: 'ส่งแล้ว', notSet: 'ไม่มีข้อมูล', lineName: 'ชื่อไลน์', customer: 'ชื่อลูกค้า', mockCustomerImage: 'รูปโปรไฟล์ตัวอย่าง',
         items: 'รายการสินค้า', itemNumber: 'รายการที่ {{number}}', itemImage: 'รายการที่ {{number}} รูปที่ {{image}}', photoName: 'ชื่อรูปภาพ', profitMargin: 'อัตรากำไร', campaign: 'แคมเปญ', discount: 'ส่วนลดแคมเปญ', saveCampaign: 'บันทึกแคมเปญ', totalBeforeDiscount: 'ก่อนหักส่วนลด', totalAfterDiscount: 'หลังหักส่วนลด',
         totalSales: 'ยอดขายรวม', totalProfit: 'กำไรรวม', bank: 'ยอดที่โอนแล้ว', deposit: 'ยอดมัดจำที่เหลือ',
       },
@@ -98,14 +99,15 @@ const resources = {
         cancel: 'ยกเลิก', save: 'บันทึกออเดอร์', localOnly: 'บันทึกไว้ในอุปกรณ์นี้เท่านั้น ยังไม่ซิงก์กลับไป Google Sheets',
         savedNotice: 'บันทึกออเดอร์ไว้ในอุปกรณ์นี้แล้ว', imageTypeError: 'กรุณาเลือกไฟล์รูปภาพ', imageReadError: 'เตรียมรูปภาพนี้ไม่สำเร็จ',
       },
-      expenses: { title: 'รายจ่ายประจำเดือน', note: 'รายจ่ายนอกเหนือจากต้นทุนสินค้า · บันทึกในอุปกรณ์นี้เท่านั้น', add: 'เพิ่มรายจ่าย', remove: 'ลบรายจ่าย', category: 'หมวดรายจ่าย', description: 'รายละเอียด / หมายเหตุ', amount: 'จำนวนเงิน (บาท)', empty: 'ยังไม่มีรายจ่ายประจำเดือน', shipping: 'ค่าขนส่ง', packaging: 'ค่าแพ็กเกจจิ้ง', ads: 'ค่าโฆษณา', other: 'อื่น ๆ' },
+      expenses: { title: 'รายจ่ายประจำเดือน', settingsTitle: 'ตั้งค่ารายจ่ายประจำเดือน', open: 'รายจ่าย', close: 'ปิดรายจ่ายประจำเดือน', done: 'เสร็จสิ้น', note: 'รายจ่ายนอกเหนือจากต้นทุนสินค้า · บันทึกในอุปกรณ์นี้เท่านั้น', add: 'เพิ่มรายจ่าย', remove: 'ลบรายจ่าย', category: 'หมวดรายจ่าย', description: 'รายละเอียด / หมายเหตุ', amount: 'จำนวนเงิน (บาท)', empty: 'ยังไม่มีรายจ่ายประจำเดือน', shipping: 'ค่าขนส่ง', packaging: 'ค่าแพ็กเกจจิ้ง', ads: 'ค่าโฆษณา', other: 'อื่น ๆ' },
+      createSheet: { open: 'สร้างชีต', title: 'สร้างชีตใหม่', close: 'ปิดหน้าสร้างชีต', name: 'ชื่อชีต', namePlaceholder: 'เช่น ออเดอร์พิเศษ', month: 'เดือน', year: 'ปี', create: 'สร้างชีต', localOnly: 'ชีตนี้บันทึกไว้ในอุปกรณ์นี้เท่านั้น ไม่ได้สร้างใน Google Sheets', validation: 'กรุณาใส่ชื่อชีตและปีระหว่าง 2000–2100' },
       analytics: {
         title: 'วิเคราะห์ข้อมูล', currentMonth: 'ภาพรวมเดือนปัจจุบัน', sales: 'ยอดขาย', orders: 'ออเดอร์', items: 'จำนวนสินค้า', shipped: 'ส่งแล้ว', totalSales: 'ยอดขายทั้งหมด', totalProfit: 'กำไรสุทธิหลังหักรายจ่าย', currentScopeProfit: 'ของเดือนนี้', filteredScopeProfit: 'กำไรจากออเดอร์ที่กรอง (ยังไม่หักรายจ่ายรายเดือน)', netProfitNote: 'หักรายจ่ายรายเดือน {{amount}} บาทแล้ว', partialProfitNote: 'มีข้อมูลกำไร {{known}}/{{total}} รายการ; ยังไม่หักรายจ่ายรายเดือน', monthlyChange: 'การเปลี่ยนแปลงยอดขายรายเดือน', yearlyChange: 'การเปลี่ยนแปลงยอดขายเทียบปีที่แล้ว', changeContext: 'เทียบกับช่วงเดียวกันของ{{month}} ตามตัวกรองสถานะเดียวกัน', yearlyContext: 'เทียบกับปี {{year}} (ยอดขายทั้งเดือน)', noComparison: 'ไม่มีฐานข้อมูลเดือนก่อนหน้าที่ใช้เปรียบเทียบได้', noYearlyComparison: 'ไม่มีข้อมูลเดือนเดียวกันของปีก่อน', noPeriodProfit: 'ช่วงเวลานี้ไม่มีข้อมูลกำไร',
-        statusTitle: 'สถานะออเดอร์', monthlySales: 'ยอดขายรายเดือน', allSheets: 'ดูชีตทั้งหมด', thisMonth: 'ยอดขายเดือนนี้', filteredSales: 'ยอดขายตามสถานะ', averageSales: 'ยอดขายเฉลี่ยต่อเดือน', averageProfit: 'กำไรเฉลี่ยต่อรายการ', averageMonths: 'จาก {{count}} เดือนที่มีข้อมูล', profitSample: 'จาก {{count}} รายการที่มีข้อมูลต้นทุนหรือกำไร', profitCoverage: 'มีข้อมูลกำไร {{known}} จาก {{total}} รายการ', noProfitData: 'ชีตที่เชื่อมไว้ไม่มีข้อมูลกำไร',
+        salesProfitGraph: 'กราฟยอดขายและกำไรสุทธิรายเดือน', chartProfitNote: 'จะแสดงกำไรสุทธิเมื่อมีข้อมูลต้นทุนครบทุกชิ้นในเดือนนั้น', partialDataNote: 'บางชีตโหลดข้อมูลได้ไม่ครบ กราฟจึงอาจแสดงยอดบางส่วน', statusTitle: 'สถานะออเดอร์', monthlySales: 'ยอดขายรายเดือน', allSheets: 'ดูชีตทั้งหมด', thisMonth: 'ยอดขายเดือนนี้', filteredSales: 'ยอดขายตามสถานะ', averageSales: 'ยอดขายเฉลี่ยต่อเดือน', averageProfit: 'กำไรเฉลี่ยต่อรายการ', averageMonths: 'จาก {{count}} เดือนที่มีข้อมูล', profitSample: 'จาก {{count}} รายการที่มีข้อมูลต้นทุนหรือกำไร', profitCoverage: 'มีข้อมูลกำไร {{known}} จาก {{total}} รายการ', noProfitData: 'ชีตที่เชื่อมไว้ไม่มีข้อมูลกำไร',
       },
       filters: { sheetType: 'ประเภทชีต', allSheets: 'ทุกประเภท', sortSheets: 'เรียงชีต', monthOrder: 'ตามเดือน', salesHigh: 'ยอดขาย: มากไปน้อย', salesLow: 'ยอดขาย: น้อยไปมาก', ordersHigh: 'จำนวนออเดอร์: มากไปน้อย', nameAZ: 'ชื่อ: ก ถึง ฮ', status: 'กรองตามสถานะ', allStatuses: 'ทุกสถานะ', sort: 'เรียงตาม', statusAZ: 'สถานะ', newest: 'ใหม่ไปเก่า', oldest: 'เก่าไปใหม่', unlisted: 'ไม่ระบุสถานะ', sortItems: 'เรียงสินค้า', show: 'ตัวกรอง', hide: 'ซ่อนตัวกรอง' },
       sheet: {
-        loading: 'กำลังโหลดข้อมูลทุกชีต…', loadingShort: 'กำลังโหลด…', empty: 'ยังไม่มีออเดอร์ในชีตนี้',
+        loading: 'กำลังโหลดข้อมูลทุกชีต…', loadingShort: 'กำลังโหลด…', loadingMoreData: 'กำลังดาวน์โหลดออเดอร์เพิ่ม…', loadMoreError: 'ดาวน์โหลดออเดอร์ชุดถัดไปไม่สำเร็จ', empty: 'ยังไม่มีออเดอร์ในชีตนี้',
         error: 'โหลดชีตนี้ไม่สำเร็จ', errorShort: 'โหลดไม่ได้', retry: 'ลองอีกครั้ง',
       },
       nav: {
@@ -122,6 +124,8 @@ try {
 } catch {
   // Keep English as the default when browser storage is unavailable.
 }
+
+if (typeof document !== 'undefined') document.documentElement.lang = initialLanguage
 
 void i18n.use(initReactI18next).init({
   resources,

@@ -7,6 +7,7 @@ export type SheetDefinition = {
   kind: 'sales' | 'haul'
   monthKey: string
   year: number
+  customName?: string
 }
 
 export type SheetLineAttribute = { key: string; value: string }
@@ -59,9 +60,23 @@ export type MonthlyExpense = {
   amount: number
 }
 
+export type SheetOrderParserState = { currentDay: string; currentOrder?: SheetOrder }
+
+export type SheetOrderPage = {
+  orders: SheetOrder[]
+  hasMore: boolean
+  nextOffset: number | null
+  parserState?: SheetOrderParserState
+}
+
 export type SheetDataState = {
   orders: SheetOrder[]
   error?: string
+  hasMore?: boolean
+  nextOffset?: number
+  parserState?: SheetOrderParserState
+  loadingMore?: boolean
+  loadMoreError?: string
 }
 
 const SHEET_ID = '1Y5z_jWtQd5-dxG_hWQlHYWNWtR4giR6k8tAwpmqRF5w'
@@ -143,9 +158,16 @@ function cell(row: string[], index: number) {
   return index >= 0 ? row[index]?.trim() ?? '' : ''
 }
 
-export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOrder[] {
+function finalizeOrder(order: SheetOrder) {
+  const hasProfitForEveryLine = order.lines.length > 0 && order.lines.every((line) => line.profitAmount !== null)
+  order.profitAmount = hasProfitForEveryLine ? order.lines.reduce((sum, line) => sum + (line.profitAmount ?? 0), 0) : null
+  order.profitPercent = hasProfitForEveryLine && order.totalSales > 0 ? ((order.profitAmount ?? 0) / order.totalSales) * 100 : null
+  return order
+}
+
+export function parseOrdersPage(csv: string, sheet: SheetDefinition, offset = 0, parserState?: SheetOrderParserState, pageSize = 120): SheetOrderPage {
   const rows = parseCsv(csv)
-  if (rows.length < 2) return []
+  if (rows.length === 0) return { orders: [], hasMore: false, nextOffset: null }
 
   const headers = rows[0].map((header) => header.trim())
   const column = {
@@ -163,11 +185,11 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
   }
   const baseColumns = new Set(Object.values(column).filter((index) => index >= 0))
   const orders: SheetOrder[] = []
-  let currentOrder: SheetOrder | undefined
-  let currentDay = ''
+  let currentOrder = parserState?.currentOrder
+  let currentDay = parserState?.currentDay ?? ''
 
   rows.slice(1).forEach((row, index) => {
-    const rowNumber = index + 2
+    const rowNumber = offset + index + 2
     const date = cell(row, column.date)
     const lineName = cell(row, column.lineName)
     const customerName = cell(row, column.customerName)
@@ -182,6 +204,7 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
     if (date) currentDay = date
 
     if (lineName) {
+      if (currentOrder?.lines.length) orders.push(finalizeOrder(currentOrder))
       currentOrder = {
         id: String(rowNumber),
         sheetRow: rowNumber,
@@ -198,12 +221,11 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
         profitPercent: null,
         quantity: 0,
       }
-      orders.push(currentOrder)
     }
 
     if (!currentOrder) return
 
-    const paymentStatus = row.find((value) => ['จ่ายเต็ม', 'มัดจำ'].includes(value.trim()))?.trim() ?? ''
+    const paymentStatus = row.find((value) => ['จ่ายเต็ม', 'มัดจำ', 'ยังไม่ได้ชำระ'].includes(value.trim()))?.trim() ?? ''
     const shippingStatus = row.find((value) => ['ยังไม่ได้สั่ง', 'สั่งแล้ว', 'รอเข้าไทย', 'ส่งแล้ว'].includes(value.trim()))?.trim() ?? ''
     if (paymentStatus) currentOrder.paymentStatus = paymentStatus
     if (shippingStatus) currentOrder.shippingStatus = shippingStatus
@@ -216,7 +238,6 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
     })
 
     const hasLineData = Boolean(lineName || customerName || itemName || quantityText || bankText || depositText || costText || costRMBText)
-    // Summary rows only contain a total in the price column; they are not order lines.
     if (!hasLineData) return
 
     const saleValue = numberFromCell(salePriceText)
@@ -242,13 +263,23 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
     currentOrder.quantity += line.quantity
   })
 
-  orders.forEach((order) => {
-    const hasProfitForEveryLine = order.lines.length > 0 && order.lines.every((line) => line.profitAmount !== null)
-    order.profitAmount = hasProfitForEveryLine ? order.lines.reduce((sum, line) => sum + (line.profitAmount ?? 0), 0) : null
-    order.profitPercent = hasProfitForEveryLine && order.totalSales > 0 ? ((order.profitAmount ?? 0) / order.totalSales) * 100 : null
-  })
+  const rowCount = Math.max(0, rows.length - 1)
+  const hasMore = rowCount >= pageSize
+  if (!hasMore && currentOrder?.lines.length) {
+    orders.push(finalizeOrder(currentOrder))
+    currentOrder = undefined
+  }
 
-  return orders.filter((order) => order.lines.length > 0)
+  return {
+    orders: orders.filter((order) => order.lines.length > 0),
+    hasMore,
+    nextOffset: hasMore ? offset + rowCount : null,
+    parserState: hasMore ? { currentDay, currentOrder } : undefined,
+  }
+}
+
+export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOrder[] {
+  return parseOrdersPage(csv, sheet, 0, undefined, Number.MAX_SAFE_INTEGER).orders
 }
 
 async function fetchCsvWithRetry(url: string, signal?: AbortSignal) {
@@ -268,9 +299,31 @@ async function fetchCsvWithRetry(url: string, signal?: AbortSignal) {
   throw lastError instanceof Error ? lastError : new Error('Spreadsheet request failed.')
 }
 
+export async function fetchSheetOrdersPage(
+  sheet: SheetDefinition,
+  offset = 0,
+  parserState?: SheetOrderParserState,
+  signal?: AbortSignal,
+  pageSize = 120,
+): Promise<SheetOrderPage> {
+  const query = encodeURIComponent(`select * limit ${pageSize} offset ${offset}`)
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${sheet.gid}&tq=${query}`
+  return parseOrdersPage(await fetchCsvWithRetry(url, signal), sheet, offset, parserState, pageSize)
+}
+
 export async function fetchSheetOrders(sheet: SheetDefinition, signal?: AbortSignal): Promise<SheetOrder[]> {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${sheet.gid}`
-  return parseOrdersFromCsv(await fetchCsvWithRetry(url, signal), sheet)
+  const orders: SheetOrder[] = []
+  let offset = 0
+  let parserState: SheetOrderParserState | undefined
+  let hasMore = true
+  while (hasMore) {
+    const page = await fetchSheetOrdersPage(sheet, offset, parserState, signal)
+    orders.push(...page.orders)
+    hasMore = page.hasMore
+    parserState = page.parserState
+    offset = page.nextOffset ?? offset
+  }
+  return orders
 }
 
 export async function fetchAllSheets(signal?: AbortSignal): Promise<Record<string, SheetDataState>> {
@@ -281,7 +334,13 @@ export async function fetchAllSheets(signal?: AbortSignal): Promise<Record<strin
       const sheet = SHEETS[nextIndex]
       nextIndex += 1
       try {
-        results[sheet.id] = { orders: await fetchSheetOrders(sheet, signal) }
+        const page = await fetchSheetOrdersPage(sheet, 0, undefined, signal)
+        results[sheet.id] = {
+          orders: page.orders,
+          hasMore: page.hasMore,
+          nextOffset: page.nextOffset ?? undefined,
+          parserState: page.parserState,
+        }
       } catch (cause) {
         if (signal?.aborted) throw cause
         results[sheet.id] = { orders: [], error: cause instanceof Error ? cause.message : 'Sheet request failed.' }
@@ -291,6 +350,7 @@ export async function fetchAllSheets(signal?: AbortSignal): Promise<Record<strin
   await Promise.all(Array.from({ length: Math.min(3, SHEETS.length) }, worker))
   return results
 }
+
 
 export function formatOrderDate(day: string, sheet: SheetDefinition, locale: string) {
   const isoMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day)
