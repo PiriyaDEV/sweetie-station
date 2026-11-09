@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { UserRound } from 'lucide-react'
+import { Plus, UserRound } from 'lucide-react'
 
 export type LineContact = { lineUserId: string; displayName: string; pictureUrl: string; updatedAt: number }
 
@@ -41,27 +41,50 @@ export function LineAvatar({ lineName, size }: { lineName: string; size: number 
   return <UserRound size={size} />
 }
 
-export function LineContactPicker({ onPick, label }: { onPick: (contact: LineContact) => void; label: string }) {
+export function LineNameField({ value, onChange, onPick, placeholder, newLabel }: {
+  value: string
+  onChange: (value: string) => void
+  onPick: (contact: LineContact) => void
+  placeholder: string
+  newLabel: (name: string) => string
+}) {
   const contacts = useLineContacts()
-  const [query, setQuery] = useState('')
-  const matches = useMemo(() => {
-    const key = query.trim().toLocaleLowerCase()
-    return key ? contacts.filter((contact) => contact.displayName.toLocaleLowerCase().includes(key)).slice(0, 6) : []
-  }, [contacts, query])
-  if (!contacts.length) return null
+  const [open, setOpen] = useState(false)
+  const key = value.trim().toLocaleLowerCase()
+  const matches = useMemo(
+    () => contacts.filter((contact) => !key || contact.displayName.toLocaleLowerCase().includes(key)).slice(0, 6),
+    [contacts, key],
+  )
+  const exact = contacts.some((contact) => contact.displayName.trim().toLocaleLowerCase() === key)
+  const showNew = key !== '' && !exact
   return (
     <div className="line-picker">
-      <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={label} aria-label={label} />
-      {matches.length > 0 && (
+      <input
+        value={value}
+        placeholder={placeholder}
+        autoComplete="off"
+        onChange={(event) => { onChange(event.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+      />
+      {open && (matches.length > 0 || showNew) && (
         <ul className="line-picker-list">
           {matches.map((contact) => (
             <li key={contact.lineUserId}>
-              <button type="button" onClick={() => { onPick(contact); setQuery('') }}>
+              <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { onPick(contact); setOpen(false) }}>
                 <span className="line-picker-avatar">{contact.pictureUrl ? <img src={contact.pictureUrl} alt="" referrerPolicy="no-referrer" /> : <UserRound size={16} />}</span>
                 <span className="line-picker-name">{contact.displayName}</span>
               </button>
             </li>
           ))}
+          {showNew && (
+            <li>
+              <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpen(false)}>
+                <span className="line-picker-avatar"><Plus size={16} /></span>
+                <span className="line-picker-name">{newLabel(value.trim())}</span>
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </div>

@@ -35,7 +35,7 @@ const resources = {
         chinaShipping: 'China shipping', netProfit: 'Net profit',
       },
       createOrder: {
-        title: 'Create an order', editTitle: 'Edit order', update: 'Save changes', open: 'Create order', close: 'Close create order', linePlaceholder: 'LINE account or handle', pickLine: 'Search LINE contacts…',
+        title: 'Create an order', editTitle: 'Edit order', update: 'Save changes', open: 'Create order', close: 'Close create order', linePlaceholder: 'LINE account or handle', useNewLine: 'Use “{{name}}” (new)',
         customerPlaceholder: 'Customer name', day: 'Order date', itemNumber: 'Item {{number}}', itemName: 'Item name', photoName: 'Name this photo', optional: 'optional', photoNamePlaceholder: 'e.g. Blue ribbon pouch',
         quantity: 'Quantity', price: 'Sale total (THB)', bank: 'Amount paid (THB)', costRMB: 'Unit cost (CNY)', exchangeRate: 'Exchange rate (THB per CNY)', exchangeRateHint: 'Default rate is saved on this device; adjust it when needed.', depositDue: 'Item deposit due', orderDepositDue: 'Order deposit due', costTHBPreview: 'Cost total', estimatedProfit: 'Estimated profit', isCampaign: 'Campaign order', campaignDiscount: 'Discount amount (THB)', afterDiscount: 'Total after discount', paymentStatusPreview: 'Payment status preview', paymentStatus: 'Payment status',
         shippingStatus: 'Shipping status', uploadPhoto: 'Upload item photo', chooseMonthImage: 'Use this month’s photo',
@@ -94,7 +94,7 @@ const resources = {
         chinaShipping: 'ค่าส่งจีน', netProfit: 'กำไรสุทธิ',
       },
       createOrder: {
-        title: 'สร้างคำสั่งซื้อ', editTitle: 'แก้ไขออเดอร์', update: 'บันทึกการแก้ไข', open: 'สร้างออเดอร์', close: 'ปิดหน้าสร้างออเดอร์', linePlaceholder: 'บัญชีหรือชื่อ LINE', pickLine: 'ค้นหารายชื่อจาก LINE…',
+        title: 'สร้างคำสั่งซื้อ', editTitle: 'แก้ไขออเดอร์', update: 'บันทึกการแก้ไข', open: 'สร้างออเดอร์', close: 'ปิดหน้าสร้างออเดอร์', linePlaceholder: 'บัญชีหรือชื่อ LINE', useNewLine: 'ใช้ “{{name}}” (ใหม่)',
         customerPlaceholder: 'ชื่อลูกค้า', day: 'วันที่สั่งซื้อ', itemNumber: 'สินค้า {{number}}', itemName: 'ชื่อสินค้า', photoName: 'ตั้งชื่อรูปภาพ', optional: 'ไม่บังคับ', photoNamePlaceholder: 'เช่น กระเป๋าริบบิ้นสีฟ้า',
         quantity: 'จำนวน', price: 'ยอดขาย (THB)', bank: 'ยอดที่โอนแล้ว (THB)', costRMB: 'ต้นทุนต่อชิ้น (หยวน)', exchangeRate: 'เรทหยวนเป็นบาท', exchangeRateHint: 'ใช้เรทตั้งต้นที่บันทึกไว้ในอุปกรณ์ และแก้ไขได้ตามต้องการ', depositDue: 'ยอดค้างชำระของรายการนี้', orderDepositDue: 'ยอดค้างชำระของออเดอร์', costTHBPreview: 'ต้นทุนรวม', estimatedProfit: 'กำไรโดยประมาณ', isCampaign: 'ออเดอร์แคมเปญ', campaignDiscount: 'ส่วนลด (บาท)', afterDiscount: 'ยอดหลังหักส่วนลด', paymentStatusPreview: 'สถานะชำระเงินอัตโนมัติ', paymentStatus: 'สถานะชำระเงิน',
         shippingStatus: 'สถานะจัดส่ง', uploadPhoto: 'อัปโหลดรูปสินค้า', chooseMonthImage: 'ใช้รูปจากเดือนนี้',

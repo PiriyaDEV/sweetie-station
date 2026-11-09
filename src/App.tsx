@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import sweetieLogo from './assets/sweetie-logo.webp'
-import { LineAvatar, LineContactPicker, LineContactsProvider } from './lineContacts'
+import { LineAvatar, LineContactsProvider, LineNameField } from './lineContacts'
 
 const AnalyticsChart = lazy(() => import('./AnalyticsChart'))
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
@@ -852,8 +852,14 @@ function CreateOrderDialog({
         <form className="order-form" onSubmit={submit}>
           <div className="form-grid two-columns">
             <div>
-              <label><span className="field-label">{t('detail.lineName')}</span><input value={draft.lineName} onChange={(event) => updateField('lineName', event.target.value)} placeholder={t('createOrder.linePlaceholder')} /></label>
-              <LineContactPicker label={t('createOrder.pickLine')} onPick={(contact) => { updateField('lineName', contact.displayName); if (!draft.customerName.trim()) updateField('customerName', contact.displayName) }} />
+              <span className="field-label">{t('detail.lineName')}</span>
+              <LineNameField
+                value={draft.lineName}
+                placeholder={t('createOrder.linePlaceholder')}
+                newLabel={(name) => t('createOrder.useNewLine', { name })}
+                onChange={(value) => updateField('lineName', value)}
+                onPick={(contact) => { updateField('lineName', contact.displayName); if (!draft.customerName.trim()) updateField('customerName', contact.displayName) }}
+              />
             </div>
             <label><span className="field-label">{t('detail.customer')} <span className="required-star">*</span></span><input value={draft.customerName} onChange={(event) => updateField('customerName', event.target.value)} required placeholder={t('createOrder.customerPlaceholder')} /></label>
           </div>
