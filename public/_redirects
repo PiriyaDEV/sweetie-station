@@ -2,4 +2,6 @@
 /api/data /.netlify/functions/data 200!
 /api/sheets /.netlify/functions/sheets 200!
 /api/orders /.netlify/functions/orders 200!
+/api/line-contacts /.netlify/functions/line-contacts 200!
+/api/line-webhook /.netlify/functions/line-webhook 200!
 /* /index.html 200

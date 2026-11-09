@@ -17,11 +17,11 @@ import {
   RefreshCw,
   Search,
   SlidersHorizontal,
-  UserRound,
   X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import sweetieLogo from './assets/sweetie-logo.webp'
+import { LineAvatar, LineContactPicker, LineContactsProvider } from './lineContacts'
 
 const AnalyticsChart = lazy(() => import('./AnalyticsChart'))
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
@@ -646,7 +646,7 @@ function OrderListRow({ order, sheet }: { order: SheetOrder; sheet: SheetDefinit
       onClick={() => navigate(`/admin/sheets/${sheet.id}/orders/${order.id}`)}
       aria-label={`${t('orders.open')} ${order.customerName || order.lineName} · ${t('orders.profit')}: ${order.profitAmount === null ? '—' : `${formatMoney(order.profitAmount, language)} THB`}`}
     >
-      <span className="order-row-photo mock-user-avatar" aria-hidden="true"><UserRound size={22} /></span>
+      <span className="order-row-photo mock-user-avatar" aria-hidden="true"><LineAvatar lineName={order.lineName} size={22} /></span>
       <span className="order-row-main">
         <span className="order-row-title">{order.customerName || order.lineName}</span>
         <span className="order-row-subtitle">{order.lineName} · {formatOrderDate(order.day, sheet, language)}</span>
@@ -851,7 +851,10 @@ function CreateOrderDialog({
 
         <form className="order-form" onSubmit={submit}>
           <div className="form-grid two-columns">
-            <label><span className="field-label">{t('detail.lineName')}</span><input value={draft.lineName} onChange={(event) => updateField('lineName', event.target.value)} placeholder={t('createOrder.linePlaceholder')} /></label>
+            <div>
+              <label><span className="field-label">{t('detail.lineName')}</span><input value={draft.lineName} onChange={(event) => updateField('lineName', event.target.value)} placeholder={t('createOrder.linePlaceholder')} /></label>
+              <LineContactPicker label={t('createOrder.pickLine')} onPick={(contact) => { updateField('lineName', contact.displayName); if (!draft.customerName.trim()) updateField('customerName', contact.displayName) }} />
+            </div>
             <label><span className="field-label">{t('detail.customer')} <span className="required-star">*</span></span><input value={draft.customerName} onChange={(event) => updateField('customerName', event.target.value)} required placeholder={t('createOrder.customerPlaceholder')} /></label>
           </div>
           <label className="day-field"><span className="field-label">{t('createOrder.day')} <span className="required-star">*</span></span><input type="date" value={draft.day} onChange={(event) => updateField('day', event.target.value)} required /></label>
@@ -1225,7 +1228,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
   return (
     <section className="app-screen detail-screen" aria-label={t('screen.detail')}>
       <div className="detail-hero">
-        <div className="detail-avatar-mock" aria-label={t('detail.mockCustomerImage')}><UserRound size={40} /></div>
+        <div className="detail-avatar-mock" aria-label={t('detail.mockCustomerImage')}><LineAvatar lineName={order.lineName} size={40} /></div>
         <button type="button" className="back-button" onClick={() => navigate(`/admin/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ChevronLeft size={20} /></button>
         <div className="hero-label">
           <h1>{order.customerName || order.lineName}</h1>
@@ -2096,6 +2099,7 @@ function App() {
   }
 
   return (
+    <LineContactsProvider enabled={isAdminAuthenticated}>
     <main className="app-stage">
       <div className="app-shell">
 
@@ -2109,6 +2113,7 @@ function App() {
         </Routes>
       </div>
     </main>
+    </LineContactsProvider>
   )
 }
 

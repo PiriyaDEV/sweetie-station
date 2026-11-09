@@ -1257,3 +1257,12 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
   .app-stage { padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
   .app-shell { width: 100%; height: calc(100dvh - env(safe-area-inset-top)); max-height: calc(100dvh - env(safe-area-inset-top)); }
 }
+
+.line-picker { position: relative; margin-top: 6px; }
+.line-picker input { font-size: 13px; }
+.line-picker-list { position: absolute; z-index: 20; top: 100%; right: 0; left: 0; margin: 4px 0 0; padding: 4px; list-style: none; border: 1px solid #ead9de; border-radius: 12px; background: #fff; box-shadow: 0 8px 20px rgb(131 71 91 / 14%); }
+.line-picker-list button { display: flex; width: 100%; align-items: center; gap: 8px; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; text-align: left; font-size: 14px; }
+.line-picker-list button:hover { background: #fff3f7; }
+.line-picker-avatar { display: grid; width: 26px; height: 26px; flex: none; overflow: hidden; place-items: center; border-radius: 50%; background: #f1c3d2; color: #b86c86; }
+.line-picker-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.detail-avatar-mock { overflow: hidden; }

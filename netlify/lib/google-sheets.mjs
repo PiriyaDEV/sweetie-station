@@ -488,3 +488,48 @@ export async function writeGoogleSnapshot(snapshot) {
   await sheetsRequest(`spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests }) })
   return { updatedAt: snapshot.updatedAt ?? Date.now(), rowsWritten: dataRows.length }
 }
+
+const LINE_CONTACTS_SHEET = 'LINE Contacts'
+const LINE_CONTACT_HEADER = ['lineUserId', 'displayName', 'pictureUrl', 'updatedAt']
+
+async function ensureLineContactsSheet() {
+  let spreadsheet = await getSpreadsheet()
+  let sheet = spreadsheet.sheets?.find(({ properties }) => properties?.title === LINE_CONTACTS_SHEET)?.properties
+  if (!sheet) {
+    await sheetsRequest(`spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}:batchUpdate`, {
+      method: 'POST',
+      body: JSON.stringify({ requests: [{ addSheet: { properties: { title: LINE_CONTACTS_SHEET, gridProperties: { rowCount: 1000, columnCount: LINE_CONTACT_HEADER.length } } } }] }),
+    })
+    cachedSpreadsheetMetadata = undefined
+    cachedSpreadsheetMetadataExpiresAt = 0
+    spreadsheet = await getSpreadsheet()
+    sheet = spreadsheet.sheets?.find(({ properties }) => properties?.title === LINE_CONTACTS_SHEET)?.properties
+    await updateSheetValuesByGid(sheet.sheetId, 'A1:D1', [LINE_CONTACT_HEADER])
+  }
+  return sheet
+}
+
+export async function readLineContacts() {
+  const sheet = await ensureLineContactsSheet()
+  const { values } = await readSheetValuesByGid(sheet.sheetId, 'A:D')
+  return values.slice(1)
+    .filter((row) => row[0])
+    .map((row) => ({ lineUserId: row[0], displayName: row[1] ?? '', pictureUrl: row[2] ?? '', updatedAt: Number(row[3]) || 0 }))
+}
+
+// Inserts or refreshes a single contact (read-only profile data from LINE).
+export async function upsertLineContact(contact) {
+  const sheet = await ensureLineContactsSheet()
+  const { values } = await readSheetValuesByGid(sheet.sheetId, 'A:A')
+  const rowIndex = values.findIndex((row, index) => index > 0 && row[0] === contact.lineUserId)
+  const row = [contact.lineUserId, contact.displayName, contact.pictureUrl, String(Date.now())]
+  if (rowIndex >= 0) {
+    await updateSheetValuesByGid(sheet.sheetId, `A${rowIndex + 1}:D${rowIndex + 1}`, [row])
+  } else {
+    const range = encodeURIComponent(`${quoteSheetTitle(sheet.title)}!A:D`)
+    await sheetsRequest(`spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+      method: 'POST',
+      body: JSON.stringify({ values: [row] }),
+    })
+  }
+}
