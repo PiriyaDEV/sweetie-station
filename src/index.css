@@ -57,8 +57,11 @@
 :root:lang(th) { font-family: 'Prompt', 'DM Sans', Arial, sans-serif; }
 
 * { box-sizing: border-box; }
-html, body, #root { width: 100%; height: 100%; min-width: 320px; margin: 0; overflow: hidden; }
+html, body, #root { width: 100%; height: 100%; min-width: 320px; margin: 0; overflow: hidden; background: #fff; }
 html { scroll-behavior: smooth; }
+html:has(.splash-stage), body:has(.splash-stage), #root:has(.splash-stage) {
+  background: linear-gradient(151deg, #f8c8f1 0%, #f5a9d1 46%, #f47799 100%);
+}
 body { height: 100%; overflow: hidden; }
 button { font: inherit; -webkit-tap-highlight-color: transparent; }
 
