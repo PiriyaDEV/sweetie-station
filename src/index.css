@@ -1228,3 +1228,32 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 @media (max-width: 360px) {
   .item-list-controls { grid-template-columns: minmax(0, 1fr); }
 }
+
+:root { --profit-positive: #75ad36; }
+
+/* Profit uses one light-green accent throughout; sales prices stay neutral. */
+.sheet-card-caption .sheet-card-profit-value { font-size: 8px; line-height: 1.2; }
+.sheet-card-profit.positive,
+.sheet-card-profit.positive .sheet-card-profit-value,
+.order-row-profit.positive,
+.order-row-profit.positive > strong,
+.metric-card strong.positive-text,
+.positive-text,
+.trend-card.positive strong,
+.profit-text.positive,
+.payment-card > div:last-child strong { color: var(--profit-positive); }
+.sheet-card-caption b { color: #dedad6; }
+.order-row-total { color: #514b49; }
+.order-row-profit strong { font-size: 9px; }
+
+/* Use the entire viewport on touch devices, including unfolded Duo-sized screens. */
+@media (pointer: coarse) {
+  .app-stage { display: block; width: 100%; height: 100vh; height: 100dvh; padding: 0; background: #fff; }
+  .app-shell { width: 100%; height: 100vh; height: 100dvh; min-height: 0; max-height: none; border-radius: 0; box-shadow: none; }
+  .app-stage.splash-stage { background: linear-gradient(151deg, #f8c8f1 0%, #f5a9d1 46%, #f47799 100%); }
+}
+
+@media (display-mode: standalone) and (pointer: coarse) {
+  .app-stage { padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+  .app-shell { width: 100%; height: calc(100dvh - env(safe-area-inset-top)); max-height: calc(100dvh - env(safe-area-inset-top)); }
+}
