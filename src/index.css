@@ -807,3 +807,5 @@ button.stat-tile svg { position: absolute; top: 11px; right: 10px; color: var(--
   .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .chip-row { grid-template-columns: repeat(4, 92px); justify-content: start; gap: 18px; }
 }
+/* Anything behind the app (scroll bounce, rounding, safe areas) shows pink, never white */
+html, body, #root { background: #f6aec8 !important; }
