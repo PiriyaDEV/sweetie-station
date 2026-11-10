@@ -8,8 +8,13 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets'
 let cachedToken
 let cachedTokenExpiresAt = 0
+let accessTokenPromise
 let cachedSpreadsheetMetadata
 let cachedSpreadsheetMetadataExpiresAt = 0
+let spreadsheetMetadataPromise
+const SHEET_PAGE_CACHE_TTL_MS = 10_000
+const SHEET_PAGE_CACHE_MAX_ENTRIES = 240
+const cachedSheetPages = new Map()
 
 function encodeBase64Url(value) {
   return Buffer.from(value).toString('base64url')
@@ -32,62 +37,96 @@ function getCredentials() {
 
 async function getAccessToken() {
   if (cachedToken && cachedTokenExpiresAt > Date.now() + 60_000) return cachedToken
-  const credentials = getCredentials()
-  const issuedAt = Math.floor(Date.now() / 1000)
-  const assertionHeader = encodeBase64Url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
-  const assertionPayload = encodeBase64Url(JSON.stringify({
-    iss: credentials.client_email,
-    scope: SHEETS_SCOPE,
-    aud: TOKEN_URL,
-    iat: issuedAt,
-    exp: issuedAt + 3600,
-  }))
-  const unsignedAssertion = `${assertionHeader}.${assertionPayload}`
-  const signer = createSign('RSA-SHA256')
-  signer.update(unsignedAssertion)
-  signer.end()
-  const assertion = `${unsignedAssertion}.${signer.sign(credentials.private_key, 'base64url')}`
-  const response = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion,
-    }),
-  })
-  const body = await response.json().catch(() => ({}))
-  if (!response.ok || typeof body.access_token !== 'string') {
-    throw new Error(`Google authentication failed (${response.status}).`)
+  if (accessTokenPromise) return accessTokenPromise
+  accessTokenPromise = (async () => {
+    const credentials = getCredentials()
+    const issuedAt = Math.floor(Date.now() / 1000)
+    const assertionHeader = encodeBase64Url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
+    const assertionPayload = encodeBase64Url(JSON.stringify({
+      iss: credentials.client_email,
+      scope: SHEETS_SCOPE,
+      aud: TOKEN_URL,
+      iat: issuedAt,
+      exp: issuedAt + 3600,
+    }))
+    const unsignedAssertion = `${assertionHeader}.${assertionPayload}`
+    const signer = createSign('RSA-SHA256')
+    signer.update(unsignedAssertion)
+    signer.end()
+    const assertion = `${unsignedAssertion}.${signer.sign(credentials.private_key, 'base64url')}`
+    const response = await fetch(TOKEN_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion,
+      }),
+    })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok || typeof body.access_token !== 'string') {
+      throw new Error(`Google authentication failed (${response.status}).`)
+    }
+    cachedToken = body.access_token
+    cachedTokenExpiresAt = Date.now() + (Number(body.expires_in) || 3600) * 1000
+    return cachedToken
+  })()
+  try {
+    return await accessTokenPromise
+  } finally {
+    accessTokenPromise = undefined
   }
-  cachedToken = body.access_token
-  cachedTokenExpiresAt = Date.now() + (Number(body.expires_in) || 3600) * 1000
-  return cachedToken
 }
 
 async function sheetsRequest(path, options = {}) {
   const token = await getAccessToken()
-  const response = await fetch(`https://sheets.googleapis.com/v4/${path}`, {
-    ...options,
-    headers: {
-      authorization: `Bearer ${token}`,
-      ...(options.body ? { 'content-type': 'application/json' } : {}),
-      ...options.headers,
-    },
-  })
-  const body = await response.json().catch(() => ({}))
-  if (!response.ok) {
+  const method = options.method ?? 'GET'
+  const shouldRetry = method === 'GET'
+  let lastError
+  for (let attempt = 0; attempt < (shouldRetry ? 3 : 1); attempt += 1) {
+    let response
+    try {
+      response = await fetch(`https://sheets.googleapis.com/v4/${path}`, {
+        ...options,
+        headers: {
+          authorization: `Bearer ${token}`,
+          ...(options.body ? { 'content-type': 'application/json' } : {}),
+          ...options.headers,
+        },
+      })
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Google Sheets request failed.')
+      if (!shouldRetry || attempt === 2) throw lastError
+      await new Promise((resolve) => setTimeout(resolve, Math.min(450 * (2 ** attempt) + Math.random() * 250, 3_000)))
+      continue
+    }
+
+    const body = await response.json().catch(() => ({}))
+    if (response.ok) return body
     const details = typeof body.error?.message === 'string' ? body.error.message : 'Google Sheets request failed.'
-    throw new Error(details)
+    lastError = new Error(details)
+    const retryable = response.status === 429 || response.status === 500 || response.status === 502 || response.status === 503 || response.status === 504
+    if (!shouldRetry || !retryable || attempt === 2) throw lastError
+    const retryAfter = Number(response.headers.get('retry-after'))
+    const delay = retryAfter > 0 ? Math.min(retryAfter * 1000, 4_000) : Math.min(450 * (2 ** attempt) + Math.random() * 250, 3_000)
+    await new Promise((resolve) => setTimeout(resolve, delay))
   }
-  return body
+  throw lastError ?? new Error('Google Sheets request failed.')
 }
 
 async function getSpreadsheet() {
   if (cachedSpreadsheetMetadata && cachedSpreadsheetMetadataExpiresAt > Date.now()) return cachedSpreadsheetMetadata
-  const fields = encodeURIComponent('spreadsheetId,properties.title,sheets.properties(sheetId,title,gridProperties(rowCount,columnCount))')
-  cachedSpreadsheetMetadata = await sheetsRequest(`spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}?fields=${fields}`)
-  cachedSpreadsheetMetadataExpiresAt = Date.now() + 5 * 60 * 1000
-  return cachedSpreadsheetMetadata
+  if (spreadsheetMetadataPromise) return spreadsheetMetadataPromise
+  spreadsheetMetadataPromise = (async () => {
+    const fields = encodeURIComponent('spreadsheetId,properties.title,sheets.properties(sheetId,title,gridProperties(rowCount,columnCount))')
+    cachedSpreadsheetMetadata = await sheetsRequest(`spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}?fields=${fields}`)
+    cachedSpreadsheetMetadataExpiresAt = Date.now() + 5 * 60 * 1000
+    return cachedSpreadsheetMetadata
+  })()
+  try {
+    return await spreadsheetMetadataPromise
+  } finally {
+    spreadsheetMetadataPromise = undefined
+  }
 }
 
 function csvCell(value) {
@@ -97,18 +136,39 @@ function csvCell(value) {
 
 export async function readSheetCsvByGid(gid, offset = 0, limit = 120) {
   if (!/^\d+$/.test(String(gid))) throw new Error('Invalid Google Sheets tab ID.')
+  const safeOffset = Math.max(0, Math.floor(Number(offset) || 0))
+  const safeLimit = Math.max(1, Math.min(2000, Math.floor(Number(limit) || 120)))
+  const cacheKey = `${gid}:${safeOffset}:${safeLimit}`
+  const cached = cachedSheetPages.get(cacheKey)
+  if (cached && cached.expiresAt > Date.now()) return cached.csv
+  if (cached) cachedSheetPages.delete(cacheKey)
+
   const spreadsheet = await getSpreadsheet()
   const sheet = spreadsheet.sheets?.find(({ properties }) => String(properties?.sheetId) === String(gid))?.properties
   if (!sheet?.title) throw new Error('Google Sheets tab was not found.')
-  const escapedTitle = sheet.title.replaceAll("'", "''")
-  const range = encodeURIComponent(`'${escapedTitle}'!A:ZZ`)
-  const result = await sheetsRequest(`spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}/values/${range}?valueRenderOption=FORMATTED_VALUE`)
-  const rows = result.values ?? []
-  if (!rows.length) return ''
-  const safeOffset = Math.max(0, Math.floor(Number(offset) || 0))
-  const safeLimit = Math.max(1, Math.min(2000, Math.floor(Number(limit) || 120)))
-  const pageRows = [rows[0], ...rows.slice(safeOffset + 1, safeOffset + safeLimit + 1)]
-  return pageRows.map((row) => row.map(csvCell).join(',')).join('\r\n')
+  const lastColumnIndex = Math.max(0, Math.min(Number(sheet.gridProperties?.columnCount) || 702, 702) - 1)
+  const endColumn = columnLabel(lastColumnIndex)
+  const quotedTitle = quoteSheetTitle(sheet.title)
+  const headerRange = `${quotedTitle}!A1:${endColumn}1`
+  const pageStartRow = safeOffset + 2
+  const pageEndRow = safeOffset + safeLimit + 1
+  const pageRange = `${quotedTitle}!A${pageStartRow}:${endColumn}${pageEndRow}`
+  const query = new URLSearchParams({ valueRenderOption: 'FORMATTED_VALUE' })
+  query.append('ranges', headerRange)
+  query.append('ranges', pageRange)
+  const result = await sheetsRequest(`spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}/values:batchGet?${query.toString()}`)
+  const header = result.valueRanges?.[0]?.values?.[0] ?? []
+  if (!header.length) return ''
+  const pageRows = result.valueRanges?.[1]?.values ?? []
+  const csv = [header, ...pageRows].map((row) => row.map(csvCell).join(',')).join('\r\n')
+  cachedSheetPages.set(cacheKey, { csv, expiresAt: Date.now() + SHEET_PAGE_CACHE_TTL_MS })
+  if (cachedSheetPages.size > SHEET_PAGE_CACHE_MAX_ENTRIES) cachedSheetPages.delete(cachedSheetPages.keys().next().value)
+  return csv
+}
+
+function invalidateSheetPageCache(gid) {
+  const prefix = `${gid}:`
+  for (const key of cachedSheetPages.keys()) if (key.startsWith(prefix)) cachedSheetPages.delete(key)
 }
 
 function getSheetProperties(spreadsheet, gid) {
@@ -308,11 +368,13 @@ export async function writeOrderToSheet(gid, order, isUpdate = false) {
 
   if (shouldUpdate) {
     const savedRows = await updateOrderRowsByGid(gid, targetRows, rowMaps, insertCount)
+    invalidateSheetPageCache(gid)
     return { orderId, rowNumbers: savedRows.slice(0, order.lines.length) }
   }
   const updatedRange = await appendOrderRowsByGid(gid, headers, rows)
   const startRow = Number(updatedRange.match(/![A-Z]+(\d+):/i)?.[1])
   if (!Number.isInteger(startRow) || startRow < 2) throw new Error('Google Sheets did not return the new order row.')
+  invalidateSheetPageCache(gid)
   return { orderId, rowNumbers: order.lines.map((_, index) => startRow + index) }
 }
 

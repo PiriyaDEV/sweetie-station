@@ -46,7 +46,13 @@ export default async function handler(request) {
         ...headers,
       },
     })
-  } catch {
+  } catch (error) {
+    console.error('Google Sheets page read failed.', {
+      gid,
+      offset,
+      limit,
+      message: error instanceof Error ? error.message : 'Unknown Google Sheets error.',
+    })
     return jsonResponse(502, { error: 'Could not read the selected Google Sheet.' }, headers)
   }
 }

@@ -32,6 +32,7 @@ const spreadsheet = {
 const originalFetch = globalThis.fetch
 let newSheetId = 88
 let mockedRequests = 0
+const requestedPageRanges = []
 
 function getRowsByRange(url) {
   const range = decodeURIComponent(url.pathname.split('/values/')[1] ?? '').split('?')[0]
@@ -45,6 +46,24 @@ function getRowsByRange(url) {
 
 function columnNumber(label) {
   return [...label.toUpperCase()].reduce((value, character) => value * 26 + character.charCodeAt(0) - 64, 0) - 1
+}
+
+function readValuesRange(range) {
+  const match = /^'((?:[^']|'')+)'!([A-Z]+)(\d+):([A-Z]+)(\d+)$/i.exec(range)
+  if (!match) throw new Error(`Unexpected batchGet range: ${range}`)
+  const title = match[1].replaceAll("''", "'")
+  const sheet = spreadsheet.sheets.find(({ properties }) => properties.title === title)
+  if (!sheet) throw new Error(`Unknown synthetic tab: ${title}`)
+  const rows = sheetRows.get(String(sheet.properties.sheetId))
+  const startColumn = columnNumber(match[2])
+  const endColumn = columnNumber(match[4])
+  const startRow = Number(match[3]) - 1
+  const endRow = Number(match[5])
+  return rows.slice(startRow, endRow).map((row) => {
+    const values = row.slice(startColumn, endColumn + 1)
+    while (values.length && values.at(-1) === '') values.pop()
+    return values
+  })
 }
 
 function applyRange(url, values) {
@@ -104,6 +123,12 @@ globalThis.fetch = async (input, options = {}) => {
     return Response.json({ totalUpdatedCells: (body.data ?? []).reduce((sum, entry) => sum + entry.values.flat().length, 0) })
   }
 
+  if (url.pathname.endsWith('/values:batchGet')) {
+    const ranges = url.searchParams.getAll('ranges')
+    requestedPageRanges.push(ranges)
+    return Response.json({ valueRanges: ranges.map((range) => ({ range, values: readValuesRange(range) })) })
+  }
+
   if (url.pathname.includes('/values/') && url.pathname.endsWith(':append')) {
     const { rows } = getRowsByRange(url)
     const body = JSON.parse(options.body ?? '{}')
@@ -137,6 +162,16 @@ test('create/update orders, persist image cells, create a real tab', async () =>
     ])
     const cookie = `sweetie_session=${createSessionToken('qa-admin', process.env.SWEETIE_SESSION_SECRET)}`
     const image = 'data:image/webp;base64,U1lOVEhFVElD'
+    const readPageRequest = () => sheetsHandler(new Request('https://synthetic.local/api/sheets?gid=42&offset=0&limit=120', { headers: { cookie } }))
+    const firstPage = await readPageRequest()
+    assert.equal(firstPage.status, 200)
+    assert.match(await firstPage.text(), /Synthetic Existing Customer/)
+    assert.deepEqual(requestedPageRanges.at(-1), ["'Synthetic Orders'!A1:K1", "'Synthetic Orders'!A2:K121"], 'Google Sheets reads should fetch only the header and requested page')
+    const readsBeforeCacheHit = requestedPageRanges.length
+    const cachedPage = await readPageRequest()
+    assert.equal(cachedPage.status, 200)
+    assert.equal(requestedPageRanges.length, readsBeforeCacheHit, 'repeated page requests should use the short-lived page cache')
+
     const order = {
       id: 'qa-order-direct-1', sheetRow: 0, day: '2026-11-09', lineName: 'Synthetic Direct Line',
       customerName: 'Synthetic Direct Customer', paymentStatus: 'ยังไม่ได้ชำระ', shippingStatus: 'ยังไม่ได้สั่ง',

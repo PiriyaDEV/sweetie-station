@@ -34,6 +34,7 @@ import {
   fetchAllSheets,
   fetchSheetOrders,
   fetchSheetOrdersPage,
+  clearSheetPageCache,
   formatOrderDate,
   SHEETS,
   type SheetDataState,
@@ -630,7 +631,6 @@ function HomePage({
   loading,
   refreshing,
   onRefresh,
-  onLoadAllHomeSheets,
   onCreateSheet,
 }: {
   dataBySheet: Record<string, SheetDataState>
@@ -639,7 +639,6 @@ function HomePage({
   loading: boolean
   refreshing: boolean
   onRefresh: () => void
-  onLoadAllHomeSheets: () => Promise<void>
   onCreateSheet: (sheet: Omit<SheetDefinition, 'id' | 'gid' | 'titleKey'>) => Promise<SheetDefinition>
 }) {
   const { t, i18n } = useTranslation()
@@ -653,10 +652,6 @@ function HomePage({
   const [createSheetOpen, setCreateSheetOpen] = useState(false)
   const scrollRootRef = useRef<HTMLDivElement>(null)
   const pullDistance = usePullToRefresh(scrollRootRef, refreshing, onRefresh)
-
-  useEffect(() => {
-    if (!loading) void onLoadAllHomeSheets()
-  }, [loading, onLoadAllHomeSheets])
 
   const sheetRows = sheets.map((sheet, index) => {
     const orders = dataBySheet[sheet.id]?.orders ?? EMPTY_ORDERS
@@ -1779,6 +1774,8 @@ function App() {
   const [exportingReportId, setExportingReportId] = useState<string | null>(null)
   const [exportMessage, setExportMessage] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
+  const refreshTargetIdsRef = useRef<string[] | null>(null)
+  const refreshInFlightRef = useRef(false)
   const [bootReady, setBootReady] = useState(false)
   const isAdminPath = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
   const allSheets = useMemo(() => [...SHEETS, ...localSheets], [localSheets])
@@ -1854,23 +1851,51 @@ function App() {
 
   useEffect(() => {
     if (!isAdminAuthenticated || !isAdminPath) return
+    const forcedTargets = refreshTargetIdsRef.current
+    refreshTargetIdsRef.current = null
+    const pathname = location.pathname
+    const selectedSheetId = pathname.startsWith('/admin/sheets/') ? pathname.split('/')[3] : ''
+    const targetSheets = forcedTargets
+      ? allSheets.filter((sheet) => forcedTargets.includes(sheet.id))
+      : pathname === '/admin/settings' ? []
+        : pathname === '/admin/analytics' ? allSheets.filter((sheet) => sheet.kind === 'sales')
+          : pathname === '/admin/orders' ? [getCurrentMonthSheet(dataBySheet, allSheets)]
+            : selectedSheetId ? allSheets.filter((sheet) => sheet.id === selectedSheetId)
+              : allSheets
+    const hasLoadedTargets = targetSheets.length > 0 && targetSheets.every((sheet) => Boolean(dataBySheet[sheet.id]))
+    if (!forcedTargets && (targetSheets.length === 0 || hasLoadedTargets)) {
+      setLoading(false)
+      setInitialDataReady(true)
+      return
+    }
+    if (targetSheets.length === 0) {
+      setLoading(false)
+      setInitialDataReady(true)
+      refreshInFlightRef.current = false
+      return
+    }
     const controller = new AbortController()
-    fetchAllSheets(controller.signal, allSheets)
-      .then((result) => setDataBySheet(result))
+    fetchAllSheets(controller.signal, targetSheets)
+      .then((result) => setDataBySheet((current) => ({ ...current, ...result })))
       .finally(() => {
         if (!controller.signal.aborted) {
           setLoading(false)
           setInitialDataReady(true)
+          refreshInFlightRef.current = false
         }
       })
       .catch(() => {
         if (!controller.signal.aborted) {
           setLoading(false)
           setInitialDataReady(true)
+          refreshInFlightRef.current = false
         }
       })
-    return () => controller.abort()
-  }, [refreshKey, isAdminAuthenticated, isAdminPath, allSheets])
+    return () => {
+      controller.abort()
+      refreshInFlightRef.current = false
+    }
+  }, [refreshKey, isAdminAuthenticated, isAdminPath, location.pathname, allSheets, dataBySheet])
 
   useEffect(() => {
     if (!isAdminAuthenticated || !localOrdersReady) return
@@ -1917,7 +1942,7 @@ function App() {
           ...previous,
           [sheetId]: {
             ...latest,
-            orders: [...latest.orders, ...page.orders],
+            orders: [...new Map([...latest.orders, ...page.orders].map((order) => [order.id, order])).values()],
             hasMore: page.hasMore,
             nextOffset: page.nextOffset ?? undefined,
             parserState: page.parserState,
@@ -1931,55 +1956,6 @@ function App() {
       setDataBySheet((previous) => ({ ...previous, [sheetId]: { ...(previous[sheetId] ?? current), loadingMore: false, loadMoreError: message } }))
     } finally {
       activePageLoadsRef.current.delete(sheetId)
-    }
-  }, [allSheets, dataBySheet])
-
-  const homeLoadRef = useRef(false)
-  const loadAllHomeSheets = useCallback(async () => {
-    if (homeLoadRef.current) return
-    homeLoadRef.current = true
-    const currentById = new Map(allSheets
-      .filter((sheet) => dataBySheet[sheet.id]?.hasMore && !dataBySheet[sheet.id]?.loadMoreError)
-      .map((sheet) => [sheet.id, dataBySheet[sheet.id]!]))
-    const queue = allSheets.filter((sheet) => currentById.has(sheet.id))
-
-    const loadWorker = async () => {
-      while (queue.length > 0) {
-        const sheet = queue.shift()
-        if (!sheet) continue
-        let current = currentById.get(sheet.id)
-        if (!current?.hasMore || activePageLoadsRef.current.has(sheet.id)) continue
-        activePageLoadsRef.current.add(sheet.id)
-        setDataBySheet((previous) => ({ ...previous, [sheet.id]: { ...(previous[sheet.id] ?? current!), loadingMore: true, loadMoreError: undefined } }))
-        try {
-          const page = await fetchSheetOrdersPage(sheet, current.nextOffset ?? 0, current.parserState)
-          current = {
-            ...current,
-            orders: [...current.orders, ...page.orders],
-            hasMore: page.hasMore,
-            nextOffset: page.nextOffset ?? undefined,
-            parserState: page.parserState,
-            loadingMore: false,
-            loadMoreError: undefined,
-          }
-          currentById.set(sheet.id, current)
-          setDataBySheet((previous) => ({ ...previous, [sheet.id]: current! }))
-          if (current.hasMore) queue.push(sheet)
-        } catch (cause) {
-          const message = cause instanceof Error ? cause.message : 'Could not load more orders.'
-          current = { ...current, loadingMore: false, loadMoreError: message }
-          currentById.set(sheet.id, current)
-          setDataBySheet((previous) => ({ ...previous, [sheet.id]: current! }))
-        } finally {
-          activePageLoadsRef.current.delete(sheet.id)
-        }
-      }
-    }
-
-    try {
-      await Promise.all(Array.from({ length: Math.min(3, queue.length) }, () => loadWorker()))
-    } finally {
-      homeLoadRef.current = false
     }
   }, [allSheets, dataBySheet])
 
@@ -2172,9 +2148,19 @@ function App() {
   }, [allSheets, exchangeRate, i18n.resolvedLanguage, localOrdersBySheet, monthlyExpensesBySheet, monthlyExpenseRevisionsBySheet, t])
 
   const refresh = useCallback(() => {
+    if (refreshInFlightRef.current) return
+    const pathname = location.pathname
+    const selectedSheetId = pathname.startsWith('/admin/sheets/') ? pathname.split('/')[3] : ''
+    const targets = pathname === '/admin/settings' ? []
+      : pathname === '/admin/analytics' ? allSheets.filter((sheet) => sheet.kind === 'sales').map((sheet) => sheet.id)
+        : pathname === '/admin/orders' ? [getCurrentMonthSheet(dataBySheet, allSheets).id]
+          : selectedSheetId ? [selectedSheetId]
+            : allSheets.map((sheet) => sheet.id)
+    refreshTargetIdsRef.current = targets
+    refreshInFlightRef.current = true
     setLoading(true)
     setRefreshKey((key) => key + 1)
-  }, [])
+  }, [allSheets, dataBySheet, location.pathname])
 
   const login = async (username: string, password: string) => {
     const response = await fetch('/api/auth', {
@@ -2285,7 +2271,7 @@ function App() {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ gid: targetSheet.gid, order }),
     })
-    const result = await response.json().catch(() => ({})) as { error?: string }
+    const result = await response.json().catch(() => ({})) as { error?: string; orderId?: string; rowNumbers?: number[] }
     if (response.status === 401) {
       throw new Error('Your secure session has expired.')
     }
@@ -2293,12 +2279,21 @@ function App() {
       throw new Error(result.error || 'Could not save the order to Google Sheets.')
     }
 
-    try {
-      const refreshedOrders = await fetchSheetOrders(targetSheet)
-      setDataBySheet((current) => ({ ...current, [sheetId]: { orders: refreshedOrders, hasMore: false } }))
-    } catch {
-      setRefreshKey((key) => key + 1)
+    clearSheetPageCache(targetSheet.gid)
+    const savedOrder: SheetOrder = {
+      ...order,
+      id: result.orderId || order.id,
+      sheetRow: result.rowNumbers?.[0] ?? order.sheetRow,
+      isLocal: false,
+      isOverride: false,
+      lines: order.lines.map((line, index) => ({ ...line, row: result.rowNumbers?.[index] ?? line.row })),
     }
+    setDataBySheet((current) => {
+      const currentSheet = current[sheetId] ?? { orders: [], hasMore: false }
+      const ordersById = new Map(currentSheet.orders.map((item) => [item.id, item]))
+      ordersById.set(savedOrder.id, savedOrder)
+      return { ...current, [sheetId]: { ...currentSheet, orders: [...ordersById.values()], error: undefined } }
+    })
     if (originalOrder) {
       setLocalOrdersBySheet((current) => {
         const next = { ...current }
@@ -2351,7 +2346,7 @@ function App() {
       <div className="app-shell">
 
         <Routes>
-          <Route path="/admin/home" element={<HomePage dataBySheet={mergedDataBySheet} monthlyExpensesBySheet={monthlyExpensesBySheet} sheets={allSheets} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} onLoadAllHomeSheets={loadAllHomeSheets} onCreateSheet={createGoogleSheetTab} />} />
+          <Route path="/admin/home" element={<HomePage dataBySheet={mergedDataBySheet} monthlyExpensesBySheet={monthlyExpensesBySheet} sheets={allSheets} loading={loading} refreshing={loading && Object.keys(dataBySheet).length > 0} onRefresh={refresh} onCreateSheet={createGoogleSheetTab} />} />
           <Route path="/admin/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={saveOrderToSheet} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} onExportMonthlyReport={exportMonthlyReport} exportingReport={exportingReportId === currentMonthSheet.id} exportMessage={exportMessage} />} />
           <Route path="/admin/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={saveOrderToSheet} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} onExportMonthlyReport={exportMonthlyReport} exportingReport={exportingReportId === (location.pathname.split('/')[3] ?? '')} exportMessage={exportMessage} />} />
           <Route path="/admin/sheets/:sheetId/orders/:orderId" element={<OrderDetailsRoute dataBySheet={mergedDataBySheet} sheets={allSheets} loading={loading} onRefresh={refresh} onSaveOrder={saveOrderToSheet} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} onLoadMoreData={loadMoreSheetData} />} />

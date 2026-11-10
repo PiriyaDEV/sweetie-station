@@ -94,6 +94,21 @@ export const SHEETS: SheetDefinition[] = [
   { id: 'dec', gid: '905302264', titleKey: 'sheets.dec', kind: 'sales', monthKey: 'dec', year: 2026 },
 ]
 
+const SHEET_PAGE_CACHE_TTL_MS = 10_000
+const SHEET_PAGE_CACHE_MAX_ENTRIES = 240
+const sheetPageCsvCache = new Map<string, { csv: string; expiresAt: number }>()
+
+export function clearSheetPageCache(gid?: string) {
+  if (!gid) {
+    sheetPageCsvCache.clear()
+    return
+  }
+  for (const key of sheetPageCsvCache.keys()) {
+    const requestUrl = new URL(key, 'https://sweetie-station.local')
+    if (requestUrl.searchParams.get('gid') === String(gid)) sheetPageCsvCache.delete(key)
+  }
+}
+
 function parseCsv(text: string): string[][] {
   const rows: string[][] = []
   let row: string[] = []
@@ -310,18 +325,35 @@ export function parseOrdersFromCsv(csv: string, sheet: SheetDefinition): SheetOr
 }
 
 async function fetchCsvWithRetry(url: string, signal?: AbortSignal) {
+  if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
+  const cached = sheetPageCsvCache.get(url)
+  if (cached && cached.expiresAt > Date.now()) return cached.csv
+  if (cached) sheetPageCsvCache.delete(url)
+
   let lastError: unknown
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const response = await fetch(url, { signal, cache: 'no-store' })
-      if (response.ok) return await response.text()
-      lastError = new Error(`Spreadsheet request failed (${response.status})`)
+      if (response.ok) {
+        const csv = await response.text()
+        sheetPageCsvCache.set(url, { csv, expiresAt: Date.now() + SHEET_PAGE_CACHE_TTL_MS })
+        if (sheetPageCsvCache.size > SHEET_PAGE_CACHE_MAX_ENTRIES) {
+          const oldestKey = sheetPageCsvCache.keys().next().value
+          if (oldestKey) sheetPageCsvCache.delete(oldestKey)
+        }
+        return csv
+      }
+      const responseDetails = await response.json().catch(() => null) as { error?: string } | null
+      lastError = new Error(responseDetails?.error || `Spreadsheet request failed (${response.status})`)
       if (response.status < 500 && response.status !== 429) break
     } catch (cause) {
       if (signal?.aborted) throw cause
       lastError = cause
     }
-    if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 350 * (attempt + 1)))
+    if (attempt < 1) {
+      const delay = Math.min(900 * (2 ** attempt) + Math.random() * 350, 2_500)
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
   }
   throw lastError instanceof Error ? lastError : new Error('Spreadsheet request failed.')
 }
@@ -374,7 +406,7 @@ export async function fetchAllSheets(signal?: AbortSignal, sheets: SheetDefiniti
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(3, sheets.length) }, worker))
+  await Promise.all(Array.from({ length: Math.min(2, sheets.length) }, worker))
   return results
 }
 

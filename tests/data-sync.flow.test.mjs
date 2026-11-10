@@ -37,6 +37,15 @@ const spreadsheet = {
 let mockedExternalRequests = 0
 const originalFetch = globalThis.fetch
 
+function readValuesRange(range) {
+  const [sheetRef, a1Range] = range.split('!')
+  const title = sheetRef?.replaceAll("'", '').replaceAll("''", "'") ?? ''
+  const rows = title === 'Sweetie App Data' ? appRows : salesRows
+  const match = /^A(\d+):[A-Z]+(\d+)$/i.exec(a1Range ?? '')
+  if (!match) throw new Error(`Unexpected batchGet range: ${range}`)
+  return rows.slice(Number(match[1]) - 1, Number(match[2])).map((row) => [...row])
+}
+
 globalThis.fetch = async (input, options = {}) => {
   mockedExternalRequests += 1
   const url = new URL(String(input))
@@ -45,6 +54,10 @@ globalThis.fetch = async (input, options = {}) => {
   }
   assert.equal(url.hostname, 'sheets.googleapis.com', 'only mocked Sheets API calls are allowed')
   if (url.pathname.endsWith('/spreadsheets/synthetic-spreadsheet')) return Response.json(spreadsheet)
+  if (url.pathname.endsWith('/values:batchGet')) {
+    const ranges = url.searchParams.getAll('ranges')
+    return Response.json({ valueRanges: ranges.map((range) => ({ range, values: readValuesRange(range) })) })
+  }
   if (url.pathname.includes('/values/')) {
     const range = decodeURIComponent(url.pathname.split('/values/')[1] ?? '')
     return Response.json({ values: range.includes('Sweetie App Data') ? appRows : salesRows })
