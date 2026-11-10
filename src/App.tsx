@@ -845,6 +845,7 @@ function OrderListRow({ order, sheet, compact = false }: { order: SheetOrder; sh
       {!compact && order.lines.length > 0 && <ul className="order-item-list" aria-label={t('detail.items')}>
         {order.lines.map((line, index) => {
           const itemName = line.itemName || t('detail.itemNumber', { number: index + 1 })
+          const unitProfit = line.profitAmount === null ? null : line.profitAmount / Math.max(1, line.quantity)
           return <li className="order-item" key={`${order.id}-${line.row || index}`}>
             <button type="button" className="order-item-photo image-preview-trigger" aria-label={`${t('detail.previewImage')}: ${itemName}`} onClick={() => setPreviewImage({ src: line.images[0], alt: itemName })}>
               <ProductImage src={line.images[0]} alt="" />
@@ -852,6 +853,7 @@ function OrderListRow({ order, sheet, compact = false }: { order: SheetOrder; sh
             <button type="button" className="order-item-text" onClick={openOrder}>
               <strong>{itemName}</strong>
               <small>{t('detail.quantity', { count: line.quantity, unit: line.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</small>
+              <small className="order-item-profit">{t('detail.itemProfitPerUnit')} {unitProfit === null ? '—' : `${unitProfit > 0 ? '+' : ''}${formatMoney(unitProfit, language)} THB`}</small>
             </button>
             <button type="button" className="order-item-price" onClick={openOrder}>{formatMoney(line.salePrice, language)} THB</button>
           </li>
@@ -1417,6 +1419,7 @@ function SheetOrdersPage({
 
       <div className="screen-surface has-dock">
         <div className="surface-scroll overscroll-y-contain" ref={scrollRootRef}>
+          <div className="sheet-context-heading display">{sheetTitle(sheet, t)}</div>
           <PullToRefreshIndicator distance={pullDistance} refreshing={loading} />
           {searchOpen && <div className="search-panel">
             <label className="search-field">
@@ -1547,6 +1550,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
         actions={<button type="button" className="icon-button" onClick={() => setEditOpen(true)} aria-label={t('orders.edit')}><Pencil size={21} strokeWidth={2.4} /></button>}
       />
       <div className="detail-scroll">
+        <div className="sheet-context-heading detail-sheet-context display">{sheetTitle(sheet, t)}</div>
         <div className="detail-hero">
           <span className="detail-hero-avatar" aria-label={t('detail.customer')}><LineAvatar lineName={order.lineName || order.customerName} lineUserId={order.lineUserId} size={52} /></span>
           <div className="detail-hero-bottom">

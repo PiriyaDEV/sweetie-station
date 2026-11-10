@@ -18,17 +18,18 @@ export function Sparkle({ className = '', size = 28 }: { className?: string; siz
 }
 
 /** Compact app-brand header with optional back navigation and page actions. */
-export function ScreenHeader({ onBack, backLabel, actions, children }: {
+export function ScreenHeader({ onBack, backLabel, actions, subtitle, children }: {
   onBack?: () => void
   backLabel?: string
   actions?: ReactNode
+  subtitle?: ReactNode
   children?: ReactNode
 }) {
   return (
     <header className="screen-header">
       <div className="screen-header-row">
         {onBack && <button type="button" className="icon-button screen-back" onClick={onBack} aria-label={backLabel}><ChevronLeft size={24} strokeWidth={2.4} /></button>}
-        <div className="screen-heading"><h1 className="screen-title display">Sweetie</h1></div>
+        <div className="screen-heading"><h1 className="screen-title display">Sweetie</h1>{subtitle && <p className="screen-context">{subtitle}</p>}</div>
         {actions && <div className="screen-header-actions">{actions}</div>}
       </div>
       {children}

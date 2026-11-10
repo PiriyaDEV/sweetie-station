@@ -160,7 +160,8 @@ img { max-width: 100%; }
 /* Compact Instagram-style app header */
 .screen-header { flex: none; border-bottom: 1px solid rgb(245 217 229 / 70%); padding: max(10px, env(safe-area-inset-top)) var(--gutter) 8px; background: var(--white); color: var(--ink); }
 .screen-header-row { display: flex; align-items: center; gap: 8px; min-height: 44px; }
-.screen-heading { flex: 1; min-width: 0; }
+.screen-heading { display: grid; flex: 1; min-width: 0; gap: 2px; }
+.screen-context { margin: 0; overflow: hidden; color: var(--muted); font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .screen-title { margin: 0; overflow: hidden; color: var(--pink); font-size: 25px; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
 :lang(th) .screen-title { font-size: 25px; }
 .screen-header-actions { display: flex; flex: none; align-items: center; gap: 2px; }
@@ -175,6 +176,9 @@ img { max-width: 100%; }
 .screen-surface { position: relative; display: flex; flex: 1; min-height: 0; flex-direction: column; margin-top: 0; border-radius: 0; background: var(--white); box-shadow: none; }
 .surface-scroll { display: flex; flex: 1; min-height: 0; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; padding: 20px var(--gutter) 28px; scrollbar-width: none; }
 .surface-scroll::-webkit-scrollbar { display: none; }
+.sheet-context-heading { margin: 0 0 12px; color: var(--ink); font-size: 20px; line-height: 1.15; overflow-wrap: anywhere; }
+:lang(th) .sheet-context-heading { font-size: 19px; font-weight: 700; }
+.detail-sheet-context { margin: 0; padding: 10px var(--gutter) 12px; background: var(--white); }
 .has-dock .surface-scroll { padding-bottom: 100px; }
 
 /* Primary call-to-action */
@@ -699,6 +703,7 @@ button.stat-tile svg { position: absolute; top: 11px; right: 10px; color: var(--
 .order-item-text { display: grid; min-width: 0; gap: 1px; }
 .order-item-text strong { overflow: hidden; font-size: 13.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .order-item-text small { color: var(--muted); font-size: 11.5px; }
+.order-item-text .order-item-profit { color: rgb(58 154 74 / 68%); font-size: 11.5px; font-weight: 600; }
 .order-item-price { color: var(--pink-ink) !important; font-size: 13px; font-weight: 700; white-space: nowrap; }
 .order-card.compact .order-card-head { grid-template-columns: 40px minmax(0, 1fr) auto; padding: 10px 12px; }
 .order-card.compact .order-avatar { width: 40px; height: 40px; border-width: 2px; }
