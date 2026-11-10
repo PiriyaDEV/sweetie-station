@@ -20,13 +20,19 @@ const salesRows = [
   ['8', 'Synthetic Line', 'Synthetic Existing Customer', 'Existing Item', '1', '80', '0', '80', '20', '60', '12', '=SUM(F2:G2)'],
 ]
 const appRows = []
-const sheetRows = new Map([['42', salesRows], ['77', appRows]])
+const lineUserId = 'Ucedef3933c7567fbbb8ffbf379e3ee1e'
+const lineContactRows = [
+  ['lineUserId', 'displayName', 'pictureUrl', 'updatedAt'],
+  [lineUserId, 'pound', 'https://example.invalid/pound.jpg', '1794253810793'],
+]
+const sheetRows = new Map([['42', salesRows], ['77', appRows], ['99', lineContactRows]])
 const spreadsheet = {
   spreadsheetId: 'direct-test-spreadsheet',
   properties: { title: 'Synthetic Direct Write Workbook' },
   sheets: [
-    { properties: { sheetId: 42, title: 'Synthetic Orders', gridProperties: { rowCount: 100, columnCount: 11 } } },
+    { properties: { sheetId: 42, title: 'Synthetic Orders', gridProperties: { rowCount: 100, columnCount: 12 } } },
     { properties: { sheetId: 77, title: 'Sweetie App Data', gridProperties: { rowCount: 1000, columnCount: 7 } } },
+    { properties: { sheetId: 99, title: 'LINE Contacts', gridProperties: { rowCount: 1000, columnCount: 4 } } },
   ],
 }
 const originalFetch = globalThis.fetch
@@ -98,6 +104,11 @@ globalThis.fetch = async (input, options = {}) => {
         sheetRows.set(String(sheetId), [])
         replies.push({ addSheet: { properties: { sheetId, title: props.title } } })
       }
+      const updatedProperties = request.updateSheetProperties?.properties
+      if (updatedProperties) {
+        const target = spreadsheet.sheets.find(({ properties }) => properties.sheetId === updatedProperties.sheetId)?.properties
+        if (target) Object.assign(target, updatedProperties)
+      }
       const insertion = request.insertDimension?.range
       if (insertion) {
         const rows = sheetRows.get(String(insertion.sheetId))
@@ -155,25 +166,29 @@ globalThis.fetch = async (input, options = {}) => {
 
 test('create/update orders, persist image cells, create a real tab', async () => {
   try {
-    const [{ default: ordersHandler }, { default: sheetsHandler }, { createSessionToken }] = await Promise.all([
+    const [{ default: ordersHandler }, { default: sheetsHandler }, { default: lineContactsHandler }, { createSessionToken }] = await Promise.all([
       import('../netlify/functions/orders.mjs'),
       import('../netlify/functions/sheets.mjs'),
+      import('../netlify/functions/line-contacts.mjs'),
       import('../netlify/lib/session.mjs'),
     ])
     const cookie = `sweetie_session=${createSessionToken('qa-admin', process.env.SWEETIE_SESSION_SECRET)}`
     const image = 'data:image/webp;base64,U1lOVEhFVElD'
+    const contactsResponse = await lineContactsHandler(new Request('https://synthetic.local/api/line-contacts', { headers: { cookie } }))
+    assert.equal(contactsResponse.status, 200)
+    assert.deepEqual((await contactsResponse.json()).contacts.map(({ lineUserId, displayName }) => ({ lineUserId, displayName })), [{ lineUserId, displayName: 'pound' }], 'order contact choices must come from LINE Contacts with LINE user IDs intact')
     const readPageRequest = () => sheetsHandler(new Request('https://synthetic.local/api/sheets?gid=42&offset=0&limit=120', { headers: { cookie } }))
     const firstPage = await readPageRequest()
     assert.equal(firstPage.status, 200)
     assert.match(await firstPage.text(), /Synthetic Existing Customer/)
-    assert.deepEqual(requestedPageRanges.at(-1), ["'Synthetic Orders'!A1:K1", "'Synthetic Orders'!A2:K121"], 'Google Sheets reads should fetch only the header and requested page')
+    assert.deepEqual(requestedPageRanges.at(-1), ["'Synthetic Orders'!A1:L1", "'Synthetic Orders'!A2:L121"], 'Google Sheets reads should fetch only the header and requested page')
     const readsBeforeCacheHit = requestedPageRanges.length
     const cachedPage = await readPageRequest()
     assert.equal(cachedPage.status, 200)
     assert.equal(requestedPageRanges.length, readsBeforeCacheHit, 'repeated page requests should use the short-lived page cache')
 
     const order = {
-      id: 'qa-order-direct-1', sheetRow: 0, day: '2026-11-09', lineName: 'Synthetic Direct Line',
+      id: 'qa-order-direct-1', sheetRow: 0, day: '2026-11-09', lineName: 'pound', lineUserId,
       customerName: 'Synthetic Direct Customer', paymentStatus: 'ยังไม่ได้ชำระ', shippingStatus: 'ยังไม่ได้สั่ง',
       lines: [
         { row: 0, itemName: 'Synthetic First Item', quantity: 2, salePrice: 100, bankAmount: 20, depositAmount: 80, profitAmount: 30, costTHB: 70, costRMB: 14, images: [image], attributes: [] },
@@ -198,10 +213,17 @@ test('create/update orders, persist image cells, create a real tab', async () =>
     salesRows[2][formulaColumn] = '=SUM(F3:G3)'
     assert.equal(salesRows[2][orderIdColumn], 'qa-order-direct-1')
     assert.equal(salesRows[2][imageColumn], JSON.stringify([image]))
+    assert.equal(salesRows[2][headers.indexOf('Sweetie LINE User ID')], lineUserId, 'the selected LINE contact ID must be saved on the order')
+    assert.equal(salesRows[3][headers.indexOf('Sweetie LINE User ID')], '', 'contact ID is stored once per order, not copied to item rows')
     assert.equal(salesRows[2][headers.indexOf('Sweetie Campaign Discount')], 10)
     assert.equal(salesRows[2][headers.indexOf('Sweetie Payment Status')], 'ยังไม่ได้ชำระ')
     assert.equal(salesRows[2][headers.indexOf('Sweetie Shipping Status')], 'ยังไม่ได้สั่ง')
     assert.equal(salesRows[3][headers.indexOf('รายการ')], 'Synthetic Second Item')
+
+    const savedPage = await readPageRequest()
+    const savedCsv = await savedPage.text()
+    assert.match(savedCsv, /Sweetie LINE User ID/, 'saved order data must expose the LINE ID column again when read')
+    assert.match(savedCsv, new RegExp(lineUserId), 'saved order data must return the same LINE user ID')
 
     const retryResponse = await postOrder({ gid: '42', order })
     assert.equal(retryResponse.status, 201)
@@ -224,6 +246,7 @@ test('create/update orders, persist image cells, create a real tab', async () =>
     assert.equal(salesRows[2][headers.indexOf('Sweetie Shipping Status')], 'รอเข้าไทย')
     assert.equal(salesRows[4][headers.indexOf('รายการ')], 'Synthetic Added Item')
     assert.equal(salesRows[4][orderIdColumn], 'qa-order-direct-1')
+    assert.equal(salesRows[2][headers.indexOf('Sweetie LINE User ID')], lineUserId, 'editing an order must preserve its LINE user ID')
     assert.equal(salesRows[2][formulaColumn], '=SUM(F3:G3)', 'updating known order cells must preserve unrelated formulas')
 
     const shortenedOrder = structuredClone(updatedOrder)
