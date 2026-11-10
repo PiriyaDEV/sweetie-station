@@ -17,10 +17,8 @@ export function Sparkle({ className = '', size = 28 }: { className?: string; siz
   )
 }
 
-/** Pink header band with an underlined display title, optional back button and icon actions. */
-export function ScreenHeader({ title, kicker, onBack, backLabel, actions, children }: {
-  title: ReactNode
-  kicker?: ReactNode
+/** Compact app-brand header with optional back navigation and page actions. */
+export function ScreenHeader({ onBack, backLabel, actions, children }: {
   onBack?: () => void
   backLabel?: string
   actions?: ReactNode
@@ -29,11 +27,8 @@ export function ScreenHeader({ title, kicker, onBack, backLabel, actions, childr
   return (
     <header className="screen-header">
       <div className="screen-header-row">
-        {onBack && <button type="button" className="icon-button screen-back" onClick={onBack} aria-label={backLabel}><ChevronLeft size={26} strokeWidth={2.4} /></button>}
-        <div className="screen-heading">
-          {kicker && <p className="screen-kicker">{kicker}</p>}
-          <h1 className="screen-title display">{title}</h1>
-        </div>
+        {onBack && <button type="button" className="icon-button screen-back" onClick={onBack} aria-label={backLabel}><ChevronLeft size={24} strokeWidth={2.4} /></button>}
+        <div className="screen-heading"><h1 className="screen-title display">Sweetie</h1></div>
         {actions && <div className="screen-header-actions">{actions}</div>}
       </div>
       {children}

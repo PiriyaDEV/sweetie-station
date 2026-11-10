@@ -1,6 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type InputHTMLAttributes } from 'react'
 import {
-  ArrowLeft,
   CalendarDays,
   Check,
   ChevronDown,
@@ -35,7 +34,7 @@ import { LineAvatar, LineContactsProvider, LineNameField } from './lineContacts'
 import { BottomNavigation, ImagePreviewDialog, ProductImage, ScreenHeader, SkeletonLine, Sparkle, StatusBadge } from './ui/components'
 import { Dropdown } from './ui/Dropdown'
 import { useDialogAccessibility } from './ui/hooks'
-import { orderMatchesStatus, paymentBadgeClass, paymentStatusLabel, shippingBadgeClass, shippingStatusLabel, statusFilterLabel, STATUS_FILTERS } from './ui/status'
+import { orderMatchesStatus, paymentBadgeClass, paymentStatusLabel, shippingBadgeClass, shippingStatusLabel, statusFilterEmoji, statusFilterLabel, STATUS_FILTERS } from './ui/status'
 
 const AnalyticsChart = lazy(() => import('./AnalyticsChart'))
 const salesCategoryImage = new URL('./assets/0065ab6781eed4ec716c07294dbb3933.PNG', import.meta.url).href
@@ -402,7 +401,7 @@ function SettingsPage({ onExportBackup, backupLoading, backupMessage, onExportDa
 
   return (
     <section className="app-screen settings-screen" aria-label={t('settings.title')}>
-      <ScreenHeader kicker={t('settings.kicker')} title={t('settings.title')} />
+      <ScreenHeader />
       <div className="screen-surface">
         <div className="surface-scroll">
           <div className="settings-brand"><img src={sweetieLogo} alt="" /><div><strong>Sweetie Station</strong><span>{t('settings.subtitle')}</span></div></div>
@@ -719,8 +718,6 @@ function HomePage({
   return (
     <section className="app-screen home-screen sheets-home-screen" aria-label={t('screen.home')}>
       <ScreenHeader
-        kicker={t('sheets.kicker')}
-        title={t('sheets.title')}
         actions={<>
           <button type="button" className={`icon-button${sheetControlsOpen ? ' is-active' : ''}`} aria-expanded={sheetControlsOpen} aria-controls="sheet-list-controls" aria-label={t(sheetControlsOpen ? 'sheets.hideControls' : 'sheets.showControls')} onClick={() => setSheetControlsOpen((open) => !open)}>
             {sheetControlsOpen ? <X size={24} /> : <Search size={24} />}
@@ -1408,8 +1405,6 @@ function SheetOrdersPage({
   return (
     <section className="app-screen orders-screen" aria-label={t('screen.sheetOrders')}>
       <ScreenHeader
-        kicker={`${t(`sheets.kind.${sheet.kind}`)} · ${t('sheets.orderCount', { count: orders.length })}`}
-        title={sheetTitle(sheet, t)}
         onBack={cameFromHome ? () => navigate(-1) : undefined}
         backLabel={t('nav.backToSheets')}
         actions={<>
@@ -1441,7 +1436,7 @@ function SheetOrdersPage({
 
           <div className="orders-toolbar">
             <div className="pill-row" role="group" aria-label={t('filters.status')}>
-              {STATUS_FILTERS.map((filter) => <button type="button" className="pill" key={filter} aria-pressed={statusFilter === filter} onClick={() => updateStatus(filter)}>{statusFilterLabel(filter, t)}<span className="pill-count">{orders.filter((order) => orderMatchesStatus(order, filter)).length}</span></button>)}
+              {STATUS_FILTERS.map((filter) => <button type="button" className="pill" key={filter} aria-pressed={statusFilter === filter} onClick={() => updateStatus(filter)}><span aria-hidden="true">{statusFilterEmoji(filter)}</span>{statusFilterLabel(filter, t)}<span className="pill-count">{orders.filter((order) => orderMatchesStatus(order, filter)).length}</span></button>)}
             </div>
           </div>
           <div className="order-list-meta">
@@ -1498,9 +1493,9 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
   }, [sheetData?.orders, t])
   const needsOrderPage = !order && Boolean(sheetData?.hasMore) && !sheetData?.loadingMore && !sheetData?.loadMoreError
   useEffect(() => { if (needsOrderPage) onLoadMoreData(sheet.id) }, [needsOrderPage, onLoadMoreData, sheet.id])
-  if (loading && !sheetData) return <section className="app-screen detail-screen" aria-busy="true" aria-label={t('sheet.loading')}><div className="detail-scroll p-5"><SkeletonLine className="mb-5 h-36 w-full rounded-3xl" /><div className="grid gap-3"><SkeletonLine className="h-16 w-full rounded-2xl" /><SkeletonLine className="h-24 w-full rounded-2xl" /><SkeletonLine className="h-40 w-full rounded-2xl" /></div></div></section>
-  if (sheetData?.error) return <section className="app-screen detail-screen"><div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div></section>
-  if (!order && sheetData?.hasMore) return <section className="app-screen detail-screen" aria-busy="true" aria-label={t('sheet.loadingMoreData')}><div className="detail-scroll p-5"><SkeletonLine className="mb-5 h-36 w-full rounded-3xl" /><div className="grid gap-3"><SkeletonLine className="h-16 w-full rounded-2xl" /><SkeletonLine className="h-24 w-full rounded-2xl" /></div>{sheetData.loadMoreError && <div className="sheet-error" role="alert">{t('sheet.loadMoreError')} <button type="button" onClick={() => onLoadMoreData(sheet.id)}>{t('sheet.retry')}</button></div>}</div></section>
+  if (loading && !sheetData) return <section className="app-screen detail-screen" aria-busy="true" aria-label={t('sheet.loading')}><ScreenHeader /><div className="detail-scroll p-5"><SkeletonLine className="mb-5 h-36 w-full rounded-3xl" /><div className="grid gap-3"><SkeletonLine className="h-16 w-full rounded-2xl" /><SkeletonLine className="h-24 w-full rounded-2xl" /><SkeletonLine className="h-40 w-full rounded-2xl" /></div></div></section>
+  if (sheetData?.error) return <section className="app-screen detail-screen"><ScreenHeader onBack={() => navigate(`/admin/sheets/${sheet.id}`)} backLabel={t('nav.backToOrders')} /><div className="detail-scroll"><div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div></div></section>
+  if (!order && sheetData?.hasMore) return <section className="app-screen detail-screen" aria-busy="true" aria-label={t('sheet.loadingMoreData')}><ScreenHeader onBack={() => navigate(`/admin/sheets/${sheet.id}`)} backLabel={t('nav.backToOrders')} /><div className="detail-scroll p-5"><SkeletonLine className="mb-5 h-36 w-full rounded-3xl" /><div className="grid gap-3"><SkeletonLine className="h-16 w-full rounded-2xl" /><SkeletonLine className="h-24 w-full rounded-2xl" /></div>{sheetData.loadMoreError && <div className="sheet-error" role="alert">{t('sheet.loadMoreError')} <button type="button" onClick={() => onLoadMoreData(sheet.id)}>{t('sheet.retry')}</button></div>}</div></section>
   if (!order) return <Navigate to={`/admin/sheets/${sheet.id}`} replace />
 
   const grossSales = order.grossSales ?? order.lines.reduce((sum, line) => sum + line.salePrice, 0)
@@ -1546,14 +1541,14 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
 
   return (
     <section className="app-screen detail-screen" aria-label={t('screen.detail')}>
+      <ScreenHeader
+        onBack={() => navigate(`/admin/sheets/${sheet.id}`)}
+        backLabel={t('nav.backToOrders')}
+        actions={<button type="button" className="icon-button" onClick={() => setEditOpen(true)} aria-label={t('orders.edit')}><Pencil size={21} strokeWidth={2.4} /></button>}
+      />
       <div className="detail-scroll">
         <div className="detail-hero">
           <span className="detail-hero-avatar" aria-label={t('detail.customer')}><LineAvatar lineName={order.lineName || order.customerName} lineUserId={order.lineUserId} size={52} /></span>
-          <div className="detail-hero-top">
-            <button type="button" className="icon-button" onClick={() => navigate(`/admin/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ArrowLeft size={26} strokeWidth={2.4} /></button>
-            <p className="detail-hero-title display">{sheetTitle(sheet, t)}</p>
-            <button type="button" className="icon-button" onClick={() => setEditOpen(true)} aria-label={t('orders.edit')}><Pencil size={21} strokeWidth={2.4} /></button>
-          </div>
           <div className="detail-hero-bottom">
             <p className="detail-hero-price display">{formatMoney(netSales, language)}<small>THB</small></p>
             <span className={`rating-pill${profitTone}`}>
@@ -1665,7 +1660,7 @@ function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: str
 
   return (
     <section className="app-screen admin-login-screen" aria-label={t('auth.title')}>
-      <ScreenHeader kicker={t('auth.kicker')} title={t('auth.signIn')} />
+      <ScreenHeader />
       <div className="screen-surface login-surface">
         <div className="surface-scroll">
           <img className="login-logo" src={sweetieLogo} alt={t('splash.logoAlt')} />
@@ -1781,8 +1776,6 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
   return (
     <section className="app-screen analytics-screen" aria-label={t('screen.analytics')}>
       <ScreenHeader
-        kicker={`${t('sheets.kind.sales')} · ${sheetTitle(currentSheet, t)}`}
-        title={t('analytics.title')}
         actions={loading || analyticsDataLoading ? <span className="icon-button" role="status" aria-label={t('sheet.loadingShort')}><LoaderCircle size={22} className="animate-spin" /></span> : undefined}
       />
       <div className="screen-surface">
@@ -1792,7 +1785,7 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
           {salesSheets.map((sheet) => <option key={sheet.id} value={sheet.id}>{sheetTitle(sheet, t)} · {sheet.year}</option>)}
         </Dropdown>
         <div className="pill-row mb-4" role="group" aria-label={t('filters.status')}>
-          {STATUS_FILTERS.map((filter) => <button type="button" className="pill" key={filter} aria-pressed={statusFilter === filter} onClick={() => setStatusFilter(filter)}>{statusFilterLabel(filter, t)}<span className="pill-count">{currentOrders.filter((order) => orderMatchesStatus(order, filter)).length}</span></button>)}
+          {STATUS_FILTERS.map((filter) => <button type="button" className="pill" key={filter} aria-pressed={statusFilter === filter} onClick={() => setStatusFilter(filter)}><span aria-hidden="true">{statusFilterEmoji(filter)}</span>{statusFilterLabel(filter, t)}<span className="pill-count">{currentOrders.filter((order) => orderMatchesStatus(order, filter)).length}</span></button>)}
         </div>
         {loading || analyticsDataLoading ? <div className="metric-grid" aria-busy="true" aria-label={t('sheet.loading')}>
           {Array.from({ length: 4 }, (_, index) => <div className="grid min-h-[96px] content-center gap-3 rounded-3xl bg-mist p-4" key={index} aria-hidden="true"><SkeletonLine className="h-3 w-2/5" /><SkeletonLine className="h-6 w-3/4" /><SkeletonLine className="h-2.5 w-1/2" /></div>)}

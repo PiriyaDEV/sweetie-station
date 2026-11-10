@@ -37,6 +37,21 @@ export function shippingBadgeClass(status: string) {
 // Filter keys used by the Home, Orders and Analytics status filters.
 export const STATUS_FILTERS = ['all', 'unpaid', 'deposit', 'paid', 'not-ordered', 'ordered', 'inbound', 'shipped', 'unlisted'] as const
 
+export function statusFilterEmoji(filter: string) {
+  const emojis: Record<string, string> = {
+    all: '📋',
+    paid: '✅',
+    unpaid: '⏳',
+    deposit: '💰',
+    shipped: '📦',
+    'not-ordered': '⏳',
+    ordered: '🛍️',
+    inbound: '🚢',
+    unlisted: '❔',
+  }
+  return emojis[filter] ?? '📋'
+}
+
 export function statusFilterLabel(filter: string, t: Translate) {
   const keys: Record<string, string> = {
     all: 'filters.allStatuses',
