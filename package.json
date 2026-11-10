@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "dev:vite": "vite",
+    "dev:mock": "MOCK_API=1 vite --port 5199",
     "test:flows": "node --test tests/*.test.mjs"
   },
   "dependencies": {
