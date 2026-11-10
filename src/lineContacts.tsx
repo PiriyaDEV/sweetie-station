@@ -45,7 +45,8 @@ export function LineAvatar({ lineName, size }: { lineName: string; size: number 
   return <UserRound size={size} />
 }
 
-export function LineNameField({ value, onChange, onPick, placeholder, newLabel }: {
+export function LineNameField({ id, value, onChange, onPick, placeholder, newLabel }: {
+  id: string
   value: string
   onChange: (value: string) => void
   onPick: (contact: LineContact) => void
@@ -65,6 +66,7 @@ export function LineNameField({ value, onChange, onPick, placeholder, newLabel }
   return (
     <div className="line-picker">
       <input
+        id={id}
         value={value}
         placeholder={placeholder}
         autoComplete="off"

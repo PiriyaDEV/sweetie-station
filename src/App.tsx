@@ -155,45 +155,74 @@ function usePullToRefresh(rootRef: { current: HTMLDivElement | null }, refreshin
       resetPull()
       if (shouldRefresh) onRefresh()
     }
-    const onPointerDown = (event: PointerEvent) => {
-      if (event.pointerType !== 'mouse' || refreshing || root.scrollTop > 0) return
-      startY = event.clientY
-      try { root.setPointerCapture(event.pointerId) } catch { /* Pointer capture is optional. */ }
-    }
-    const onPointerMove = (event: PointerEvent) => {
-      if (event.pointerType !== 'mouse' || startY === null || refreshing || event.buttons === 0) return
-      const delta = event.clientY - startY
-      if (delta <= 0 || root.scrollTop > 0) {
-        resetPull()
-        return
-      }
-      event.preventDefault()
-      const nextDistance = Math.min(88, delta * 0.55)
-      distanceRef.current = nextDistance
-      setPullDistance(nextDistance)
-    }
-
     root.addEventListener('touchstart', onTouchStart, { passive: true })
     root.addEventListener('touchmove', onTouchMove, { passive: false })
     root.addEventListener('touchend', onTouchEnd)
     root.addEventListener('touchcancel', onTouchEnd)
-    root.addEventListener('pointerdown', onPointerDown)
-    root.addEventListener('pointermove', onPointerMove, { passive: false })
-    root.addEventListener('pointerup', onTouchEnd)
-    root.addEventListener('pointercancel', onTouchEnd)
     return () => {
       root.removeEventListener('touchstart', onTouchStart)
       root.removeEventListener('touchmove', onTouchMove)
       root.removeEventListener('touchend', onTouchEnd)
       root.removeEventListener('touchcancel', onTouchEnd)
-      root.removeEventListener('pointerdown', onPointerDown)
-      root.removeEventListener('pointermove', onPointerMove)
-      root.removeEventListener('pointerup', onTouchEnd)
-      root.removeEventListener('pointercancel', onTouchEnd)
     }
   }, [onRefresh, refreshing, rootRef])
 
   return pullDistance
+}
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const media = window.matchMedia(query)
+    const update = () => setMatches(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [query])
+  return matches
+}
+
+function useDialogAccessibility(dialogRef: { current: HTMLElement | null }, onEscape: () => void) {
+  const onEscapeRef = useRef(onEscape)
+  useEffect(() => { onEscapeRef.current = onEscape }, [onEscape])
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const initialFocus = dialog.querySelector<HTMLElement>('[data-dialog-initial-focus]')
+    const focusableSelector = 'a[href],button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])'
+    const visibleFocusableElements = () => [...dialog.querySelectorAll<HTMLElement>(focusableSelector)].filter((element) => !element.closest('[hidden]') && element.getClientRects().length > 0)
+    initialFocus?.focus()
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onEscapeRef.current()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const focusable = visibleFocusableElements()
+      if (focusable.length === 0) {
+        event.preventDefault()
+        dialog.focus()
+        return
+      }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      if (previousFocus?.isConnected) previousFocus.focus()
+    }
+  }, [dialogRef])
 }
 
 function PullToRefreshIndicator({ distance, refreshing }: { distance: number; refreshing: boolean }) {
@@ -448,7 +477,7 @@ function SplashScreen({ showLoading = true }: { showLoading?: boolean }) {
   )
 }
 
-function BottomNavigation() {
+function BottomNavigation({ desktop = false }: { desktop?: boolean }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
@@ -458,7 +487,8 @@ function BottomNavigation() {
   const isOrders = location.pathname === '/admin/orders' || location.pathname.startsWith('/admin/sheets/')
 
   return (
-    <nav className="bottom-nav" aria-label={t('nav.label')}>
+    <nav className={`bottom-nav${desktop ? ' desktop-sidebar' : ''}`} aria-label={t('nav.label')}>
+      <div className="sidebar-brand" aria-hidden="true"><img src={sweetieLogo} alt="" /><span>Sweetie Station</span></div>
       <button type="button" className={`nav-item${isHome ? ' active' : ''}`} aria-label={t('nav.home')} aria-current={isHome ? 'page' : undefined} onClick={() => navigate('/admin/home')}><Home size={20} fill={isHome ? 'currentColor' : 'none'} /><span>{t('nav.home')}</span></button>
       <button type="button" className={`nav-item${isOrders ? ' active' : ''}`} aria-label={t('nav.orders')} aria-current={isOrders ? 'page' : undefined} onClick={() => navigate('/admin/orders')}><ClipboardList size={20} /><span>{t('nav.orders')}</span></button>
       <button type="button" className={`nav-item${isAnalytics ? ' active' : ''}`} aria-label={t('nav.analytics')} aria-current={isAnalytics ? 'page' : undefined} onClick={() => navigate('/admin/analytics')}><BarChart3 size={20} /><span>{t('nav.analytics')}</span></button>
@@ -572,6 +602,14 @@ function CreateSheetDialog({ onClose, onCreate }: {
   const [year, setYear] = useState(String(now.getFullYear()))
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
+  const dialogRef = useRef<HTMLElement | null>(null)
+  const initialDraftSnapshot = useRef(JSON.stringify({ name, kind, monthKey, year }))
+  const requestClose = () => {
+    if (creating) return
+    if (JSON.stringify({ name, kind, monthKey, year }) !== initialDraftSnapshot.current && !window.confirm(t('createSheet.discardUnsaved'))) return
+    onClose()
+  }
+  useDialogAccessibility(dialogRef, requestClose)
   const previewName = name.trim() || t('createSheet.namePlaceholder')
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -593,11 +631,11 @@ function CreateSheetDialog({ onClose, onCreate }: {
   }
 
   return (
-    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <section className="create-order-modal create-sheet-modal" role="dialog" aria-modal="true" aria-labelledby="create-sheet-heading">
+    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) requestClose() }}>
+      <section className="create-order-modal create-sheet-modal" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="create-sheet-heading">
         <header className="modal-header">
-          <div><p>{t('sheets.kicker')}</p><h2 id="create-sheet-heading">{t('createSheet.title')}</h2></div>
-          <button type="button" className="modal-close" onClick={onClose} aria-label={t('createSheet.close')} disabled={creating}><X size={20} /></button>
+          <div><p>{t('sheets.kicker')}</p><h2 id="create-sheet-heading" tabIndex={-1}>{t('createSheet.title')}</h2></div>
+          <button type="button" className="modal-close" data-dialog-initial-focus onClick={requestClose} aria-label={t('createSheet.close')} disabled={creating}><X size={20} /></button>
         </header>
         <form className="order-form" onSubmit={submit}>
           <label><span className="field-label">{t('createSheet.name')} <span className="required-star">*</span></span><input value={name} onChange={(event) => { setName(event.target.value); setError('') }} required autoFocus placeholder={t('createSheet.namePlaceholder')} /></label>
@@ -615,7 +653,7 @@ function CreateSheetDialog({ onClose, onCreate }: {
           <p className="local-save-note">{t('createSheet.localOnly')}</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <footer className="modal-actions">
-            <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose} disabled={creating}>{t('createOrder.cancel')}</button>
+            <button type="button" className="cancel-order-button btn btn-ghost" onClick={requestClose} disabled={creating}>{t('createOrder.cancel')}</button>
             <button type="submit" className="save-order-button btn btn-primary" disabled={creating}>{creating ? <LoaderCircle size={16} className="animate-spin" /> : <Check size={16} />} {creating ? t('createSheet.creating') : t('createSheet.create')}</button>
           </footer>
         </form>
@@ -780,7 +818,7 @@ function OrderListRow({ order, sheet }: { order: SheetOrder; sheet: SheetDefinit
       <span className="order-row-photo mock-user-avatar" aria-hidden="true"><LineAvatar lineName={order.lineName} size={22} /></span>
       <span className="order-row-main">
         <span className="order-row-title">{order.customerName || order.lineName}</span>
-        <span className="order-row-subtitle">{order.lineName} · {formatOrderDate(order.day, sheet, language)}</span>
+        <span className="order-row-subtitle">{order.lineName} · {formatOrderDate(order.day, sheet, language)} · {t('orders.itemCount', { count: order.quantity })}</span>
         <span className="order-row-badges">
           <StatusBadge type="payment" status={order.paymentStatus} />
           <StatusBadge type="shipping" status={order.shippingStatus} />
@@ -916,6 +954,7 @@ function CreateOrderDialog({
   const { t, i18n } = useTranslation()
   const language = i18n.resolvedLanguage ?? 'en'
   const [draft, setDraft] = useState(() => initialOrder ? draftFromOrder(initialOrder, defaultExchangeRate, sheet) : emptyDraft(sheet, defaultExchangeRate))
+  const initialDraftSnapshot = useRef(JSON.stringify(draft))
   const [openPicker, setOpenPicker] = useState<number | null>(null)
   const [imageQuery, setImageQuery] = useState('')
   const [imageError, setImageError] = useState('')
@@ -923,6 +962,7 @@ function CreateOrderDialog({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [currentStep, setCurrentStep] = useState(0)
+  const dialogRef = useRef<HTMLElement | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const exchangeRate = Number(draft.exchangeRate) || defaultExchangeRate
   const grossSales = draft.lines.reduce((sum, line) => sum + (Number(line.salePrice) || 0), 0)
@@ -960,6 +1000,12 @@ function CreateOrderDialog({
   }
 
   const filteredImages = imageChoices.filter((choice) => `${choice.label} ${choice.itemName}`.toLocaleLowerCase().includes(imageQuery.toLocaleLowerCase()))
+  const requestClose = () => {
+    if (saving) return
+    if (JSON.stringify(draft) !== initialDraftSnapshot.current && !window.confirm(t('createOrder.discardUnsaved'))) return
+    onClose()
+  }
+  useDialogAccessibility(dialogRef, requestClose)
 
   const validateCurrentStep = () => {
     const activePanel = formRef.current?.querySelector<HTMLElement>(`[data-order-step="${currentStep}"]`)
@@ -1001,14 +1047,14 @@ function CreateOrderDialog({
   }
 
   return (
-    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <section className="create-order-modal" role="dialog" aria-modal="true" aria-labelledby="create-order-heading">
+    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) requestClose() }}>
+      <section className="create-order-modal" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="create-order-heading">
         <header className="modal-header">
           <div>
             <p>{sheetTitle(sheet, t)}</p>
-            <h2 id="create-order-heading">{t(initialOrder ? 'createOrder.editTitle' : 'createOrder.title')}</h2>
+            <h2 id="create-order-heading" tabIndex={-1}>{t(initialOrder ? 'createOrder.editTitle' : 'createOrder.title')}</h2>
           </div>
-          <button type="button" className="modal-close" onClick={onClose} aria-label={t('createOrder.close')}><X size={20} /></button>
+          <button type="button" className="modal-close" data-dialog-initial-focus onClick={requestClose} aria-label={t('createOrder.close')}><X size={20} /></button>
         </header>
 
         <form className="order-form" ref={formRef} onSubmit={submit}>
@@ -1032,8 +1078,9 @@ function CreateOrderDialog({
           <div className="form-section-heading form-section-heading-first"><h3>{t('createOrder.orderInfo')}</h3><span>{t('createOrder.requiredFieldsNote')}</span></div>
           <div className="form-grid two-columns">
             <div>
-              <span className="field-label">{t('detail.lineName')}</span>
+              <label className="field-label" htmlFor="order-line-name">{t('detail.lineName')}</label>
               <LineNameField
+                id="order-line-name"
                 value={draft.lineName}
                 placeholder={t('createOrder.linePlaceholder')}
                 newLabel={(name) => t('createOrder.useNewLine', { name })}
@@ -1139,7 +1186,7 @@ function CreateOrderDialog({
               <small>{t('createOrder.orderDepositDue')}: {formatMoney(orderDepositDue, language)} THB</small>
             </div>
             <div className={`order-step-actions${currentStep === 0 ? ' two-actions' : ''}`}>
-              <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose} disabled={saving}>{t('createOrder.cancel')}</button>
+              <button type="button" className="cancel-order-button btn btn-ghost" onClick={requestClose} disabled={saving}>{t('createOrder.cancel')}</button>
               {currentStep > 0 && <button type="button" className="back-order-button btn btn-ghost" onClick={() => goToStep(currentStep - 1)} disabled={saving}><ChevronLeft size={15} />{t('createOrder.back')}</button>}
               {currentStep < 2
                 ? <button type="button" className="save-order-button btn btn-primary" onClick={goToNextStep} disabled={saving}>{t('createOrder.next')}<ChevronRight size={15} /></button>
@@ -1185,18 +1232,24 @@ function MonthlyExpensesSection({ expenses, onChange }: { expenses: MonthlyExpen
 function MonthlyExpensesDialog({ sheetName, expenses, onClose, onSave }: { sheetName: string; expenses: MonthlyExpense[]; onClose: () => void; onSave: (expenses: MonthlyExpense[]) => void }) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState(() => expenses.map((expense) => ({ ...expense })))
+  const dialogRef = useRef<HTMLElement | null>(null)
   const isDirty = JSON.stringify(draft) !== JSON.stringify(expenses)
+  const requestClose = () => {
+    if (isDirty && !window.confirm(t('expenses.discardUnsaved'))) return
+    onClose()
+  }
+  useDialogAccessibility(dialogRef, requestClose)
 
   return (
-    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget && !isDirty) onClose() }}>
-      <section className="create-order-modal monthly-expenses-modal" role="dialog" aria-modal="true" aria-labelledby="monthly-expenses-heading">
+    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) requestClose() }}>
+      <section className="create-order-modal monthly-expenses-modal" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="monthly-expenses-heading">
         <header className="modal-header">
-          <div><p>{sheetName}</p><h2 id="monthly-expenses-heading">{t('expenses.title')}</h2><small className="modal-subtitle">{t('expenses.savePrompt')}</small></div>
-          <button type="button" className="modal-close" onClick={onClose} aria-label={t('expenses.close')}><X size={20} /></button>
+          <div><p>{sheetName}</p><h2 id="monthly-expenses-heading" tabIndex={-1}>{t('expenses.title')}</h2><small className="modal-subtitle">{t('expenses.savePrompt')}</small></div>
+          <button type="button" className="modal-close" data-dialog-initial-focus onClick={requestClose} aria-label={t('expenses.close')}><X size={20} /></button>
         </header>
         <div className="monthly-expenses-modal-body"><MonthlyExpensesSection expenses={draft} onChange={setDraft} /></div>
         <footer className="modal-actions expense-modal-actions">
-          <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose}>{t('createOrder.cancel')}</button>
+          <button type="button" className="cancel-order-button btn btn-ghost" onClick={requestClose}>{t('createOrder.cancel')}</button>
           <button type="button" className="save-order-button btn btn-primary" onClick={() => { onSave(draft); onClose() }} disabled={!isDirty}><Check size={15} />{t('expenses.save')}</button>
         </footer>
       </section>
@@ -1238,12 +1291,15 @@ function SheetOrdersPage({
   const location = useLocation()
   const cameFromHome = (location.state as { from?: string } | null)?.from === 'home'
   const language = i18n.resolvedLanguage ?? 'en'
+  const isDesktop = useMediaQuery('(min-width: 768px)')
   const scrollRootRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const pullDistance = usePullToRefresh(scrollRootRef, loading, onRefresh)
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
-  const [summaryOpen, setSummaryOpen] = useState(false)
+  const [summaryOpenOverride, setSummaryOpenOverride] = useState<boolean | null>(null)
+  const summaryOpen = summaryOpenOverride ?? isDesktop
+  const [compactList, setCompactList] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
   const [visibleCount, setVisibleCount] = useState(10)
@@ -1295,7 +1351,7 @@ function SheetOrdersPage({
   }, [hasMore, sortedOrders.length, visibleCount, sheetData?.hasMore, sheetData?.loadingMore, sheetData?.loadMoreError, onLoadMoreData, sheet.id])
 
   const toggleSummary = () => {
-    setSummaryOpen((open) => !open)
+    setSummaryOpenOverride(!summaryOpen)
     setSearchOpen(false)
     setFiltersOpen(false)
   }
@@ -1323,15 +1379,15 @@ function SheetOrdersPage({
   }
 
   return (
-    <section className={`app-screen home-screen orders-screen${summaryOpen ? ' summary-open' : ''}`} aria-label={t('screen.sheetOrders')}>
+    <section className={`app-screen home-screen orders-screen${summaryOpen ? ' summary-open' : ''}${compactList ? ' compact-list' : ''}`} aria-label={t('screen.sheetOrders')}>
       <div className="screen-fixed-header orders-fixed-header">
         {cameFromHome && <button type="button" className="screen-back-button" onClick={() => navigate(-1)} aria-label={t('nav.backToSheets')}><ChevronLeft size={18} /> {t('nav.allSheets')}</button>}
         <header className="sales-summary month-summary">
           <p>{t(`sheets.kind.${sheet.kind}`)}</p>
           <div className="month-title-row">
             <h1>{sheetTitle(sheet, t)}</h1>
-            <button type="button" className="month-summary-toggle" aria-label={t(summaryOpen ? 'orders.hideSummary' : 'orders.showSummary')} aria-expanded={summaryOpen} aria-controls="month-summary-content order-tools-content" onClick={toggleSummary}>
-              <ChevronDown size={17} className={summaryOpen ? 'is-open' : ''} />
+            <button type="button" className="month-summary-toggle" aria-label={t(summaryOpen ? 'orders.hideSummary' : 'orders.showSummary')} aria-expanded={summaryOpen} aria-controls="month-summary-content" onClick={toggleSummary}>
+              <ChevronDown size={17} className={summaryOpen ? 'is-open' : ''} /><span className="summary-toggle-label">{t(summaryOpen ? 'orders.hideSummary' : 'orders.showSummary')}</span>
             </button>
           </div>
           {summaryOpen && <div className="month-summary-details" id="month-summary-content">
@@ -1347,9 +1403,10 @@ function SheetOrdersPage({
 
         <div className="order-list-heading">
           <div><h2>{t('orders.title')}</h2><span>{sheetData?.hasMore ? t('orders.resultCountPartial', { shown: visibleOrders.length, total: sortedOrders.length }) : t('orders.resultCount', { shown: visibleOrders.length, total: sortedOrders.length })}</span></div>
+          <button type="button" className="order-view-toggle" aria-pressed={compactList} onClick={() => setCompactList((compact) => !compact)}>{t(compactList ? 'orders.cardView' : 'orders.compactView')}</button>
         </div>
 
-        {summaryOpen && <div className="order-summary-tools" id="order-tools-content">
+        {(summaryOpen || isDesktop) && <div className="order-summary-tools" id="order-tools-content">
         <div className={`search-filter-row${searchOpen ? ' is-search-open' : ' is-search-closed'}`}>
           {searchOpen && <label className="order-search">
             <Search size={16} />
@@ -1682,7 +1739,7 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
         </div> : <>
           <div className="analytics-metrics analytics-primary-metrics">
             <article className="metric-card featured"><span>{statusFilter === 'all' ? t('analytics.thisMonth') : t('analytics.filteredSales')}</span><strong>{formatMoney(sheetTotal(scopedOrders), language)} <small>THB</small></strong></article>
-            <article className="metric-card"><span>{t('analytics.totalProfit')}</span><strong className={scopedProfit.amount === null ? 'profit-unavailable' : scopedProfit.amount < 0 ? 'negative-text' : 'positive-text'}>{scopedProfit.amount === null ? '—' : `${formatMoney(scopedProfit.amount, language)} THB`}</strong><em>{scopedProfit.amount === null ? t('analytics.noPeriodProfit') : scopedProfit.knownLines < scopedProfit.totalLines ? t('analytics.profitCoverage', { known: scopedProfit.knownLines, total: scopedProfit.totalLines }) : statusFilter === 'all' ? t('analytics.currentScopeProfit') : t('analytics.filteredScopeProfit')}</em></article>
+            <article className="metric-card profit-coverage-card"><span>{t('analytics.totalProfit')}</span><strong className={scopedProfit.amount === null ? 'profit-unavailable' : scopedProfit.amount < 0 ? 'negative-text' : 'positive-text'}>{scopedProfit.amount === null ? '—' : `${formatMoney(scopedProfit.amount, language)} THB`}</strong><em>{scopedProfit.amount === null ? t('analytics.noPeriodProfit') : scopedProfit.knownLines < scopedProfit.totalLines ? t('analytics.profitCoverage', { known: scopedProfit.knownLines, total: scopedProfit.totalLines }) : statusFilter === 'all' ? t('analytics.currentScopeProfit') : t('analytics.filteredScopeProfit')}</em>{scopedProfit.totalLines > 0 && <div className="profit-coverage-track" role="meter" aria-label={t('analytics.profitCoverage', { known: scopedProfit.knownLines, total: scopedProfit.totalLines })} aria-valuemin={0} aria-valuemax={scopedProfit.totalLines} aria-valuenow={scopedProfit.knownLines} aria-valuetext={t('analytics.profitCoverage', { known: scopedProfit.knownLines, total: scopedProfit.totalLines })}><span style={{ width: `${Math.round((scopedProfit.knownLines / scopedProfit.totalLines) * 100)}%` }} /></div>}</article>
             <article className={`metric-card trend-card${currentSalesChange === null ? ' unavailable' : currentSalesChange < 0 ? ' negative' : ' positive'}`}>
               <span>{t('analytics.monthlyChange')}</span>
               <strong>{formatSignedPercent(currentSalesChange, language)}</strong>
@@ -2354,6 +2411,7 @@ function App() {
           <Route path="/admin/settings" element={<SettingsPage onExportBackup={exportFullBackup} backupLoading={backupLoading} backupMessage={backupMessage} onLogout={logout} />} />
           <Route path="*" element={<Navigate to="/admin/home" replace />} />
         </Routes>
+        <BottomNavigation desktop />
       </div>
     </main>
     </LineContactsProvider>
