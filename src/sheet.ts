@@ -388,7 +388,7 @@ export async function fetchSheetOrders(sheet: SheetDefinition, signal?: AbortSig
   return orders
 }
 
-export async function fetchAllSheets(signal?: AbortSignal, sheets: SheetDefinition[] = SHEETS): Promise<Record<string, SheetDataState>> {
+export async function fetchAllSheets(signal?: AbortSignal, sheets: SheetDefinition[] = SHEETS, pageSize = 120): Promise<Record<string, SheetDataState>> {
   const results: Record<string, SheetDataState> = {}
   let nextIndex = 0
   const worker = async () => {
@@ -396,7 +396,7 @@ export async function fetchAllSheets(signal?: AbortSignal, sheets: SheetDefiniti
       const sheet = sheets[nextIndex]
       nextIndex += 1
       try {
-        const page = await fetchSheetOrdersPage(sheet, 0, undefined, signal)
+        const page = await fetchSheetOrdersPage(sheet, 0, undefined, signal, pageSize)
         results[sheet.id] = {
           orders: page.orders,
           hasMore: page.hasMore,

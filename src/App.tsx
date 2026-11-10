@@ -92,6 +92,7 @@ const MONTHLY_EXPENSE_REVISIONS_KEY = 'sweetie-monthly-expense-revisions-v1'
 const EXCHANGE_RATE_KEY = 'sweetie-cny-thb-rate-v1'
 const DEFAULT_CNY_TO_THB = 5.02
 const EMPTY_ORDERS: SheetOrder[] = []
+const HOME_SHEET_BATCH_SIZE = 100
 const MONTH_INDEX: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, june: 5, july: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 }
 type ImageChoice = { url: string; label: string; itemName: string; salePrice: number }
 
@@ -733,8 +734,11 @@ function HomePage({
             {Array.from({ length: 4 }, (_, index) => <div className="grid gap-2" key={index} aria-hidden="true"><SkeletonLine className="aspect-square w-full rounded-[28px]" /><SkeletonLine className="h-5 w-3/4" /><SkeletonLine className="h-3 w-1/2" /><SkeletonLine className="h-5 w-2/3" /></div>)}
           </div> : <div className="product-grid">
             {visibleSheets.map(({ sheet, orders, error, profit }) => {
+              const sheetState = dataBySheet[sheet.id]
               const images = getPreviewImages(orders, 3)
               const unpaid = orders.filter((order) => order.paymentStatus === 'ยังไม่ได้ชำระ').length
+              const isSheetIncomplete = Boolean(!error && sheetState?.hasMore && !sheetState.loadMoreError)
+              const orderCountLabel = error ? t('sheet.errorShort') : sheetState?.loadMoreError ? `${t('sheets.partialOrderCount', { count: orders.length })} · ${t('sheets.loadMoreFailed')}` : isSheetIncomplete ? `${t('sheets.partialOrderCount', { count: orders.length })} · ${t('sheets.loadingMore')}` : t('sheets.orderCount', { count: orders.length })
               const profitTone = profit.amount === null ? ' unavailable' : profit.amount < 0 ? ' negative' : ''
               return (
                 <button
@@ -742,7 +746,9 @@ function HomePage({
                   className="product-card"
                   key={sheet.id}
                   onClick={() => navigate(`/admin/sheets/${sheet.id}`, { state: { from: 'home' } })}
+                  disabled={isSheetIncomplete}
                   aria-label={`${sheetTitle(sheet, t)} · ${orders.length} ${t('orders.orders')}`}
+                  aria-busy={isSheetIncomplete}
                 >
                   <span className={`product-media ${sheet.kind}`}>
                     <span className={`product-collage count-${Math.max(1, images.length)}`} aria-hidden="true">{images.length > 0 ? images.map((image, index) => <ProductImage key={`${sheet.id}-${index}`} src={image} alt="" />) : <ProductImage alt="" />}</span>
@@ -752,12 +758,12 @@ function HomePage({
                   </span>
                   <span className="product-title display">{sheetTitle(sheet, t)}</span>
                   <span className="product-meta">
-                    {error ? t('sheet.errorShort') : dataBySheet[sheet.id]?.hasMore ? t('sheets.partialOrderCount', { count: orders.length }) : t('sheets.orderCount', { count: orders.length })}
+                    {orderCountLabel}
                     {unpaid > 0 && <> · <b>{t('sheets.unpaidCount', { count: unpaid })}</b></>}
                   </span>
-                  <span className="product-price display">{error ? '—' : `${formatMoney(sheetTotal(orders), language)} THB`}</span>
-                  <span className={`profit-chip${profitTone}`}>
-                    {t(profit.amount !== null && !profit.complete ? 'sheets.partialProfit' : 'sheets.profit')} {profit.amount === null ? '—' : `${profit.amount > 0 ? '+' : ''}${formatMoney(profit.amount, language)} THB`}
+                  <span className="product-price display">{error ? '—' : isSheetIncomplete ? <SkeletonLine className="h-6 w-28 rounded-md" /> : `${formatMoney(sheetTotal(orders), language)} THB`}</span>
+                  <span className={`profit-chip${isSheetIncomplete ? ' unavailable' : profitTone}`} aria-busy={isSheetIncomplete}>
+                    {isSheetIncomplete ? <SkeletonLine className="h-3 w-32 rounded-full" /> : <>{t(profit.amount !== null && !profit.complete ? 'sheets.partialProfit' : 'sheets.profit')} {profit.amount === null ? '—' : `${profit.amount > 0 ? '+' : ''}${formatMoney(profit.amount, language)} THB`}</>}
                   </span>
                 </button>
               )
@@ -1976,7 +1982,7 @@ function App() {
       return
     }
     const controller = new AbortController()
-    fetchAllSheets(controller.signal, targetSheets)
+    fetchAllSheets(controller.signal, targetSheets, pathname === '/admin/home' ? HOME_SHEET_BATCH_SIZE : 120)
       .then((result) => setDataBySheet((current) => ({ ...current, ...result })))
       .finally(() => {
         if (!controller.signal.aborted) {
@@ -2028,6 +2034,8 @@ function App() {
 
   const activePageLoadsRef = useRef(new Set<string>())
   const analyticsLoadRef = useRef(false)
+  const homeLoadRef = useRef(false)
+  const homeLoadAbortRef = useRef<AbortController | null>(null)
 
   const loadMoreSheetData = useCallback(async (sheetId: string) => {
     const sheet = allSheets.find((item) => item.id === sheetId)
@@ -2059,6 +2067,55 @@ function App() {
       activePageLoadsRef.current.delete(sheetId)
     }
   }, [allSheets, dataBySheet])
+
+  const loadAllHomeSheets = useCallback(async () => {
+    if (homeLoadRef.current) return
+    homeLoadRef.current = true
+    const controller = new AbortController()
+    homeLoadAbortRef.current = controller
+    try {
+      // Load one sheet page at a time (100 source rows per request) to keep API traffic bounded.
+      for (const sheet of allSheets) {
+        if (!sheet.gid || controller.signal.aborted) continue
+        let current = dataBySheet[sheet.id]
+        if (!current || current.error || current.loadMoreError) continue
+        while (current.hasMore && !current.loadMoreError && !controller.signal.aborted) {
+          if (activePageLoadsRef.current.has(sheet.id)) break
+          activePageLoadsRef.current.add(sheet.id)
+          setDataBySheet((previous) => ({ ...previous, [sheet.id]: { ...(previous[sheet.id] ?? current!), loadingMore: true, loadMoreError: undefined } }))
+          try {
+            const page = await fetchSheetOrdersPage(sheet, current.nextOffset ?? 0, current.parserState, controller.signal, HOME_SHEET_BATCH_SIZE)
+            current = {
+              ...current,
+              orders: [...new Map([...current.orders, ...page.orders].map((order) => [order.id, order])).values()],
+              hasMore: page.hasMore,
+              nextOffset: page.nextOffset ?? undefined,
+              parserState: page.parserState,
+              loadingMore: false,
+              loadMoreError: undefined,
+            }
+            setDataBySheet((previous) => ({ ...previous, [sheet.id]: { ...(previous[sheet.id] ?? current!), ...current! } }))
+          } catch (cause) {
+            if (controller.signal.aborted) break
+            const message = cause instanceof Error ? cause.message : 'Could not load more orders.'
+            current = { ...current, loadingMore: false, loadMoreError: message }
+            setDataBySheet((previous) => ({ ...previous, [sheet.id]: { ...(previous[sheet.id] ?? current!), ...current! } }))
+          } finally {
+            activePageLoadsRef.current.delete(sheet.id)
+          }
+        }
+      }
+    } finally {
+      if (homeLoadAbortRef.current === controller) homeLoadAbortRef.current = null
+      homeLoadRef.current = false
+    }
+  }, [allSheets, dataBySheet])
+
+  useEffect(() => {
+    if (!isAdminAuthenticated || location.pathname !== '/admin/home' || loading) return
+    const timer = window.setTimeout(() => { void loadAllHomeSheets() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [isAdminAuthenticated, location.pathname, loading, loadAllHomeSheets])
 
   const loadAllSalesSheets = useCallback(async () => {
     if (analyticsLoadRef.current) return
@@ -2250,6 +2307,9 @@ function App() {
 
   const refresh = useCallback(() => {
     if (refreshInFlightRef.current) return
+    homeLoadAbortRef.current?.abort()
+    homeLoadAbortRef.current = null
+    homeLoadRef.current = false
     const pathname = location.pathname
     const selectedSheetId = pathname.startsWith('/admin/sheets/') ? pathname.split('/')[3] : ''
     const targets = pathname === '/admin/settings' ? []

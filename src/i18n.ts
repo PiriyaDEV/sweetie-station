@@ -9,7 +9,7 @@ const resources = {
       splash: { tagline: 'Pre-order your favorites\nfrom around the world', continue: 'Skip loading and open home', loading: 'Preparing your workspace…', logoAlt: 'Sweetie Station logo' },
       sheets: {
         kicker: 'Sweetie preorder shop', title: 'Sheets', sheetCountShort: '{{count}} sheets', unpaidCount: '{{count}} unpaid', current: 'Current month', chips: { all: 'All', sales: 'Sales', haul: 'Haul', unpaid: 'Unpaid' }, chooseMonth: 'Choose a month', sheetCount: '{{count}} sheets · tap one to view its orders',
-        allSheets: 'All sheets', showControls: 'Show search and filters', hideControls: 'Hide search and filters', orderCount: '{{count}} orders', partialOrderCount: '{{count}}+ orders loaded', profit: 'Profit', partialProfit: 'Partial profit', monthSummary: '{{orders}} orders · {{total}} THB', search: 'Search sheets', noMatch: 'No sheets match this search.',
+        allSheets: 'All sheets', showControls: 'Show search and filters', hideControls: 'Hide search and filters', orderCount: '{{count}} orders', partialOrderCount: '{{count}}+ orders loaded', loadingMore: 'loading more', loadMoreFailed: 'load incomplete — open to retry', profit: 'Profit', partialProfit: 'Partial profit', monthSummary: '{{orders}} orders · {{total}} THB', search: 'Search sheets', noMatch: 'No sheets match this search.',
         kind: { sales: 'SALES', haul: 'HAUL' },
         jan: 'January', feb: 'February', mar: 'March', apr: 'April', may: 'May', june: 'June', haulJul: 'Guangzhou · 4–18 Jul', july: 'July', aug: 'August', sep: 'September',
         haulSep: 'Guangzhou · 16–23 Sep', oct: 'October', nov: 'November', dec: 'December',
@@ -69,7 +69,7 @@ const resources = {
       splash: { tagline: 'พรีออเดอร์ของน่ารักจากทั่วโลก\nส่งตรงถึงมือคุณ', continue: 'ข้ามหน้ารอและไปหน้าหลัก', loading: 'กำลังเตรียมพื้นที่ทำงาน…', logoAlt: 'โลโก้ Sweetie Station' },
       sheets: {
         kicker: 'จัดการพรีออเดอร์ Sweetie', title: 'ชีต', sheetCountShort: '{{count}} ชีต', unpaidCount: 'ค้างจ่าย {{count}}', current: 'เดือนปัจจุบัน', chips: { all: 'ทั้งหมด', sales: 'ยอดขาย', haul: 'หิ้วสินค้า', unpaid: 'ค้างจ่าย' }, chooseMonth: 'เลือกเดือน', sheetCount: '{{count}} ชีต · แตะเพื่อดูคำสั่งซื้อ',
-        allSheets: 'ชีตทั้งหมด', showControls: 'แสดงช่องค้นหาและตัวกรอง', hideControls: 'ซ่อนช่องค้นหาและตัวกรอง', orderCount: '{{count}} ออเดอร์', partialOrderCount: 'โหลดแล้วอย่างน้อย {{count}} ออเดอร์', profit: 'กำไรสุทธิ', partialProfit: 'กำไรบางส่วน', monthSummary: '{{orders}} ออเดอร์ · {{total}} THB', search: 'ค้นหาชีต', noMatch: 'ไม่พบชีตที่ตรงกับคำค้นหา',
+        allSheets: 'ชีตทั้งหมด', showControls: 'แสดงช่องค้นหาและตัวกรอง', hideControls: 'ซ่อนช่องค้นหาและตัวกรอง', orderCount: '{{count}} ออเดอร์', partialOrderCount: 'โหลดแล้วอย่างน้อย {{count}} ออเดอร์', loadingMore: 'กำลังโหลดเพิ่ม', loadMoreFailed: 'โหลดไม่ครบ — แตะเพื่อไปลองอีกครั้ง', profit: 'กำไรสุทธิ', partialProfit: 'กำไรบางส่วน', monthSummary: '{{orders}} ออเดอร์ · {{total}} THB', search: 'ค้นหาชีต', noMatch: 'ไม่พบชีตที่ตรงกับคำค้นหา',
         kind: { sales: 'ยอดขาย', haul: 'หิ้วสินค้า' },
         jan: 'มกราคม', feb: 'กุมภาพันธ์', mar: 'มีนาคม', apr: 'เมษายน', may: 'พฤษภาคม', june: 'มิถุนายน', haulJul: 'กวางโจว · 4–18 ก.ค.', july: 'กรกฎาคม', aug: 'สิงหาคม', sep: 'กันยายน',
         haulSep: 'กวางโจว · 16–23 ก.ย.', oct: 'ตุลาคม', nov: 'พฤศจิกายน', dec: 'ธันวาคม',
