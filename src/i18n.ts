@@ -15,10 +15,11 @@ const resources = {
         haulSep: 'Guangzhou · 16–23 Sep', oct: 'October', nov: 'November', dec: 'December',
       },
       orders: {
-        title: 'Orders', orders: 'orders', refresh: 'Refresh', refreshing: 'Updating', open: 'Open order', showSummary: 'Show summary and tools', hideSummary: 'Hide summary and tools',
+        title: 'Orders', orders: 'orders', refresh: 'Refresh', refreshing: 'Updating', pullToRefresh: 'Pull down to refresh', releaseToRefresh: 'Release to refresh', open: 'Open order', showSummary: 'Show summary and tools', hideSummary: 'Hide summary and tools',
         item: 'item', items: 'items', oneItem: '1 item', manyItems: '{{count}} items', itemCount: '{{count}} items', resultCount: '{{shown}} of {{total}} orders', resultCountPartial: '{{shown}} shown · {{total}}+ loaded', search: 'Search customer or item', closeSearch: 'Close search', searchItems: 'Search items', noMatch: 'No matching orders', edit: 'Edit', editSaved: 'Order changes saved to Google Sheets.', loadingMore: 'Loading more orders…', endOfList: 'You’re all caught up.', profit: 'Profit', profitUnavailable: '—',
       },
-      details: { title: 'Order details', summary: 'Order summary', status: 'Order status', statusHint: 'Update payment and shipping here.', itemCount: '{{count}} items' },
+      details: { title: 'Order details', summary: 'Order summary', status: 'Order status', statusHint: 'Update payment and shipping here.', saving: 'Saving status…', itemCount: '{{count}} items' },
+      lineContacts: { loading: 'Loading LINE contacts…' },
       settings: { title: 'Settings', kicker: 'Sweetie Station', subtitle: 'Manage your preferences and account.', preferences: 'Preferences', data: 'Data & backup', backupHint: 'Download a copy of your order and app data.', account: 'Account', displayLanguage: 'Display language' },
       sync: { idle: 'App settings not saved yet', syncing: 'Saving app settings…', synced: 'Google Sheets connected', offline: 'Google Sheets unavailable — local changes are not synced', syncNow: 'Save settings', storageNote: 'Orders and photos are written directly to their month tabs. Monthly expenses, app settings, and custom tab metadata are stored in Sweetie App Data.' },
       backup: { download: 'Download full backup', preparing: 'Preparing download…', success: 'Full backup downloaded.', error: 'Could not download the full backup.', exportMonthly: 'Export', reportSuccess: 'Monthly report downloaded.', reportError: 'Could not export the monthly report.' },
@@ -26,7 +27,7 @@ const resources = {
       detail: {
         orderDay: '{{day}}', quantity: '{{count}} {{unit}}', piece: 'pc', pieces: 'pcs', paymentFull: 'Paid in full', paymentDeposit: 'Deposit', paymentUnpaid: 'Unpaid',
         shippingNotOrdered: 'Not ordered', shippingOrdered: 'Ordered', shippingInbound: 'Waiting for Thailand', shippingSent: 'Shipped', notSet: 'Not listed', lineName: 'LINE name', customer: 'Customer', mockCustomerImage: 'Mock customer avatar',
-        items: 'Items', itemNumber: 'Order item {{number}}', itemImage: 'Order item {{number}}, photo {{image}}', photoName: 'Photo name', profitMargin: 'Profit margin', campaign: 'Campaign', discount: 'Campaign discount', saveCampaign: 'Save campaign', totalBeforeDiscount: 'Before discount', totalAfterDiscount: 'After discount',
+        items: 'Items', itemNumber: 'Order item {{number}}', itemImage: 'Order item {{number}}, photo {{image}}', photoName: 'Photo name', profitMargin: 'Profit margin', campaign: 'Campaign', discount: 'Campaign discount', saveCampaign: 'Save campaign', savingCampaign: 'Saving…', totalBeforeDiscount: 'Before discount', totalAfterDiscount: 'After discount',
         totalSales: 'Sales total', totalProfit: 'Total profit', bank: 'Paid so far', deposit: 'Deposit due',
       },
       detailFields: {
@@ -38,7 +39,7 @@ const resources = {
         title: 'Create an order', editTitle: 'Edit order', update: 'Save changes', open: 'Create order', close: 'Close create order', orderInfo: 'Order information', stepInfo: 'Details', stepItems: 'Items', stepReview: 'Review', stepProgress: 'Step {{current}} of {{total}}', next: 'Next', back: 'Back', create: 'Create order', requiredFieldsNote: 'Required fields are marked *', fulfillmentPayment: 'Payment & shipping', statusHint: 'These statuses can be updated later.', campaignSummary: 'Campaign & totals', liveSummary: 'Totals update as you edit', linePlaceholder: 'LINE account or handle', useNewLine: 'Use “{{name}}” (new)',
         customerPlaceholder: 'Customer name', day: 'Order date', itemNumber: 'Item {{number}}', itemName: 'Item name', photoName: 'Name this photo', optional: 'optional', photoNamePlaceholder: 'e.g. Blue ribbon pouch',
         quantity: 'Quantity', price: 'Sale total (THB)', bank: 'Amount paid (THB)', costRMB: 'Unit cost (CNY)', exchangeRate: 'Exchange rate (THB per CNY)', exchangeRateHint: 'Default rate is saved on this device; adjust it when needed.', depositDue: 'Item deposit due', orderDepositDue: 'Order deposit due', costTHBPreview: 'Cost total', estimatedProfit: 'Estimated profit', isCampaign: 'Campaign order', campaignDiscount: 'Discount amount (THB)', afterDiscount: 'Total after discount', paymentStatusPreview: 'Payment status preview', paymentStatus: 'Payment status',
-        shippingStatus: 'Shipping status', uploadPhoto: 'Upload item photo', chooseMonthImage: 'Use this month’s photo', imagePrefillHint: 'Choosing a saved photo fills in its item name and sale price.',
+        shippingStatus: 'Shipping status', uploadPhoto: 'Upload item photo', chooseMonthImage: 'Use this month’s photo', imagePrefillHint: 'Choosing a saved photo fills in its item name and sale price.', preparingImage: 'Preparing image…',
         monthOnlyImages: 'Photos from {{month}} only', filterMonthImages: 'Filter this month’s photos', noMonthImages: 'No item photos in this sheet yet.',
         selectedImage: 'Selected item photo', removeImage: 'Remove photo', addItem: 'Add another item', remove: 'Remove',
         cancel: 'Cancel', save: 'Save order', localOnly: 'Saved directly to this Google Sheet.', saving: 'Saving to Google Sheets…', saveError: 'Could not save this order to Google Sheets.',
@@ -74,10 +75,11 @@ const resources = {
         haulSep: 'กวางโจว · 16–23 ก.ย.', oct: 'ตุลาคม', nov: 'พฤศจิกายน', dec: 'ธันวาคม',
       },
       orders: {
-        title: 'รายการคำสั่งซื้อ', orders: 'ออเดอร์', refresh: 'รีเฟรช', refreshing: 'กำลังอัปเดต', open: 'เปิดคำสั่งซื้อ', showSummary: 'แสดงสรุปและเครื่องมือ', hideSummary: 'ซ่อนสรุปและเครื่องมือ',
+        title: 'รายการคำสั่งซื้อ', orders: 'ออเดอร์', refresh: 'รีเฟรช', refreshing: 'กำลังอัปเดต', pullToRefresh: 'ดึงลงเพื่อรีเฟรช', releaseToRefresh: 'ปล่อยเพื่อรีเฟรช', open: 'เปิดคำสั่งซื้อ', showSummary: 'แสดงสรุปและเครื่องมือ', hideSummary: 'ซ่อนสรุปและเครื่องมือ',
         item: 'ชิ้น', items: 'ชิ้น', oneItem: '1 ชิ้น', manyItems: '{{count}} ชิ้น', itemCount: '{{count}} รายการ', resultCount: 'แสดง {{shown}} จาก {{total}} ออเดอร์', resultCountPartial: 'แสดง {{shown}} · โหลดแล้ว {{total}}+ ออเดอร์', search: 'ค้นหาลูกค้าหรือสินค้า', closeSearch: 'ปิดช่องค้นหา', searchItems: 'ค้นหารายการสินค้า', noMatch: 'ไม่พบออเดอร์ที่ตรงกัน', edit: 'แก้ไข', editSaved: 'บันทึกการแก้ไขออเดอร์ลง Google Sheets แล้ว', loadingMore: 'กำลังโหลดออเดอร์เพิ่ม…', endOfList: 'แสดงครบแล้ว', profit: 'กำไร', profitUnavailable: '—',
       },
-      details: { title: 'รายละเอียดคำสั่งซื้อ', summary: 'สรุปคำสั่งซื้อ', status: 'สถานะออเดอร์', statusHint: 'เปลี่ยนสถานะชำระเงินและจัดส่งได้ที่นี่', itemCount: '{{count}} ชิ้น' },
+      details: { title: 'รายละเอียดคำสั่งซื้อ', summary: 'สรุปคำสั่งซื้อ', status: 'สถานะออเดอร์', statusHint: 'เปลี่ยนสถานะชำระเงินและจัดส่งได้ที่นี่', saving: 'กำลังบันทึกสถานะ…', itemCount: '{{count}} ชิ้น' },
+      lineContacts: { loading: 'กำลังโหลดรายชื่อ LINE…' },
       settings: { title: 'ตั้งค่า', kicker: 'Sweetie Station', subtitle: 'จัดการภาษาและบัญชีของคุณ', preferences: 'การตั้งค่า', data: 'ข้อมูลและการสำรอง', backupHint: 'ดาวน์โหลดสำเนาข้อมูลออเดอร์และการตั้งค่าแอป', account: 'บัญชี', displayLanguage: 'ภาษาที่แสดง' },
       sync: { idle: 'ยังไม่ได้บันทึกการตั้งค่าแอป', syncing: 'กำลังบันทึกการตั้งค่าแอป…', synced: 'เชื่อมต่อ Google Sheets แล้ว', offline: 'เชื่อมต่อ Google Sheets ไม่ได้ — การเปลี่ยนแปลงในเครื่องยังไม่ถูกบันทึก', syncNow: 'บันทึกการตั้งค่า', storageNote: 'ออเดอร์และรูปจะเขียนลงแท็บรายเดือนโดยตรง ส่วนรายจ่ายรายเดือน การตั้งค่าแอป และข้อมูลแท็บที่สร้างเพิ่มจะเก็บใน Sweetie App Data' },
       backup: { download: 'ดาวน์โหลดข้อมูลสำรองทั้งหมด', preparing: 'กำลังเตรียมไฟล์…', success: 'ดาวน์โหลดข้อมูลสำรองแล้ว', error: 'ดาวน์โหลดข้อมูลสำรองไม่สำเร็จ', exportMonthly: 'ส่งออก', reportSuccess: 'ดาวน์โหลดรายงานรายเดือนแล้ว', reportError: 'ส่งออกรายงานรายเดือนไม่สำเร็จ' },
@@ -85,7 +87,7 @@ const resources = {
       detail: {
         orderDay: '{{day}}', quantity: '{{count}} {{unit}}', piece: 'ชิ้น', pieces: 'ชิ้น', paymentFull: 'จ่ายเต็มแล้ว', paymentDeposit: 'มัดจำ', paymentUnpaid: 'ยังไม่ได้ชำระ',
         shippingNotOrdered: 'ยังไม่ได้สั่ง', shippingOrdered: 'สั่งแล้ว', shippingInbound: 'รอเข้าไทย', shippingSent: 'ส่งแล้ว', notSet: 'ไม่มีข้อมูล', lineName: 'ชื่อไลน์', customer: 'ชื่อลูกค้า', mockCustomerImage: 'รูปโปรไฟล์ตัวอย่าง',
-        items: 'รายการสินค้า', itemNumber: 'รายการที่ {{number}}', itemImage: 'รายการที่ {{number}} รูปที่ {{image}}', photoName: 'ชื่อรูปภาพ', profitMargin: 'อัตรากำไร', campaign: 'แคมเปญ', discount: 'ส่วนลดแคมเปญ', saveCampaign: 'บันทึกแคมเปญ', totalBeforeDiscount: 'ก่อนหักส่วนลด', totalAfterDiscount: 'หลังหักส่วนลด',
+        items: 'รายการสินค้า', itemNumber: 'รายการที่ {{number}}', itemImage: 'รายการที่ {{number}} รูปที่ {{image}}', photoName: 'ชื่อรูปภาพ', profitMargin: 'อัตรากำไร', campaign: 'แคมเปญ', discount: 'ส่วนลดแคมเปญ', saveCampaign: 'บันทึกแคมเปญ', savingCampaign: 'กำลังบันทึก…', totalBeforeDiscount: 'ก่อนหักส่วนลด', totalAfterDiscount: 'หลังหักส่วนลด',
         totalSales: 'ยอดขายรวม', totalProfit: 'กำไรรวม', bank: 'ยอดที่โอนแล้ว', deposit: 'ยอดมัดจำที่เหลือ',
       },
       detailFields: {
@@ -97,7 +99,7 @@ const resources = {
         title: 'สร้างคำสั่งซื้อ', editTitle: 'แก้ไขออเดอร์', update: 'บันทึกการแก้ไข', open: 'สร้างออเดอร์', close: 'ปิดหน้าสร้างออเดอร์', orderInfo: 'ข้อมูลออเดอร์', stepInfo: 'ข้อมูล', stepItems: 'สินค้า', stepReview: 'ยืนยัน', stepProgress: 'ขั้นตอน {{current}} จาก {{total}}', next: 'ถัดไป', back: 'ย้อนกลับ', create: 'สร้างออเดอร์', requiredFieldsNote: 'ช่องที่ต้องกรอกมีเครื่องหมาย *', fulfillmentPayment: 'การชำระเงินและจัดส่ง', statusHint: 'เปลี่ยนสถานะภายหลังได้', campaignSummary: 'แคมเปญและยอดรวม', liveSummary: 'ยอดจะอัปเดตตามข้อมูลที่กรอก', linePlaceholder: 'บัญชีหรือชื่อ LINE', useNewLine: 'ใช้ “{{name}}” (ใหม่)',
         customerPlaceholder: 'ชื่อลูกค้า', day: 'วันที่สั่งซื้อ', itemNumber: 'สินค้า {{number}}', itemName: 'ชื่อสินค้า', photoName: 'ตั้งชื่อรูปภาพ', optional: 'ไม่บังคับ', photoNamePlaceholder: 'เช่น กระเป๋าริบบิ้นสีฟ้า',
         quantity: 'จำนวน', price: 'ยอดขาย (THB)', bank: 'ยอดที่โอนแล้ว (THB)', costRMB: 'ต้นทุนต่อชิ้น (หยวน)', exchangeRate: 'เรทหยวนเป็นบาท', exchangeRateHint: 'ใช้เรทตั้งต้นที่บันทึกไว้ในอุปกรณ์ และแก้ไขได้ตามต้องการ', depositDue: 'ยอดค้างชำระของรายการนี้', orderDepositDue: 'ยอดค้างชำระของออเดอร์', costTHBPreview: 'ต้นทุนรวม', estimatedProfit: 'กำไรโดยประมาณ', isCampaign: 'ออเดอร์แคมเปญ', campaignDiscount: 'ส่วนลด (บาท)', afterDiscount: 'ยอดหลังหักส่วนลด', paymentStatusPreview: 'สถานะชำระเงินอัตโนมัติ', paymentStatus: 'สถานะชำระเงิน',
-        shippingStatus: 'สถานะจัดส่ง', uploadPhoto: 'อัปโหลดรูปสินค้า', chooseMonthImage: 'ใช้รูปจากเดือนนี้', imagePrefillHint: 'เมื่อเลือกรูปที่มีอยู่ ระบบจะเติมชื่อสินค้าและยอดขายให้อัตโนมัติ',
+        shippingStatus: 'สถานะจัดส่ง', uploadPhoto: 'อัปโหลดรูปสินค้า', chooseMonthImage: 'ใช้รูปจากเดือนนี้', imagePrefillHint: 'เมื่อเลือกรูปที่มีอยู่ ระบบจะเติมชื่อสินค้าและยอดขายให้อัตโนมัติ', preparingImage: 'กำลังเตรียมรูป…',
         monthOnlyImages: 'เลือกรูปจาก {{month}} เท่านั้น', filterMonthImages: 'ค้นหารูปในเดือนนี้', noMonthImages: 'ยังไม่มีรูปสินค้าในชีตนี้',
         selectedImage: 'รูปสินค้าที่เลือก', removeImage: 'ลบรูป', addItem: 'เพิ่มสินค้า', remove: 'ลบ',
         cancel: 'ยกเลิก', save: 'บันทึกออเดอร์', localOnly: 'ออเดอร์นี้จะบันทึกในแท็บ Sweetie App Data ของ Google Sheets',

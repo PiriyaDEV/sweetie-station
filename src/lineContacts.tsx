@@ -1,12 +1,15 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Plus, UserRound } from 'lucide-react'
+import { LoaderCircle, Plus, UserRound } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 export type LineContact = { lineUserId: string; displayName: string; pictureUrl: string; updatedAt: number }
 
-const LineContactsContext = createContext<LineContact[]>([])
+type LineContactsState = { contacts: LineContact[]; loading: boolean }
+const LineContactsContext = createContext<LineContactsState>({ contacts: [], loading: false })
 
 export function LineContactsProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
   const [contacts, setContacts] = useState<LineContact[]>([])
+  const [loading, setLoading] = useState(enabled)
   useEffect(() => {
     if (!enabled) return
     let cancelled = false
@@ -14,9 +17,10 @@ export function LineContactsProvider({ enabled, children }: { enabled: boolean; 
       .then((response) => (response.ok ? response.json() : null))
       .then((data: { contacts?: LineContact[] } | null) => { if (!cancelled && data?.contacts) setContacts(data.contacts) })
       .catch(() => { /* LINE contacts are optional; manual entry still works. */ })
+      .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [enabled])
-  return <LineContactsContext.Provider value={contacts}>{children}</LineContactsContext.Provider>
+  return <LineContactsContext.Provider value={{ contacts, loading }}>{children}</LineContactsContext.Provider>
 }
 
 export function useLineContacts() {
@@ -25,7 +29,7 @@ export function useLineContacts() {
 
 // An order is mapped to a contact when its LINE name equals the contact's display name.
 export function useLineContactByName(lineName: string) {
-  const contacts = useLineContacts()
+  const { contacts } = useLineContacts()
   return useMemo(() => {
     const key = lineName.trim().toLocaleLowerCase()
     return key ? contacts.find((contact) => contact.displayName.trim().toLocaleLowerCase() === key) : undefined
@@ -48,7 +52,8 @@ export function LineNameField({ value, onChange, onPick, placeholder, newLabel }
   placeholder: string
   newLabel: (name: string) => string
 }) {
-  const contacts = useLineContacts()
+  const { contacts, loading } = useLineContacts()
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const key = value.trim().toLocaleLowerCase()
   const matches = useMemo(
@@ -67,8 +72,9 @@ export function LineNameField({ value, onChange, onPick, placeholder, newLabel }
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
       />
-      {open && (matches.length > 0 || showNew) && (
+      {open && (loading || matches.length > 0 || showNew) && (
         <ul className="line-picker-list">
+          {loading && <li className="flex items-center gap-2 px-3 py-2 text-xs text-rose-700" role="status"><LoaderCircle size={15} className="animate-spin" />{t('lineContacts.loading')}</li>}
           {matches.map((contact) => (
             <li key={contact.lineUserId}>
               <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { onPick(contact); setOpen(false) }}>
