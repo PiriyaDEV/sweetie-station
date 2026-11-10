@@ -213,11 +213,15 @@ test('create/update orders, persist image cells, create a real tab', async () =>
     updatedOrder.lines[1].row = 4
     updatedOrder.lines.push({ row: 0, itemName: 'Synthetic Added Item', quantity: 1, salePrice: 25, bankAmount: 0, depositAmount: 25, profitAmount: null, images: [], attributes: [] })
     updatedOrder.lines[0].salePrice = 110
+    updatedOrder.paymentStatus = 'จ่ายเต็ม'
+    updatedOrder.shippingStatus = 'รอเข้าไทย'
     const updateResponse = await postOrder({ gid: '42', order: updatedOrder }, 'PUT')
     assert.equal(updateResponse.status, 200)
     const updated = await updateResponse.json()
     assert.deepEqual(updated.rowNumbers, [3, 4, 5])
     assert.equal(salesRows[2][headers.indexOf('ราคาขาย')], 110)
+    assert.equal(salesRows[2][headers.indexOf('Sweetie Payment Status')], 'จ่ายเต็ม')
+    assert.equal(salesRows[2][headers.indexOf('Sweetie Shipping Status')], 'รอเข้าไทย')
     assert.equal(salesRows[4][headers.indexOf('รายการ')], 'Synthetic Added Item')
     assert.equal(salesRows[4][orderIdColumn], 'qa-order-direct-1')
     assert.equal(salesRows[2][formulaColumn], '=SUM(F3:G3)', 'updating known order cells must preserve unrelated formulas')

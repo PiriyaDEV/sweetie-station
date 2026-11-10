@@ -10,16 +10,17 @@ import {
   Eye,
   EyeOff,
   ImagePlus,
+  LayoutList,
   Languages,
   LoaderCircle,
   LogOut,
   Minus,
-  Package,
   Pencil,
   Plane,
   Plus,
   Receipt,
   RefreshCw,
+  Rows3,
   Search,
   ShieldCheck,
   ShoppingBag,
@@ -30,7 +31,8 @@ import {
 import { useTranslation } from 'react-i18next'
 import sweetieLogo from './assets/sweetie-logo.webp'
 import { LineAvatar, LineContactsProvider, LineNameField } from './lineContacts'
-import { BottomNavigation, ScreenHeader, SkeletonLine, Sparkle, StatusBadge } from './ui/components'
+import { BottomNavigation, ImagePreviewDialog, ProductImage, ScreenHeader, SkeletonLine, Sparkle, StatusBadge } from './ui/components'
+import { useDialogAccessibility } from './ui/hooks'
 import { paymentBadgeClass, paymentStatusLabel, shippingBadgeClass, shippingStatusLabel, statusFilterLabel, STATUS_FILTERS } from './ui/status'
 
 const AnalyticsChart = lazy(() => import('./AnalyticsChart'))
@@ -435,8 +437,17 @@ function sheetTotal(orders: SheetOrder[]) {
   return orders.reduce((sum, order) => sum + order.totalSales, 0)
 }
 
-function getPreviewImage(orders: SheetOrder[]) {
-  return orders.flatMap((order) => order.lines).flatMap((line) => line.images)[0]
+function getPreviewImages(orders: SheetOrder[], limit = 4) {
+  const images = new Set<string>()
+  for (const order of orders) {
+    for (const line of order.lines) {
+      for (const image of line.images) {
+        if (image) images.add(image)
+        if (images.size === limit) return [...images]
+      }
+    }
+  }
+  return [...images]
 }
 
 function mergeOrderOverrides(remoteOrders: SheetOrder[], localOrders: SheetOrder[]) {
@@ -536,6 +547,14 @@ function CreateSheetDialog({ onClose, onCreate }: {
   const [year, setYear] = useState(String(now.getFullYear()))
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
+  const dialogRef = useRef<HTMLElement | null>(null)
+  const initialDraftSnapshot = useRef(JSON.stringify({ name, kind, monthKey, year }))
+  const requestClose = () => {
+    if (creating) return
+    if (JSON.stringify({ name, kind, monthKey, year }) !== initialDraftSnapshot.current && !window.confirm(t('createSheet.discardUnsaved'))) return
+    onClose()
+  }
+  useDialogAccessibility(dialogRef, requestClose)
   const previewName = name.trim() || t('createSheet.namePlaceholder')
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -557,11 +576,11 @@ function CreateSheetDialog({ onClose, onCreate }: {
   }
 
   return (
-    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <section className="create-order-modal create-sheet-modal" role="dialog" aria-modal="true" aria-labelledby="create-sheet-heading">
+    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) requestClose() }}>
+      <section className="create-order-modal create-sheet-modal" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="create-sheet-heading">
         <header className="modal-header">
-          <div><p>{t('sheets.kicker')}</p><h2 id="create-sheet-heading">{t('createSheet.title')}</h2></div>
-          <button type="button" className="modal-close" onClick={onClose} aria-label={t('createSheet.close')} disabled={creating}><X size={20} /></button>
+          <div><p>{t('sheets.kicker')}</p><h2 id="create-sheet-heading" tabIndex={-1}>{t('createSheet.title')}</h2></div>
+          <button type="button" className="modal-close" data-dialog-initial-focus onClick={requestClose} aria-label={t('createSheet.close')} disabled={creating}><X size={20} /></button>
         </header>
         <form className="order-form" onSubmit={submit}>
           <label><span className="field-label">{t('createSheet.name')} <span className="required-star">*</span></span><input value={name} onChange={(event) => { setName(event.target.value); setError('') }} required autoFocus placeholder={t('createSheet.namePlaceholder')} /></label>
@@ -580,7 +599,7 @@ function CreateSheetDialog({ onClose, onCreate }: {
           <p className="local-save-note">{t('createSheet.localOnly')}</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <footer className="modal-actions">
-            <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose} disabled={creating}>{t('createOrder.cancel')}</button>
+            <button type="button" className="cancel-order-button btn btn-ghost" onClick={requestClose} disabled={creating}>{t('createOrder.cancel')}</button>
             <button type="submit" className="save-order-button btn btn-primary" disabled={creating}>{creating ? <LoaderCircle size={16} className="animate-spin" /> : <Check size={16} />} {creating ? t('createSheet.creating') : t('createSheet.create')}</button>
           </footer>
         </form>
@@ -648,7 +667,7 @@ function HomePage({
   const activeFilterCount = [Boolean(query.trim()), kindFilter !== 'all', statusFilter !== 'all', sortBy !== 'month'].filter(Boolean).length
 
   const currentSheetId = getCurrentMonthSheet(dataBySheet, sheets).id
-  const previewFor = (kind?: SheetDefinition['kind']) => sheetRows.filter(({ sheet }) => !kind || sheet.kind === kind).map(({ orders }) => getPreviewImage(orders)).find(Boolean)
+  const previewFor = (kind?: SheetDefinition['kind']) => sheetRows.filter(({ sheet }) => !kind || sheet.kind === kind).map(({ orders }) => getPreviewImages(orders, 1)[0]).find(Boolean)
   const chips = [
     { key: 'all', label: t('sheets.chips.all'), active: kindFilter === 'all' && statusFilter === 'all', image: previewFor(), count: sheets.length, onSelect: () => { setKindFilter('all'); setStatusFilter('all') } },
     { key: 'sales', label: t('sheets.chips.sales'), active: kindFilter === 'sales' && statusFilter === 'all', image: previewFor('sales'), onSelect: () => { setKindFilter('sales'); setStatusFilter('all') } },
@@ -719,7 +738,7 @@ function HomePage({
             {Array.from({ length: 4 }, (_, index) => <div className="grid gap-2" key={index} aria-hidden="true"><SkeletonLine className="aspect-square w-full rounded-[28px]" /><SkeletonLine className="h-5 w-3/4" /><SkeletonLine className="h-3 w-1/2" /><SkeletonLine className="h-5 w-2/3" /></div>)}
           </div> : <div className="product-grid">
             {visibleSheets.map(({ sheet, orders, error, profit }) => {
-              const image = getPreviewImage(orders)
+              const images = getPreviewImages(orders)
               const unpaid = orders.filter((order) => order.paymentStatus === 'ยังไม่ได้ชำระ').length
               const profitTone = profit.amount === null ? ' unavailable' : profit.amount < 0 ? ' negative' : ''
               return (
@@ -731,7 +750,7 @@ function HomePage({
                   aria-label={`${sheetTitle(sheet, t)} · ${orders.length} ${t('orders.orders')}`}
                 >
                   <span className={`product-media ${sheet.kind}`}>
-                    {image ? <img src={image} alt="" loading="lazy" /> : <span className="product-media-placeholder"><CalendarDays size={36} /></span>}
+                    <span className={`product-collage count-${Math.max(1, images.length)}`} aria-hidden="true">{images.length > 0 ? images.map((image, index) => <ProductImage key={`${sheet.id}-${index}`} src={image} alt="" />) : <ProductImage alt="" />}</span>
                     <span className={`product-tag ${sheet.kind}`}>{t(`sheets.kind.${sheet.kind}`)}</span>
                     {sheet.id === currentSheetId && <span title={t('sheets.current')}><Sparkle size={26} /></span>}
                     <span className="product-fab" aria-hidden="true">{sheet.kind === 'haul' ? <Plane size={19} /> : <ShoppingBag size={19} />}</span>
@@ -761,39 +780,53 @@ function HomePage({
   )
 }
 
-function OrderListRow({ order, sheet }: { order: SheetOrder; sheet: SheetDefinition }) {
+function OrderListRow({ order, sheet, compact = false }: { order: SheetOrder; sheet: SheetDefinition; compact?: boolean }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const language = i18n.resolvedLanguage ?? 'en'
-  const image = order.lines.find((line) => line.images[0])?.images[0]
-  const itemNames = order.lines.map((line, index) => line.itemName || t('detail.itemNumber', { number: index + 1 })).join(' · ')
+  const [previewImage, setPreviewImage] = useState<{ src?: string; alt: string } | null>(null)
   const profitTone = order.profitAmount === null ? ' unavailable' : order.profitAmount < 0 ? ' negative' : ''
-  return (
-    <button
-      type="button"
-      className="cart-row"
-      onClick={() => navigate(`/admin/sheets/${sheet.id}/orders/${order.id}`)}
-      aria-label={`${t('orders.open')} ${order.customerName || order.lineName} · ${t('orders.profit')}: ${order.profitAmount === null ? '—' : `${formatMoney(order.profitAmount, language)} THB`}`}
-    >
-      <span className="cart-thumb" aria-hidden="true">
-        {image ? <img src={image} alt="" loading="lazy" /> : <LineAvatar lineName={order.lineName} size={34} />}
-        {order.lines.length > 1 && <span className="cart-thumb-count">+{order.lines.length - 1}</span>}
-      </span>
-      <span className="cart-body">
-        <span className="cart-title display">{order.customerName || order.lineName}</span>
-        <span className="cart-sub">{order.lineName} · {formatOrderDate(order.day, sheet, language)} · {t('detail.quantity', { count: order.quantity, unit: order.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</span>
-        <span className="cart-sub">{itemNames}</span>
-        <span className="cart-price-row">
-          <span className="cart-price display">{formatMoney(order.totalSales, language)} THB</span>
+  const openOrder = () => navigate(`/admin/sheets/${sheet.id}/orders/${order.id}`)
+  return <>
+    <article className={`order-card${compact ? ' compact' : ''}`}>
+      <button
+        type="button"
+        className="order-card-head"
+        onClick={openOrder}
+        aria-label={`${t('orders.open')} ${order.customerName || order.lineName} · ${t('orders.profit')}: ${order.profitAmount === null ? '—' : `${formatMoney(order.profitAmount, language)} THB`}`}
+      >
+        <span className="order-avatar" aria-hidden="true"><LineAvatar lineName={order.lineName} size={compact ? 20 : 26} /></span>
+        <span className="order-card-main">
+          <span className="cart-title display">{order.customerName || order.lineName}</span>
+          <span className="cart-sub">{order.lineName} · {formatOrderDate(order.day, sheet, language)} · {t('detail.quantity', { count: order.quantity, unit: order.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</span>
+          <span className="cart-badges">
+            <StatusBadge type="payment" status={order.paymentStatus} />
+            <StatusBadge type="shipping" status={order.shippingStatus} />
+          </span>
+        </span>
+        <span className="order-card-total">
+          <span className="cart-price display">{formatMoney(order.totalSales, language)}<small> THB</small></span>
           <span className={`profit-chip${profitTone}`}>{t('orders.profit')} {order.profitAmount === null ? '—' : `${order.profitAmount > 0 ? '+' : ''}${formatMoney(order.profitAmount, language)}`}</span>
         </span>
-        <span className="cart-badges">
-          <StatusBadge type="payment" status={order.paymentStatus} />
-          <StatusBadge type="shipping" status={order.shippingStatus} />
-        </span>
-      </span>
-    </button>
-  )
+      </button>
+      {!compact && order.lines.length > 0 && <ul className="order-item-list" aria-label={t('detail.items')}>
+        {order.lines.map((line, index) => {
+          const itemName = line.itemName || t('detail.itemNumber', { number: index + 1 })
+          return <li className="order-item" key={`${order.id}-${line.row || index}`}>
+            <button type="button" className="order-item-photo image-preview-trigger" aria-label={`${t('detail.previewImage')}: ${itemName}`} onClick={() => setPreviewImage({ src: line.images[0], alt: itemName })}>
+              <ProductImage src={line.images[0]} alt="" />
+            </button>
+            <button type="button" className="order-item-text" onClick={openOrder}>
+              <strong>{itemName}</strong>
+              <small>{t('detail.quantity', { count: line.quantity, unit: line.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</small>
+            </button>
+            <button type="button" className="order-item-price" onClick={openOrder}>{formatMoney(line.salePrice, language)} THB</button>
+          </li>
+        })}
+      </ul>}
+    </article>
+    {previewImage && <ImagePreviewDialog src={previewImage.src} alt={previewImage.alt} onClose={() => setPreviewImage(null)} />}
+  </>
 }
 
 function getDefaultDay(_sheet: SheetDefinition) {
@@ -907,6 +940,8 @@ function CreateOrderDialog({
   const { t, i18n } = useTranslation()
   const language = i18n.resolvedLanguage ?? 'en'
   const [draft, setDraft] = useState(() => initialOrder ? draftFromOrder(initialOrder, defaultExchangeRate, sheet) : emptyDraft(sheet, defaultExchangeRate))
+  const initialDraftSnapshot = useRef(JSON.stringify(draft))
+  const dialogRef = useRef<HTMLElement | null>(null)
   const [openPicker, setOpenPicker] = useState<number | null>(null)
   const [imageQuery, setImageQuery] = useState('')
   const [imageError, setImageError] = useState('')
@@ -950,6 +985,12 @@ function CreateOrderDialog({
     }
   }
 
+  const requestClose = () => {
+    if (saving) return
+    if (JSON.stringify(draft) !== initialDraftSnapshot.current && !window.confirm(t('createOrder.discardUnsaved'))) return
+    onClose()
+  }
+  useDialogAccessibility(dialogRef, requestClose)
   const filteredImages = imageChoices.filter((choice) => `${choice.label} ${choice.itemName}`.toLocaleLowerCase().includes(imageQuery.toLocaleLowerCase()))
 
   const validateCurrentStep = () => {
@@ -992,14 +1033,14 @@ function CreateOrderDialog({
   }
 
   return (
-    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <section className="create-order-modal" role="dialog" aria-modal="true" aria-labelledby="create-order-heading">
+    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) requestClose() }}>
+      <section className="create-order-modal" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="create-order-heading">
         <header className="modal-header">
           <div>
             <p>{sheetTitle(sheet, t)}</p>
-            <h2 id="create-order-heading">{t(initialOrder ? 'createOrder.editTitle' : 'createOrder.title')}</h2>
+            <h2 id="create-order-heading" tabIndex={-1}>{t(initialOrder ? 'createOrder.editTitle' : 'createOrder.title')}</h2>
           </div>
-          <button type="button" className="modal-close" onClick={onClose} aria-label={t('createOrder.close')}><X size={20} /></button>
+          <button type="button" className="modal-close" data-dialog-initial-focus onClick={requestClose} aria-label={t('createOrder.close')}><X size={20} /></button>
         </header>
 
         <form className="order-form" ref={formRef} onSubmit={submit}>
@@ -1023,8 +1064,9 @@ function CreateOrderDialog({
           <div className="form-section-heading form-section-heading-first"><h3>{t('createOrder.orderInfo')}</h3><span>{t('createOrder.requiredFieldsNote')}</span></div>
           <div className="form-grid two-columns">
             <div>
-              <span className="field-label">{t('detail.lineName')}</span>
+              <label className="field-label" htmlFor="order-line-name">{t('detail.lineName')}</label>
               <LineNameField
+                id="order-line-name"
                 value={draft.lineName}
                 placeholder={t('createOrder.linePlaceholder')}
                 newLabel={(name) => t('createOrder.useNewLine', { name })}
@@ -1074,7 +1116,7 @@ function CreateOrderDialog({
                   </div>
                 </div>}
                 <div className="draft-item-main">
-                  <div className="draft-item-photo">{line.image ? <img src={line.image} alt={line.itemName || t('createOrder.selectedImage')} /> : <Package size={22} />}</div>
+                  <div className="draft-item-photo"><ProductImage src={line.image} alt={line.itemName || t('createOrder.selectedImage')} /></div>
                   <div className="draft-item-fields">
                     <label><span className="field-label">{t('createOrder.itemName')} <span className="required-star">*</span></span><input value={line.itemName} onChange={(event) => updateLine(index, 'itemName', event.target.value)} required /></label>
                     <div className="form-grid two-columns">
@@ -1130,7 +1172,7 @@ function CreateOrderDialog({
               <small>{t('createOrder.orderDepositDue')}: {formatMoney(orderDepositDue, language)} THB</small>
             </div>
             <div className={`order-step-actions${currentStep === 0 ? ' two-actions' : ''}`}>
-              <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose} disabled={saving}>{t('createOrder.cancel')}</button>
+              <button type="button" className="cancel-order-button btn btn-ghost" onClick={requestClose} disabled={saving}>{t('createOrder.cancel')}</button>
               {currentStep > 0 && <button type="button" className="back-order-button btn btn-ghost" onClick={() => goToStep(currentStep - 1)} disabled={saving}><ChevronLeft size={15} />{t('createOrder.back')}</button>}
               {currentStep < 2
                 ? <button key="next-step" type="button" className="save-order-button btn btn-primary" onClick={goToNextStep} disabled={saving}>{t('createOrder.next')}<ChevronRight size={15} /></button>
@@ -1188,18 +1230,24 @@ function MonthlyExpensesSection({ expenses, onChange }: { expenses: MonthlyExpen
 function MonthlyExpensesDialog({ sheetName, expenses, onClose, onSave }: { sheetName: string; expenses: MonthlyExpense[]; onClose: () => void; onSave: (expenses: MonthlyExpense[]) => void }) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState(() => expenses.map((expense) => ({ ...expense })))
+  const dialogRef = useRef<HTMLElement | null>(null)
   const isDirty = JSON.stringify(draft) !== JSON.stringify(expenses)
+  const requestClose = () => {
+    if (isDirty && !window.confirm(t('expenses.discardUnsaved'))) return
+    onClose()
+  }
+  useDialogAccessibility(dialogRef, requestClose)
 
   return (
-    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget && !isDirty) onClose() }}>
-      <section className="create-order-modal monthly-expenses-modal" role="dialog" aria-modal="true" aria-labelledby="monthly-expenses-heading">
+    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) requestClose() }}>
+      <section className="create-order-modal monthly-expenses-modal" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="monthly-expenses-heading">
         <header className="modal-header">
-          <div><p>{sheetName}</p><h2 id="monthly-expenses-heading">{t('expenses.title')}</h2><small className="modal-subtitle">{t('expenses.savePrompt')}</small></div>
-          <button type="button" className="modal-close" onClick={onClose} aria-label={t('expenses.close')}><X size={20} /></button>
+          <div><p>{sheetName}</p><h2 id="monthly-expenses-heading" tabIndex={-1}>{t('expenses.title')}</h2><small className="modal-subtitle">{t('expenses.savePrompt')}</small></div>
+          <button type="button" className="modal-close" data-dialog-initial-focus onClick={requestClose} aria-label={t('expenses.close')}><X size={20} /></button>
         </header>
         <div className="monthly-expenses-modal-body"><MonthlyExpensesSection expenses={draft} onChange={setDraft} /></div>
         <footer className="modal-actions expense-modal-actions">
-          <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose}>{t('createOrder.cancel')}</button>
+          <button type="button" className="cancel-order-button btn btn-ghost" onClick={requestClose}>{t('createOrder.cancel')}</button>
           <button type="button" className="save-order-button btn btn-primary" onClick={() => { onSave(draft); onClose() }} disabled={!isDirty}><Check size={15} />{t('expenses.save')}</button>
         </footer>
       </section>
@@ -1246,6 +1294,7 @@ function SheetOrdersPage({
   const pullDistance = usePullToRefresh(scrollRootRef, loading, onRefresh)
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
+  const [compactList, setCompactList] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
   const [visibleCount, setVisibleCount] = useState(10)
@@ -1368,6 +1417,8 @@ function SheetOrdersPage({
           </div>
           <div className="order-list-meta">
             <span>{sheetData?.hasMore ? t('orders.resultCountPartial', { shown: visibleOrders.length, total: sortedOrders.length }) : t('orders.resultCount', { shown: visibleOrders.length, total: sortedOrders.length })}</span>
+            <span className="order-list-actions">
+            <button type="button" className="pill pill-small" aria-pressed={compactList} onClick={() => setCompactList((compact) => !compact)}>{compactList ? <LayoutList size={15} /> : <Rows3 size={15} />}<span className="sr-only">{t(compactList ? 'orders.cardView' : 'orders.compactView')}</span></button>
             <label className="pill-select">
               <span className="sr-only">{t('filters.sort')}</span>
               <select value={sortBy} onChange={(event) => updateSort(event.target.value)}>
@@ -1375,6 +1426,7 @@ function SheetOrdersPage({
               </select>
               <ChevronDown size={14} />
             </label>
+            </span>
           </div>
 
           {sheetData?.error && <div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div>}
@@ -1382,7 +1434,7 @@ function SheetOrdersPage({
           {sheetData && !sheetData.error && orders.length === 0 && !sheetData.hasMore && <p className="sheet-message">{t('sheet.empty')}</p>}
           {sortedOrders.length === 0 && !loading && orders.length > 0 && !sheetData?.hasMore && <p className="sheet-message">{t('orders.noMatch')}</p>}
           <div className="cart-list">
-            {visibleOrders.map((order) => <OrderListRow key={order.id} order={order} sheet={sheet} />)}
+            {visibleOrders.map((order) => <OrderListRow key={order.id} order={order} sheet={sheet} compact={compactList} />)}
           </div>
           {sheetData?.loadMoreError && <div className="sheet-error" role="alert">{t('sheet.loadMoreError')} <button type="button" onClick={() => onLoadMoreData(sheet.id)}>{t('sheet.retry')}</button></div>}
           {hasMore && <div className="load-more-sentinel flex items-center justify-center gap-2 py-3 text-xs font-medium" ref={sentinelRef} aria-live="polite"><LoaderCircle size={14} className="animate-spin" /> {sheetData?.loadingMore ? t('sheet.loadingMoreData') : t('orders.loadingMore')}</div>}
@@ -1406,6 +1458,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
   const language = i18n.resolvedLanguage ?? 'en'
   const [itemQuery, setItemQuery] = useState('')
   const [itemSort, setItemSort] = useState('sales-desc')
+  const [previewImage, setPreviewImage] = useState<{ src?: string; alt: string } | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [editNotice, setEditNotice] = useState('')
   const [savingStatus, setSavingStatus] = useState(false)
@@ -1471,7 +1524,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
     <section className="app-screen detail-screen" aria-label={t('screen.detail')}>
       <div className="detail-scroll">
         <div className="detail-hero">
-          {heroImage ? <img src={heroImage} alt="" /> : <span className="detail-hero-avatar" aria-label={t('detail.mockCustomerImage')}><LineAvatar lineName={order.lineName} size={56} /></span>}
+          {heroImage ? <button type="button" className="detail-hero-image image-preview-trigger" aria-label={t('detail.previewImage')} onClick={() => setPreviewImage({ src: heroImage, alt: order.lines.find((line) => line.images[0])?.itemName ?? '' })}><ProductImage src={heroImage} alt="" /></button> : <span className="detail-hero-avatar" aria-label={t('detail.mockCustomerImage')}><LineAvatar lineName={order.lineName} size={56} /></span>}
           <div className="detail-hero-top">
             <button type="button" className="icon-button" onClick={() => navigate(`/admin/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ArrowLeft size={26} strokeWidth={2.4} /></button>
             <p className="detail-hero-title display">{sheetTitle(sheet, t)}</p>
@@ -1505,12 +1558,14 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
             <select className="select" value={itemSort} onChange={(event) => setItemSort(event.target.value)} aria-label={t('filters.sortItems')}><option value="sales-desc">{t('filters.salesHighShort')}</option><option value="sales-asc">{t('filters.salesLowShort')}</option><option value="name">{t('filters.nameAZShort')}</option></select>
           </div>}
           <div className="cart-list">
-            {visibleLines.map((line, index) => (
-              <article className="cart-row" key={`${order.id}-${line.row || index}`}>
-                <span className="cart-thumb">
-                  {line.images[0] ? <img src={line.images[0]} alt={t('detail.itemImage', { number: index + 1, image: 1 })} loading="lazy" /> : <Package size={28} />}
+            {visibleLines.map((line, index) => {
+              const itemName = line.itemName || t('detail.itemNumber', { number: index + 1 })
+              const unitProfit = line.profitAmount === null ? null : line.profitAmount / Math.max(1, line.quantity)
+              return <article className="cart-row" key={`${order.id}-${line.row || index}`}>
+                <button type="button" className="cart-thumb image-preview-trigger" aria-label={`${t('detail.previewImage')}: ${itemName}`} onClick={() => setPreviewImage({ src: line.images[0], alt: itemName })}>
+                  <ProductImage src={line.images[0]} alt={t('detail.itemImage', { number: index + 1, image: 1 })} />
                   {line.images.length > 1 && <span className="cart-thumb-count">+{line.images.length - 1}</span>}
-                </span>
+                </button>
                 <div className="cart-body">
                   <h3 className="cart-title display">{line.itemName || t('detail.itemNumber', { number: index + 1 })}</h3>
                   {line.imageName && <span className="cart-sub">{t('detail.photoName')}: {line.imageName}</span>}
@@ -1518,18 +1573,19 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
                     <span className="cart-price display">{line.salePrice ? `${formatMoney(line.salePrice, language)} THB` : '—'}</span>
                     <span className="status-badge quantity">× {line.quantity}</span>
                   </span>
+                  <span className={`profit-chip${unitProfit === null ? ' unavailable' : unitProfit < 0 ? ' negative' : ''}`}>{t('detail.itemProfitPerUnit')} {unitProfit === null ? '—' : formatMoney(unitProfit, language)}</span>
                   {line.costRMB != null && <span className="cart-sub">{t('createOrder.costRMB')}: {formatMoney(line.costRMB, language)} CNY{line.costTHB != null && ` · ${formatMoney(line.costTHB, language)} THB`}</span>}
                   {line.attributes.length > 0 && <div className="item-attributes">{line.attributes.slice(0, 3).map((attribute) => <span key={`${attribute.key}-${attribute.value}`}>{fieldLabel(attribute.key, t)}: {attribute.value}</span>)}</div>}
                 </div>
               </article>
-            ))}
+            })}
             {visibleLines.length === 0 && <p className="picker-empty">{t('orders.noMatch')}</p>}
           </div>
         </section>
 
         <section className="detail-section">
           <div className="section-head"><h2 className="display">{t('details.summary')}</h2></div>
-          <div className="summary-rows">
+          <div className="summary-rows summary-card">
             <div className="summary-row"><span>{t('detail.lineName')}</span><b>{order.lineName || t('detail.notSet')}</b></div>
             <div className="summary-row"><span>{t('detail.customer')}</span><b>{order.customerName || t('detail.notSet')}</b></div>
             {getPaidTotal(order) > 0 && <div className="summary-row"><span>{t('detail.bank')}</span><strong>{formatMoney(getPaidTotal(order), language)} THB</strong></div>}
@@ -1555,6 +1611,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
         </section>
       </div>
       {editOpen && order && <CreateOrderDialog sheet={sheet} initialOrder={order} imageChoices={imageChoices} defaultExchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onClose={() => setEditOpen(false)} onSave={async (draft) => { await onSaveOrder(sheet.id, draft, order); setEditOpen(false); showEditNotice(t('orders.editSaved')) }} />}
+      {previewImage && <ImagePreviewDialog src={previewImage.src} alt={previewImage.alt} onClose={() => setPreviewImage(null)} />}
       {editNotice && <p className="app-toast" role="status">{editNotice}</p>}
     </section>
   )
@@ -1605,7 +1662,11 @@ function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: str
 function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, analyticsDataLoading, onLoadAllSalesSheets }: { dataBySheet: Record<string, SheetDataState>; monthlyExpensesBySheet: Record<string, MonthlyExpense[]>; sheets: SheetDefinition[]; loading: boolean; analyticsDataLoading: boolean; onLoadAllSalesSheets: () => void }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
-  const currentSheet = getCurrentMonthSheet(dataBySheet, sheets)
+  const salesSheets = sheets.filter((sheet) => sheet.kind === 'sales').sort((a, b) => a.year - b.year || MONTH_INDEX[a.monthKey] - MONTH_INDEX[b.monthKey])
+  const comparisonDate = getCurrentDate()
+  const defaultCurrentSheet = salesSheets.find((sheet) => sheet.year === comparisonDate.getFullYear() && MONTH_INDEX[sheet.monthKey] === comparisonDate.getMonth()) ?? getCurrentMonthSheet(dataBySheet, sheets)
+  const [selectedSheetId, setSelectedSheetId] = useState(defaultCurrentSheet.id)
+  const currentSheet = salesSheets.find((sheet) => sheet.id === selectedSheetId) ?? defaultCurrentSheet
   const currentOrders = dataBySheet[currentSheet.id]?.orders ?? EMPTY_ORDERS
   const language = i18n.resolvedLanguage ?? 'en'
   const [statusFilter, setStatusFilter] = useState('all')
@@ -1629,7 +1690,6 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
   const inbound = scopedOrders.filter((order) => order.shippingStatus === 'รอเข้าไทย').length
   const paid = scopedOrders.filter((order) => order.paymentStatus === 'จ่ายเต็ม').length
   const deposits = scopedOrders.filter((order) => order.paymentStatus === 'มัดจำ').length
-  const salesSheets = sheets.filter((sheet) => sheet.kind === 'sales').sort((a, b) => a.year - b.year || MONTH_INDEX[a.monthKey] - MONTH_INDEX[b.monthKey])
   const needsFullSalesData = salesSheets.some((sheet) => dataBySheet[sheet.id]?.hasMore && !dataBySheet[sheet.id]?.loadMoreError)
   const hasSalesLoadError = salesSheets.some((sheet) => Boolean(dataBySheet[sheet.id]?.loadMoreError || dataBySheet[sheet.id]?.error))
   useEffect(() => { if (!loading && needsFullSalesData) void onLoadAllSalesSheets() }, [loading, needsFullSalesData, onLoadAllSalesSheets])
@@ -1638,7 +1698,6 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
   const previousSalesState = previousSalesSheet ? dataBySheet[previousSalesSheet.id] : undefined
   const previousSalesOrders = previousSalesSheet ? filteredOrdersForSheet(previousSalesSheet) : EMPTY_ORDERS
   const currentSalesState = dataBySheet[currentSheet.id]
-  const comparisonDate = getCurrentDate()
   const isCurrentMonth = currentSheet.year === comparisonDate.getFullYear() && MONTH_INDEX[currentSheet.monthKey] === comparisonDate.getMonth()
   const currentComparableSales = isCurrentMonth ? sheetSalesThroughDay(scopedOrders, comparisonDate.getDate()) : sheetTotal(scopedOrders)
   const previousComparableSales = previousSalesSheet && previousSalesState && !previousSalesState.error
@@ -1677,6 +1736,31 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
       netProfit: profit.complete ? profit.amount : null,
     }
   })
+  const topItemTotals = new Map<string, { name: string; attributes: string; quantity: number; sales: number; profit: number; lineCount: number; knownProfitLines: number; image?: string }>()
+  for (const order of scopedOrders) {
+    order.lines.forEach((line) => {
+      const baseName = (line.itemName || line.imageName || '').trim()
+      const image = line.images[0]
+      if (!baseName && !image) return
+      const attributes = line.attributes.map((attribute) => `${fieldLabel(attribute.key, t)}: ${attribute.value}`).join(' · ')
+      const identity = baseName ? baseName.toLocaleLowerCase(language) : image!
+      const key = `${identity}|${attributes.toLocaleLowerCase(language)}`
+      const name = baseName || t('analytics.unnamedItem')
+      const item = topItemTotals.get(key) ?? { name, attributes, quantity: 0, sales: 0, profit: 0, lineCount: 0, knownProfitLines: 0, image }
+      item.quantity += line.quantity
+      item.sales += line.salePrice
+      item.lineCount += 1
+      if (line.profitAmount !== null) {
+        item.profit += line.profitAmount
+        item.knownProfitLines += 1
+      }
+      item.image ||= image
+      topItemTotals.set(key, item)
+    })
+  }
+  const topItems = [...topItemTotals.values()]
+    .sort((a, b) => b.quantity - a.quantity || b.sales - a.sales || a.name.localeCompare(b.name, language))
+    .slice(0, 3)
 
   return (
     <section className="app-screen analytics-screen" aria-label={t('screen.analytics')}>
@@ -1687,6 +1771,12 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
       />
       <div className="screen-surface">
       <div className="surface-scroll">
+        <label className="info-bar month-picker">
+          <CalendarDays size={21} />
+          <span className="info-bar-text"><small>{t('analytics.monthPicker')}</small><strong>{sheetTitle(currentSheet, t)} · {currentSheet.year}</strong></span>
+          <select value={currentSheet.id} onChange={(event) => setSelectedSheetId(event.target.value)} aria-label={t('analytics.monthPicker')}>{salesSheets.map((sheet) => <option key={sheet.id} value={sheet.id}>{sheetTitle(sheet, t)} · {sheet.year}</option>)}</select>
+          <ChevronDown size={16} className="info-bar-end" />
+        </label>
         <div className="pill-row mb-4" role="group" aria-label={t('filters.status')}>
           {STATUS_FILTERS.map((filter) => <button type="button" className="pill" key={filter} aria-pressed={statusFilter === filter} onClick={() => setStatusFilter(filter)}>{statusFilterLabel(filter, t)}</button>)}
         </div>
@@ -1694,7 +1784,7 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
           {Array.from({ length: 4 }, (_, index) => <div className="grid min-h-[96px] content-center gap-3 rounded-3xl bg-mist p-4" key={index} aria-hidden="true"><SkeletonLine className="h-3 w-2/5" /><SkeletonLine className="h-6 w-3/4" /><SkeletonLine className="h-2.5 w-1/2" /></div>)}
         </div> : <>
           <div className="metric-grid">
-            <article className="metric-card featured"><Sparkle size={26} /><span>{statusFilter === 'all' ? t('analytics.thisMonth') : t('analytics.filteredSales')}</span><strong>{formatMoney(sheetTotal(scopedOrders), language)} <small>THB</small></strong></article>
+            <article className="metric-card featured"><Sparkle size={26} /><span>{statusFilter === 'all' ? t('analytics.selectedMonthSales') : t('analytics.filteredSales')}</span><strong>{formatMoney(sheetTotal(scopedOrders), language)} <small>THB</small></strong></article>
             <article className="metric-card"><span>{t('analytics.totalProfit')}</span><strong className={scopedProfit.amount === null ? 'profit-unavailable' : scopedProfit.amount < 0 ? 'negative-text' : 'positive-text'}>{scopedProfit.amount === null ? '—' : `${formatMoney(scopedProfit.amount, language)} THB`}</strong><em>{scopedProfit.amount === null ? t('analytics.noPeriodProfit') : scopedProfit.knownLines < scopedProfit.totalLines ? t('analytics.profitCoverage', { known: scopedProfit.knownLines, total: scopedProfit.totalLines }) : statusFilter === 'all' ? t('analytics.currentScopeProfit') : t('analytics.filteredScopeProfit')}</em></article>
             <article className={`metric-card trend-card${currentSalesChange === null ? ' unavailable' : currentSalesChange < 0 ? ' negative' : ' positive'}`}>
               <span>{t('analytics.monthlyChange')}</span>
@@ -1719,15 +1809,39 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
           </details>
         </>}
 
+        <section className="analytics-section top-items-section" aria-labelledby="top-items-heading">
+          <div className="section-head"><h2 className="display" id="top-items-heading">{t('analytics.topItems')}</h2><span>{t('analytics.topItemsHint')}</span></div>
+          {loading || analyticsDataLoading
+            ? <div className="cart-list" aria-busy="true">{Array.from({ length: 3 }, (_, index) => <div className="cart-row" key={index} aria-hidden="true"><SkeletonLine className="size-[92px] rounded-3xl" /><div className="grid gap-2"><SkeletonLine className="h-5 w-3/4" /><SkeletonLine className="h-3 w-1/2" /></div></div>)}</div>
+            : topItems.length > 0
+              ? <ol className="cart-list top-items-list">
+                {topItems.map((item, index) => (
+                  <li className="cart-row" key={`${item.name}-${item.attributes}-${index}`}>
+                    <span className="cart-thumb"><ProductImage src={item.image} alt={item.name} /><span className="top-item-rank display" aria-hidden="true">#{index + 1}</span></span>
+                    <div className="cart-body">
+                      <strong className="cart-title display" title={item.name}>{item.name}</strong>
+                      {item.attributes && <span className="cart-sub">{item.attributes}</span>}
+                      <span className="cart-sub">{t('analytics.unitsSold', { count: item.quantity })}</span>
+                      <span className="cart-price-row">
+                        <span className="cart-price display">{formatMoney(item.sales, language)} THB</span>
+                        <span className={`profit-chip${item.knownProfitLines === 0 ? ' unavailable' : ''}`}>{t(item.knownProfitLines > 0 && item.knownProfitLines < item.lineCount ? 'analytics.partialItemProfit' : 'analytics.itemProfit')} {item.knownProfitLines === 0 ? '—' : formatMoney(item.profit, language)}</span>
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              : <p className="sheet-message">{t('analytics.topItemsEmpty')}</p>}
+        </section>
+
         <section className="analytics-section">
           <div className="section-head"><h2 className="display">{t('analytics.statusTitle')}</h2></div>
           {analyticsDataLoading ? <div className="grid gap-3" aria-busy="true" aria-label={t('sheet.loading')}>{Array.from({ length: 6 }, (_, index) => <div className="flex items-center justify-between gap-3" key={index} aria-hidden="true"><SkeletonLine className="h-6 w-28 rounded-full" /><SkeletonLine className="h-4 w-8" /></div>)}</div> : <div className="status-summary-grid">
-          <div className="status-summary-row"><span className="status-badge paid">{t('detail.paymentFull')}</span><strong>{paid}</strong></div>
-          <div className="status-summary-row"><span className="status-badge deposit">{t('detail.paymentDeposit')}</span><strong>{deposits}</strong></div>
-          <div className="status-summary-row"><span className="status-badge shipped">{t('detail.shippingSent')}</span><strong>{shipped}</strong></div>
-          <div className="status-summary-row"><span className="status-badge not-ordered">{t('detail.shippingNotOrdered')}</span><strong>{scopedOrders.filter((order) => order.shippingStatus === 'ยังไม่ได้สั่ง').length}</strong></div>
-          <div className="status-summary-row"><span className="status-badge ordered">{t('detail.shippingOrdered')}</span><strong>{scopedOrders.filter((order) => order.shippingStatus === 'สั่งแล้ว').length}</strong></div>
-          <div className="status-summary-row"><span className="status-badge inbound">{t('detail.shippingInbound')}</span><strong>{inbound}</strong></div>
+          <div className="status-summary-row"><StatusBadge type="payment" status="จ่ายเต็ม" /><strong>{paid}</strong></div>
+          <div className="status-summary-row"><StatusBadge type="payment" status="มัดจำ" /><strong>{deposits}</strong></div>
+          <div className="status-summary-row"><StatusBadge type="shipping" status="ส่งแล้ว" /><strong>{shipped}</strong></div>
+          <div className="status-summary-row"><StatusBadge type="shipping" status="ยังไม่ได้สั่ง" /><strong>{scopedOrders.filter((order) => order.shippingStatus === 'ยังไม่ได้สั่ง').length}</strong></div>
+          <div className="status-summary-row"><StatusBadge type="shipping" status="สั่งแล้ว" /><strong>{scopedOrders.filter((order) => order.shippingStatus === 'สั่งแล้ว').length}</strong></div>
+          <div className="status-summary-row"><StatusBadge type="shipping" status="รอเข้าไทย" /><strong>{inbound}</strong></div>
           </div>}
         </section>
 
@@ -2368,6 +2482,7 @@ function App() {
           <Route path="/admin/settings" element={<SettingsPage onExportBackup={exportFullBackup} backupLoading={backupLoading} backupMessage={backupMessage} onLogout={logout} />} />
           <Route path="*" element={<Navigate to="/admin/home" replace />} />
         </Routes>
+        <BottomNavigation desktop />
       </div>
     </main>
     </LineContactsProvider>
