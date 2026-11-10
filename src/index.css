@@ -126,25 +126,15 @@ img { max-width: 100%; }
 /* ===================================================================
    App shell (phone frame on desktop, full-bleed on phones)
    =================================================================== */
-.app-stage { display: grid; width: 100%; height: 100dvh; min-height: 0; overflow: hidden; place-items: center; padding: 24px; background: #f6f5f1; }
+.app-stage { display: block; width: 100%; height: 100dvh; min-height: 0; overflow: hidden; padding: 0; background: #f6aec8; }
+/* The app always fills the screen: no phone frame at any width */
 .app-shell {
   position: relative;
-  width: min(100%, 410px);
-  height: min(880px, calc(100dvh - 48px));
+  width: 100%;
+  height: 100dvh;
   min-height: 0;
   overflow: hidden;
-  border-radius: 44px;
   background: #f6aec8;
-  box-shadow: 0 30px 80px rgb(60 30 40 / 18%), 0 0 0 10px #1b1b1b;
-}
-.splash-stage .app-shell { box-shadow: 0 30px 80px rgb(60 30 40 / 18%), 0 0 0 10px #1b1b1b; }
-@media (max-width: 600px) {
-  .app-stage { display: block; padding: 0; background: var(--white); }
-  .app-shell { width: 100%; height: 100dvh; border-radius: 0; box-shadow: none !important; }
-}
-@media (max-height: 760px) and (min-width: 601px) {
-  .app-stage { padding-block: 16px; }
-  .app-shell { height: calc(100dvh - 32px); }
 }
 
 .app-screen {
@@ -746,8 +736,6 @@ button.stat-tile svg { position: absolute; top: 11px; right: 10px; color: var(--
 @media (min-width: 768px) {
   :root { --gutter: 32px; }
   html, body, #root, .app-stage { background: #f8f4f6; }
-  .app-stage { display: block; padding: 0; }
-  .app-shell { width: 100%; height: 100dvh; border-radius: 0; box-shadow: none !important; background: #f8f4f6; }
   .app-screen { left: 248px; }
   .app-screen.splash-screen, .app-screen.admin-login-screen { left: 0; }
   .app-screen .bottom-nav { display: none; }
@@ -815,3 +803,7 @@ button.stat-tile svg { position: absolute; top: 11px; right: 10px; color: var(--
 .image-preview-caption { font-size: 19px; }
 .top-item-rank { font-size: 12px; }
 .settings-brand strong { font-size: 21px; }
+@media (min-width: 560px) and (max-width: 767px) {
+  .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .chip-row { grid-template-columns: repeat(4, 92px); justify-content: start; gap: 18px; }
+}
