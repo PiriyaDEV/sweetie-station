@@ -33,6 +33,7 @@ import { useTranslation } from 'react-i18next'
 import sweetieLogo from './assets/sweetie-logo.webp'
 import { LineAvatar, LineContactsProvider, LineNameField } from './lineContacts'
 import { BottomNavigation, ImagePreviewDialog, ProductImage, ScreenHeader, SkeletonLine, Sparkle, StatusBadge } from './ui/components'
+import { Dropdown } from './ui/Dropdown'
 import { useDialogAccessibility } from './ui/hooks'
 import { orderMatchesStatus, paymentBadgeClass, paymentStatusLabel, shippingBadgeClass, shippingStatusLabel, statusFilterLabel, STATUS_FILTERS } from './ui/status'
 
@@ -383,15 +384,11 @@ function SettingsPage({ onExportBackup, backupLoading, backupMessage, onLogout }
           <div className="settings-brand"><img src={sweetieLogo} alt="" /><div><strong>Sweetie Station</strong><span>{t('settings.subtitle')}</span></div></div>
           <section className="settings-group">
             <h2 className="display">{t('settings.preferences')}</h2>
-            <label className="info-bar">
-              <Languages size={21} />
-              <span className="info-bar-text"><strong>{t('settings.displayLanguage')}</strong></span>
-              <select value={language} onChange={(event) => changeLanguage(event.target.value)}>
-                <option value="en">English</option>
-                <option value="th">ไทย</option>
-              </select>
-              <ChevronDown size={16} className="info-bar-end" />
-            </label>
+            <Dropdown variant="bar" className="info-bar" aria-label={t('settings.displayLanguage')} value={language} onChange={(event) => changeLanguage(event.target.value)} align="end"
+              triggerContent={<><Languages size={21} /><span className="info-bar-text"><strong>{t('settings.displayLanguage')}</strong></span><span className="info-bar-value">{language === 'th' ? 'ไทย' : 'English'}</span><ChevronDown size={16} className="info-bar-end" /></>}>
+              <option value="en">English</option>
+              <option value="th">ไทย</option>
+            </Dropdown>
           </section>
           <section className="settings-group">
             <h2 className="display">{t('settings.data')}</h2>
@@ -586,8 +583,8 @@ function CreateSheetDialog({ onClose, onCreate }: {
         <form className="order-form" onSubmit={submit}>
           <label><span className="field-label">{t('createSheet.name')} <span className="required-star">*</span></span><input value={name} onChange={(event) => { setName(event.target.value); setError('') }} required autoFocus placeholder={t('createSheet.namePlaceholder')} /></label>
           <div className="form-grid two-columns">
-            <label>{t('filters.sheetType')}<select className="select select-bordered select-sm select-primary" value={kind} onChange={(event) => setKind(event.target.value as SheetDefinition['kind'])}><option value="sales">{t('sheets.kind.sales')}</option><option value="haul">{t('sheets.kind.haul')}</option></select></label>
-            <label>{t('createSheet.month')}<select className="select select-bordered select-sm select-primary" value={monthKey} onChange={(event) => setMonthKey(event.target.value)}>{Object.keys(MONTH_INDEX).map((key) => <option key={key} value={key}>{t(`sheets.${key}`)}</option>)}</select></label>
+            <label>{t('filters.sheetType')}<Dropdown className="field-trigger" value={kind} onChange={(event) => setKind(event.target.value as SheetDefinition['kind'])}><option value="sales">{t('sheets.kind.sales')}</option><option value="haul">{t('sheets.kind.haul')}</option></Dropdown></label>
+            <label>{t('createSheet.month')}<Dropdown className="field-trigger" value={monthKey} onChange={(event) => setMonthKey(event.target.value)}>{Object.keys(MONTH_INDEX).map((key) => <option key={key} value={key}>{t(`sheets.${key}`)}</option>)}</Dropdown></label>
           </div>
           <label className="year-field"><span className="field-label">{t('createSheet.year')} <span className="required-star">*</span></span><NumericInput integer minValue={2000} maxValue={2100} value={year} onValueChange={setYear} required /></label>
           <section className="create-sheet-preview" aria-live="polite">
@@ -707,13 +704,9 @@ function HomePage({
             </label>
             <div className="pill-row" role="group" aria-label={t('filters.sortSheets')}>
               {sortOptions.map((option) => <button type="button" className="pill" key={option.value} aria-pressed={sortBy === option.value} onClick={() => setSortBy(option.value)}>{option.label}</button>)}
-              <label className="pill-select">
-                <span className="sr-only">{t('filters.status')}</span>
-                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <Dropdown variant="pill" align="end" aria-label={t('filters.status')} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                   {STATUS_FILTERS.map((filter) => <option key={filter} value={filter}>{statusFilterLabel(filter, t)}</option>)}
-                </select>
-                <ChevronDown size={14} />
-              </label>
+                </Dropdown>
               {activeFilterCount > 0 && <button type="button" className="pill" onClick={() => { setQuery(''); setKindFilter('all'); setStatusFilter('all'); setSortBy('month') }}>{t('filters.clear')}</button>}
             </div>
           </div>}
@@ -1146,8 +1139,8 @@ function CreateOrderDialog({
           <fieldset className="order-step-panel" data-order-step="2" disabled={currentStep !== 2} hidden={currentStep !== 2}>
           <div className="form-section-heading"><h3>{t('createOrder.fulfillmentPayment')}</h3><span>{t('createOrder.statusHint')}</span></div>
           <div className="form-grid two-columns">
-            <label>{t('createOrder.paymentStatus')}<select className="select select-bordered select-sm select-primary" value={draft.paymentStatus} onChange={(event) => updateField('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้ชำระ">{t('detail.paymentUnpaid')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option></select></label>
-            <label>{t('createOrder.shippingStatus')}<select className="select select-bordered select-sm select-primary" value={draft.shippingStatus} onChange={(event) => updateField('shippingStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้สั่ง">{t('detail.shippingNotOrdered')}</option><option value="สั่งแล้ว">{t('detail.shippingOrdered')}</option><option value="รอเข้าไทย">{t('detail.shippingInbound')}</option><option value="ส่งแล้ว">{t('detail.shippingSent')}</option></select></label>
+            <label>{t('createOrder.paymentStatus')}<Dropdown className="field-trigger" value={draft.paymentStatus} onChange={(event) => updateField('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้ชำระ">{t('detail.paymentUnpaid')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option></Dropdown></label>
+            <label>{t('createOrder.shippingStatus')}<Dropdown className="field-trigger" value={draft.shippingStatus} onChange={(event) => updateField('shippingStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้สั่ง">{t('detail.shippingNotOrdered')}</option><option value="สั่งแล้ว">{t('detail.shippingOrdered')}</option><option value="รอเข้าไทย">{t('detail.shippingInbound')}</option><option value="ส่งแล้ว">{t('detail.shippingSent')}</option></Dropdown></label>
           </div>
 
           <section className="campaign-form-card">
@@ -1212,9 +1205,9 @@ function MonthlyExpensesSection({ expenses, onChange }: { expenses: MonthlyExpen
         {expenses.map((expense) => (
           <div className="monthly-expense-row" key={expense.id}>
             <div className="monthly-expense-fields">
-              <select className="select select-bordered select-sm select-primary" aria-label={t('expenses.category')} value={expense.category} onChange={(event) => update(expense.id, 'category', event.target.value)}>
+              <Dropdown className="field-trigger" aria-label={t('expenses.category')} value={expense.category} onChange={(event) => update(expense.id, 'category', event.target.value)}>
                 <option value="shipping">{t('expenses.shipping')}</option><option value="packaging">{t('expenses.packaging')}</option><option value="ads">{t('expenses.ads')}</option><option value="other">{t('expenses.other')}</option>
-              </select>
+              </Dropdown>
               <input type="text" aria-label={t('expenses.description')} placeholder={t('expenses.description')} value={expense.description} onChange={(event) => update(expense.id, 'description', event.target.value)} />
               <NumericInput minValue={0} aria-label={t('expenses.amount')} value={String(expense.amount)} onValueChange={(value) => update(expense.id, 'amount', Number(value) || 0)} />
             </div>
@@ -1412,13 +1405,9 @@ function SheetOrdersPage({
             <span>{visibleOrders.length}/{sortedOrders.length}{sheetData?.hasMore ? '+' : ''} {t('orders.orders')}</span>
             <span className="order-list-actions">
             <button type="button" className="pill pill-small" aria-pressed={compactList} onClick={() => setCompactList((compact) => !compact)}>{compactList ? <LayoutList size={15} /> : <Rows3 size={15} />}<span className="sr-only">{t(compactList ? 'orders.cardView' : 'orders.compactView')}</span></button>
-            <label className="pill-select">
-              <span className="sr-only">{t('filters.sort')}</span>
-              <select value={sortBy} onChange={(event) => updateSort(event.target.value)}>
+            <Dropdown variant="pill" align="end" aria-label={t('filters.sort')} value={sortBy} onChange={(event) => updateSort(event.target.value)}>
                 {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-              <ChevronDown size={14} />
-            </label>
+              </Dropdown>
             </span>
           </div>
 
@@ -1537,8 +1526,8 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
           <h1 className="detail-name display">{order.customerName || order.lineName}</h1>
           <p className="detail-lead">{order.lineName || t('detail.notSet')} · {formatOrderDate(order.day, sheet, language)} · {t('detail.quantity', { count: order.quantity, unit: order.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}{order.sheetRow > 0 && ` · #${order.sheetRow}`}</p>
           <div className="detail-status-grid" aria-label={t('details.status')}>
-            <label>{t('createOrder.paymentStatus')}<select disabled={savingStatus} className={`select select-bordered select-sm select-primary detail-status-select payment-${paymentBadgeClass(order.paymentStatus)}`} value={order.paymentStatus} onChange={(event) => saveStatus('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้ชำระ">{t('detail.paymentUnpaid')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option></select></label>
-            <label>{t('createOrder.shippingStatus')}<select disabled={savingStatus} className={`select select-bordered select-sm select-primary detail-status-select shipping-${shippingBadgeClass(order.shippingStatus)}`} value={order.shippingStatus} onChange={(event) => saveStatus('shippingStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้สั่ง">{t('detail.shippingNotOrdered')}</option><option value="สั่งแล้ว">{t('detail.shippingOrdered')}</option><option value="รอเข้าไทย">{t('detail.shippingInbound')}</option><option value="ส่งแล้ว">{t('detail.shippingSent')}</option></select></label>
+            <label>{t('createOrder.paymentStatus')}<Dropdown disabled={savingStatus} variant="status" className={`detail-status-select payment-${paymentBadgeClass(order.paymentStatus)}`} value={order.paymentStatus} onChange={(event) => saveStatus('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้ชำระ">{t('detail.paymentUnpaid')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option></Dropdown></label>
+            <label>{t('createOrder.shippingStatus')}<Dropdown disabled={savingStatus} variant="status" className={`detail-status-select shipping-${shippingBadgeClass(order.shippingStatus)}`} value={order.shippingStatus} onChange={(event) => saveStatus('shippingStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้สั่ง">{t('detail.shippingNotOrdered')}</option><option value="สั่งแล้ว">{t('detail.shippingOrdered')}</option><option value="รอเข้าไทย">{t('detail.shippingInbound')}</option><option value="ส่งแล้ว">{t('detail.shippingSent')}</option></Dropdown></label>
           </div>
           <p className="detail-status-note">{savingStatus && <LoaderCircle size={13} className="animate-spin" />}{savingStatus ? t('details.saving') : t('details.statusHint')}</p>
           <button type="button" className="cta" onClick={() => setEditOpen(true)}><Pencil size={19} /> {t('orders.edit')}</button>
@@ -1548,7 +1537,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
           <div className="section-head"><h2 className="display">{t('detail.items')}</h2><span>{t('detail.quantity', { count: order.quantity, unit: order.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</span></div>
           {order.lines.length > 3 && <div className="item-list-controls">
             <input value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder={t('orders.searchItems')} aria-label={t('orders.searchItems')} />
-            <select className="select" value={itemSort} onChange={(event) => setItemSort(event.target.value)} aria-label={t('filters.sortItems')}><option value="sales-desc">{t('filters.salesHighShort')}</option><option value="sales-asc">{t('filters.salesLowShort')}</option><option value="name">{t('filters.nameAZShort')}</option></select>
+            <Dropdown className="field-trigger" align="end" value={itemSort} onChange={(event) => setItemSort(event.target.value)} aria-label={t('filters.sortItems')}><option value="sales-desc">{t('filters.salesHighShort')}</option><option value="sales-asc">{t('filters.salesLowShort')}</option><option value="name">{t('filters.nameAZShort')}</option></Dropdown>
           </div>}
           <div className="cart-list">
             {visibleLines.map((line, index) => {
@@ -1756,12 +1745,10 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
       />
       <div className="screen-surface">
       <div className="surface-scroll">
-        <label className="info-bar month-picker">
-          <CalendarDays size={21} />
-          <span className="info-bar-text"><small>{t('analytics.monthPicker')}</small><strong>{sheetTitle(currentSheet, t)} · {currentSheet.year}</strong></span>
-          <select value={currentSheet.id} onChange={(event) => setSelectedSheetId(event.target.value)} aria-label={t('analytics.monthPicker')}>{salesSheets.map((sheet) => <option key={sheet.id} value={sheet.id}>{sheetTitle(sheet, t)} · {sheet.year}</option>)}</select>
-          <ChevronDown size={16} className="info-bar-end" />
-        </label>
+        <Dropdown variant="bar" className="info-bar month-picker" aria-label={t('analytics.monthPicker')} value={currentSheet.id} onChange={(event) => setSelectedSheetId(event.target.value)}
+          triggerContent={<><CalendarDays size={21} /><span className="info-bar-text"><small>{t('analytics.monthPicker')}</small><strong>{sheetTitle(currentSheet, t)} · {currentSheet.year}</strong></span><ChevronDown size={16} className="info-bar-end" /></>}>
+          {salesSheets.map((sheet) => <option key={sheet.id} value={sheet.id}>{sheetTitle(sheet, t)} · {sheet.year}</option>)}
+        </Dropdown>
         <div className="pill-row mb-4" role="group" aria-label={t('filters.status')}>
           {STATUS_FILTERS.map((filter) => <button type="button" className="pill" key={filter} aria-pressed={statusFilter === filter} onClick={() => setStatusFilter(filter)}>{statusFilterLabel(filter, t)}<span className="pill-count">{currentOrders.filter((order) => orderMatchesStatus(order, filter)).length}</span></button>)}
         </div>
@@ -1839,7 +1826,7 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
         </section>
 
         <section className="analytics-section sales-by-month">
-          <div className="section-head"><h2 className="display">{t('analytics.monthlySales')}</h2><label className="pill-select"><span className="sr-only">{t('filters.sort')}</span><select value={monthlySort} onChange={(event) => setMonthlySort(event.target.value)}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="month">{t('filters.monthOrder')}</option></select><ChevronDown size={14} /></label></div>
+          <div className="section-head"><h2 className="display">{t('analytics.monthlySales')}</h2><Dropdown variant="pill" align="end" aria-label={t('filters.sort')} value={monthlySort} onChange={(event) => setMonthlySort(event.target.value)}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="month">{t('filters.monthOrder')}</option></Dropdown></div>
           {analyticsDataLoading ? <div className="grid gap-1" aria-busy="true" aria-label={t('sheet.loading')}>{Array.from({ length: 6 }, (_, index) => <div className="flex min-h-10 items-center gap-3" key={index} aria-hidden="true"><SkeletonLine className="h-3 w-16" /><SkeletonLine className="h-2 flex-1 rounded-full" /><SkeletonLine className="h-3 w-12" /></div>)}</div> : sortedSalesSheets.map((sheet) => {
             const sheetOrders = filteredOrdersForSheet(sheet)
             const amount = sheetTotal(sheetOrders)
@@ -2437,6 +2424,7 @@ function App() {
   }
 
   const currentMonthSheet = getCurrentMonthSheet(mergedDataBySheet, allSheets)
+  const knownLineNames = useMemo(() => [...new Set(Object.values(mergedDataBySheet).flatMap((state) => state.orders.map((order) => order.lineName.trim())).filter(Boolean))], [mergedDataBySheet])
 
   if (authChecking) {
     return <main className="app-stage splash-stage"><div className="app-shell"><SplashScreen /></div></main>
@@ -2454,7 +2442,7 @@ function App() {
   }
 
   return (
-    <LineContactsProvider enabled={isAdminAuthenticated}>
+    <LineContactsProvider enabled={isAdminAuthenticated} knownNames={knownLineNames}>
     <main className="app-stage">
       <div className="app-shell">
 

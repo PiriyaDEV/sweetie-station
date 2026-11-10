@@ -4,10 +4,11 @@ import { useTranslation } from 'react-i18next'
 
 export type LineContact = { lineUserId: string; displayName: string; pictureUrl: string; updatedAt: number }
 
-type LineContactsState = { contacts: LineContact[]; loading: boolean }
-const LineContactsContext = createContext<LineContactsState>({ contacts: [], loading: false })
+type LineContactsState = { contacts: LineContact[]; loading: boolean; knownNames: string[] }
+const LineContactsContext = createContext<LineContactsState>({ contacts: [], loading: false, knownNames: [] })
 
-export function LineContactsProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
+/** knownNames: LINE names already used in sheet orders, so customers who never messaged the LINE OA can still be found. */
+export function LineContactsProvider({ enabled, knownNames = [], children }: { enabled: boolean; knownNames?: string[]; children: ReactNode }) {
   const [contacts, setContacts] = useState<LineContact[]>([])
   const [loading, setLoading] = useState(enabled)
   useEffect(() => {
@@ -20,7 +21,8 @@ export function LineContactsProvider({ enabled, children }: { enabled: boolean; 
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [enabled])
-  return <LineContactsContext.Provider value={{ contacts, loading }}>{children}</LineContactsContext.Provider>
+  const value = useMemo(() => ({ contacts, loading, knownNames }), [contacts, loading, knownNames])
+  return <LineContactsContext.Provider value={value}>{children}</LineContactsContext.Provider>
 }
 
 export function useLineContacts() {
@@ -68,15 +70,29 @@ export function LineNameField({ id, value, onChange, onPick, placeholder, newLab
   placeholder: string
   newLabel: (name: string) => string
 }) {
-  const { contacts, loading } = useLineContacts()
+  const { contacts, loading, knownNames } = useLineContacts()
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const key = value.trim().toLocaleLowerCase()
-  const matches = useMemo(
-    () => contacts.filter((contact) => !key || contact.displayName.toLocaleLowerCase().includes(key)).slice(0, 6),
-    [contacts, key],
-  )
-  const exact = contacts.some((contact) => contact.displayName.trim().toLocaleLowerCase() === key)
+  // LINE OA contacts first, then names already used in the sheets that are not contacts yet.
+  const pool = useMemo(() => {
+    const seen = new Set(contacts.map((contact) => contact.displayName.trim().toLocaleLowerCase()))
+    const fromSheets: LineContact[] = []
+    for (const name of knownNames) {
+      const normalized = name.trim().toLocaleLowerCase()
+      if (!normalized || seen.has(normalized)) continue
+      seen.add(normalized)
+      fromSheets.push({ lineUserId: `sheet:${normalized}`, displayName: name.trim(), pictureUrl: '', updatedAt: 0 })
+    }
+    return [...contacts, ...fromSheets]
+  }, [contacts, knownNames])
+  const matches = useMemo(() => {
+    const found = pool.filter((contact) => !key || contact.displayName.toLocaleLowerCase().includes(key))
+    // Names that start with what was typed come first, so "p" finds "pound" before "aomsin p".
+    found.sort((a, b) => Number(b.displayName.toLocaleLowerCase().startsWith(key)) - Number(a.displayName.toLocaleLowerCase().startsWith(key)))
+    return found.slice(0, 8)
+  }, [pool, key])
+  const exact = pool.some((contact) => contact.displayName.trim().toLocaleLowerCase() === key)
   const showNew = key !== '' && !exact
   return (
     <div className="line-picker">

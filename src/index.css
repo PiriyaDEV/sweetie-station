@@ -418,13 +418,13 @@ button.stat-tile svg { position: absolute; top: 11px; right: 10px; color: var(--
 .detail-lead { margin: 0 0 16px; color: var(--ink-soft); font-size: 15px; line-height: 1.6; }
 .detail-status-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
 .detail-status-grid label { display: grid; min-width: 0; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
-.detail-status-grid select { width: 100%; height: 46px; border: 0; border-radius: 12px; padding: 0 34px 0 14px; font: inherit; font-size: 13.5px; font-weight: 700; }
-.detail-status-grid select.payment-paid, .detail-status-grid select.shipping-shipped { background-color: var(--leaf-soft); color: var(--leaf-ink); }
-.detail-status-grid select.payment-deposit { background-color: #fff2d6; color: #8a5a00; }
-.detail-status-grid select.payment-unpaid { background-color: var(--blush); color: var(--pink-ink); }
-.detail-status-grid select.shipping-inbound { background-color: var(--sky-soft); color: var(--sky-ink); }
-.detail-status-grid select.shipping-ordered { background-color: #efe7ff; color: #5b3aa6; }
-.detail-status-grid select.payment-neutral, .detail-status-grid select.shipping-neutral, .detail-status-grid select.shipping-not-ordered { background-color: var(--mist); color: var(--ink); }
+
+.detail-status-grid .dd-trigger.payment-paid, .detail-status-grid .dd-trigger.shipping-shipped { background-color: var(--leaf-soft); color: var(--leaf-ink); }
+.detail-status-grid .dd-trigger.payment-deposit { background-color: #fff2d6; color: #8a5a00; }
+.detail-status-grid .dd-trigger.payment-unpaid { background-color: var(--blush); color: var(--pink-ink); }
+.detail-status-grid .dd-trigger.shipping-inbound { background-color: var(--sky-soft); color: var(--sky-ink); }
+.detail-status-grid .dd-trigger.shipping-ordered { background-color: #efe7ff; color: #5b3aa6; }
+.detail-status-grid .dd-trigger.payment-neutral, .detail-status-grid .dd-trigger.shipping-neutral, .detail-status-grid .dd-trigger.shipping-not-ordered { background-color: var(--mist); color: var(--ink); }
 .detail-status-note { display: flex; align-items: center; gap: 6px; margin: -6px 0 14px; color: var(--muted); font-size: 12px; }
 .detail-section { padding: 26px var(--gutter) 0; }
 .detail-section:last-child { padding-bottom: 32px; }
@@ -877,11 +877,11 @@ html, body, #root { background: #f6aec8 !important; }
 .status-badge.shipping.not-ordered { padding: 0 10px; background: var(--alert-soft); color: var(--alert); }
 .status-badge.shipping.shipped { color: var(--muted); }
 .status-summary-row .status-badge.shipping { padding: 0 2px; }
-.detail-status-grid select.payment-paid, .detail-status-grid select.shipping-shipped,
-.detail-status-grid select.shipping-ordered, .detail-status-grid select.shipping-inbound,
-.detail-status-grid select.payment-neutral, .detail-status-grid select.shipping-neutral { background-color: var(--mist); color: var(--ink); }
-.detail-status-grid select.payment-unpaid, .detail-status-grid select.shipping-not-ordered { background-color: var(--alert-soft); color: var(--alert); }
-.detail-status-grid select.payment-deposit { background-color: #fff4d6; color: #7a5200; }
+.detail-status-grid .dd-trigger.payment-paid, .detail-status-grid .dd-trigger.shipping-shipped,
+.detail-status-grid .dd-trigger.shipping-ordered, .detail-status-grid .dd-trigger.shipping-inbound,
+.detail-status-grid .dd-trigger.payment-neutral, .detail-status-grid .dd-trigger.shipping-neutral { background-color: var(--mist); color: var(--ink); }
+.detail-status-grid .dd-trigger.payment-unpaid, .detail-status-grid .dd-trigger.shipping-not-ordered { background-color: var(--alert-soft); color: var(--alert); }
+.detail-status-grid .dd-trigger.payment-deposit { background-color: #fff4d6; color: #7a5200; }
 
 /* 5 · Numbers: Nunito 800 with tabular figures; Lilita stays for titles and one hero number */
 .product-price, .cart-price, .order-card-total .cart-price, .stat-tile strong, .metric-card strong,
@@ -934,3 +934,65 @@ html, body, #root { background: #f6aec8 !important; }
 .stat-tile strong small { font-size: 11px; font-weight: 800; }
 /* Softer profit green (user request) */
 :root { --leaf-ink: #3a9a4a; }
+
+/* ===================================================================
+   Dropdown (replaces native <select>; list uses DaisyUI `menu`)
+   =================================================================== */
+.dd { position: relative; min-width: 0; }
+.dd-trigger { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; border: 2px solid transparent; background: var(--mist); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s; }
+.dd-trigger:disabled { opacity: .6; cursor: default; }
+.dd-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-chevron { flex: none; color: var(--ink-soft); transition: transform .18s ease; }
+.dd.is-open .dd-chevron, .dd.is-open .info-bar-end { transform: rotate(180deg); }
+
+/* field: forms and dialogs */
+.dd-field .dd-trigger { height: 52px; border-radius: 12px; padding: 0 14px 0 16px; font-size: 15px; font-weight: 500; }
+.dd-field .dd-trigger:hover { background: var(--mist-strong); }
+.dd-field.is-open .dd-trigger, .dd-field .dd-trigger:focus-visible { border-color: var(--pink); background: var(--white); outline: none; }
+.item-list-controls .dd-field .dd-trigger { height: 44px; font-size: 13.5px; }
+
+/* status: order detail payment / shipping */
+.dd-status .dd-trigger { height: 46px; border-radius: 12px; padding: 0 12px 0 14px; font-size: 13.5px; font-weight: 700; }
+.dd-status.is-open .dd-trigger { box-shadow: 0 0 0 2px var(--pink); }
+
+/* pill: compact sort / status filters */
+.dd-pill { display: inline-flex; flex: none; }
+.dd-pill .dd-trigger { width: auto; height: 36px; border: 0; border-radius: 999px; padding: 0 12px 0 15px; background: var(--white); box-shadow: var(--shadow-1); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.dd-pill .dd-trigger:hover { background: var(--blush); }
+.dd-pill.is-open .dd-trigger { background: var(--ink); color: var(--white); }
+.dd-pill.is-open .dd-chevron { color: var(--white); }
+
+/* bar: whole info-bar is the trigger */
+.dd-bar { width: 100%; }
+.dd-bar .dd-trigger.info-bar { border: 0; background: var(--card); }
+.dd-bar .dd-trigger.info-bar:hover { background: #fff8fb; }
+.dd-bar.is-open .dd-trigger.info-bar { box-shadow: 0 0 0 2px var(--pink), var(--shadow-2); }
+.info-bar-value { flex: none; color: var(--ink); font-weight: 700; }
+.info-bar-end { transition: transform .18s ease; }
+
+/* the open list */
+.dd-menu.menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+  display: flex; flex-direction: column; flex-wrap: nowrap; gap: 2px;
+  width: max-content; min-width: 100%; max-width: min(320px, calc(100vw - 36px)); max-height: 300px;
+  overflow-y: auto; overscroll-behavior: contain;
+  margin: 0; border: 1px solid var(--mist-strong); border-radius: 20px; padding: 6px;
+  background: var(--white); box-shadow: 0 14px 34px rgb(120 60 80 / 16%);
+  animation: dd-in 140ms ease-out both;
+}
+.dd-menu.drop-up { top: auto; bottom: calc(100% + 6px); animation-name: dd-in-up; }
+.dd-menu.align-end { left: auto; right: 0; }
+.dd-pill .dd-menu { min-width: 210px; }
+@keyframes dd-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes dd-in-up { from { opacity: 0; transform: translateY(4px) scale(.98); } to { opacity: 1; transform: none; } }
+.dd-menu.menu li { width: 100%; }
+.dd-menu.menu li > button {
+  display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: space-between; gap: 12px;
+  border: 0; border-radius: 12px; padding: 10px 12px; background: none;
+  color: var(--ink); font: inherit; font-size: 14.5px; font-weight: 600; text-align: left; white-space: normal;
+}
+.dd-menu.menu li > button:hover, .dd-menu.menu li > button:focus-visible { background: var(--mist); outline: none; }
+.dd-menu.menu li > button.menu-active { background: var(--blush); color: var(--pink-ink); }
+.dd-menu.menu li > button.menu-active svg { color: var(--pink); }
+.dd-menu.menu li > button:disabled { opacity: .45; }
+.dd-option-label { min-width: 0; }
