@@ -35,21 +35,22 @@ export function useLineContacts() {
   return useContext(LineContactsContext)
 }
 
-// An order is mapped to a contact when its LINE name matches the contact's display name.
-export function useLineContactByName(lineName: string) {
+// Prefer the stable LINE user ID; use display-name matching only for legacy orders without an ID.
+export function useLineContactByName(lineName: string, lineUserId = '') {
   const { contacts } = useLineContacts()
   return useMemo(() => {
+    if (lineUserId) return contacts.find((contact) => contact.lineUserId === lineUserId)
     const exactKey = lineName.trim().toLocaleLowerCase()
     if (!exactKey) return undefined
     const exact = contacts.find((contact) => contact.displayName.trim().toLocaleLowerCase() === exactKey)
     if (exact) return exact
     const looseKey = normalizeLineName(lineName)
     return looseKey ? contacts.find((contact) => normalizeLineName(contact.displayName) === looseKey) : undefined
-  }, [contacts, lineName])
+  }, [contacts, lineName, lineUserId])
 }
 
-export function LineAvatar({ lineName }: { lineName: string; size?: number; initials?: boolean }) {
-  const contact = useLineContactByName(lineName)
+export function LineAvatar({ lineName, lineUserId = '' }: { lineName: string; lineUserId?: string; size?: number; initials?: boolean }) {
+  const contact = useLineContactByName(lineName, lineUserId)
   const [failed, setFailed] = useState(false)
   if (contact?.pictureUrl && !failed) {
     return <img src={contact.pictureUrl} alt="" referrerPolicy="no-referrer" onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

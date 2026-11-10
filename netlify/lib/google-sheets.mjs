@@ -308,7 +308,7 @@ export async function writeOrderToSheet(gid, order, isUpdate = false) {
   if (!/^\d+$/.test(String(gid)) || !order || !Array.isArray(order.lines) || order.lines.length === 0) throw new Error('Order has no items to save.')
   const { values } = await readSheetValuesByGid(gid, 'A:ZZ')
   if (!values.length) throw new Error('The selected sheet has no header row.')
-  const helperHeaders = ['Sweetie Order ID', 'Sweetie Image Data', 'Sweetie Image Name', 'Sweetie Exchange Rate', 'Sweetie Campaign', 'Sweetie Campaign Discount', 'Sweetie Payment Status', 'Sweetie Shipping Status']
+  const helperHeaders = ['Sweetie Order ID', 'Sweetie LINE User ID', 'Sweetie Image Data', 'Sweetie Image Name', 'Sweetie Exchange Rate', 'Sweetie Campaign', 'Sweetie Campaign Discount', 'Sweetie Payment Status', 'Sweetie Shipping Status']
   const headers = await addAppColumnsIfMissing(gid, values, helperHeaders)
   const normalize = (value) => String(value ?? '').toLocaleLowerCase().replace(/[\s()（）]/g, '')
   const find = (needles) => headers.findIndex((header) => needles.some((needle) => normalize(header).includes(normalize(needle))))
@@ -317,7 +317,7 @@ export async function writeOrderToSheet(gid, order, isUpdate = false) {
     itemName: find(['รายการ']), quantity: find(['จำนวน']), salePrice: find(['ราคาขาย']), bank: find(['BANK']),
     deposit: find(['ราคามัดจำ']), profit: find(['กำไรสุทธิ', 'กำไร']), costTHB: find(['ต้นทุน(บาท)', 'ต้นทุน(THB)']),
     costRMB: find(['ต้นทุน(RMB)', 'ต้นทุน(หยวน)', 'ค่าสินค้า(Y)', 'ราคาจีน']),
-    orderId: headers.indexOf('Sweetie Order ID'), imageData: headers.indexOf('Sweetie Image Data'),
+    orderId: headers.indexOf('Sweetie Order ID'), lineUserId: headers.indexOf('Sweetie LINE User ID'), imageData: headers.indexOf('Sweetie Image Data'),
     imageName: headers.indexOf('Sweetie Image Name'), exchangeRate: headers.indexOf('Sweetie Exchange Rate'),
     campaign: headers.indexOf('Sweetie Campaign'), campaignDiscount: headers.indexOf('Sweetie Campaign Discount'),
     paymentStatus: headers.indexOf('Sweetie Payment Status'), shippingStatus: headers.indexOf('Sweetie Shipping Status'),
@@ -339,6 +339,7 @@ export async function writeOrderToSheet(gid, order, isUpdate = false) {
     const set = (key, value) => { if (columns[key] >= 0) row[columns[key]] = value == null ? '' : value }
     set('date', index === 0 ? order.day : '')
     set('lineName', index === 0 ? order.lineName : '')
+    set('lineUserId', index === 0 ? order.lineUserId ?? '' : '')
     set('customerName', index === 0 ? order.customerName : '')
     set('itemName', line.itemName ?? '')
     set('quantity', line.quantity ?? 1)

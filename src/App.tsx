@@ -74,6 +74,7 @@ type DraftLine = {
 
 type OrderDraft = {
   lineName: string
+  lineUserId: string
   customerName: string
   day: string
   exchangeRate: string
@@ -789,7 +790,7 @@ function OrderListRow({ order, sheet, compact = false }: { order: SheetOrder; sh
         onClick={openOrder}
         aria-label={`${t('orders.open')} ${order.customerName || order.lineName} · ${t('orders.profit')}: ${order.profitAmount === null ? '—' : `${formatMoney(order.profitAmount, language)} THB`}`}
       >
-        <span className="order-avatar" aria-hidden="true"><LineAvatar lineName={order.customerName || order.lineName} size={compact ? 17 : 21} initials /></span>
+        <span className="order-avatar" aria-hidden="true"><LineAvatar lineName={order.lineName || order.customerName} lineUserId={order.lineUserId} size={compact ? 17 : 21} initials /></span>
         <span className="order-card-main">
           <span className="cart-title display">{order.customerName || order.lineName}</span>
           <span className="cart-sub">{order.lineName} · {formatOrderDate(order.day, sheet, language)} · {t('detail.quantity', { count: order.quantity, unit: order.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</span>
@@ -837,7 +838,7 @@ function emptyDraftLine(): DraftLine {
 
 function emptyDraft(sheet: SheetDefinition, exchangeRate: number): OrderDraft {
   return {
-    lineName: '', customerName: '', day: getDefaultDay(sheet), exchangeRate: String(exchangeRate),
+    lineName: '', lineUserId: '', customerName: '', day: getDefaultDay(sheet), exchangeRate: String(exchangeRate),
     isCampaign: false, campaignDiscount: '', paymentStatus: '', shippingStatus: '', lines: [emptyDraftLine()],
   }
 }
@@ -858,6 +859,7 @@ function getDateInputValue(day: string, sheet: SheetDefinition) {
 function draftFromOrder(order: SheetOrder, defaultExchangeRate: number, sheet: SheetDefinition): OrderDraft {
   return {
     lineName: order.lineName,
+    lineUserId: order.lineUserId ?? '',
     customerName: order.customerName,
     day: getDateInputValue(order.day, sheet),
     exchangeRate: String(order.exchangeRate ?? defaultExchangeRate),
@@ -1064,8 +1066,8 @@ function CreateOrderDialog({
                 value={draft.lineName}
                 placeholder={t('createOrder.linePlaceholder')}
                 newLabel={(name) => t('createOrder.useNewLine', { name })}
-                onChange={(value) => updateField('lineName', value)}
-                onPick={(contact) => { updateField('lineName', contact.displayName); if (!draft.customerName.trim()) updateField('customerName', contact.displayName) }}
+                onChange={(value) => { updateField('lineName', value); updateField('lineUserId', '') }}
+                onPick={(contact) => { updateField('lineName', contact.displayName); updateField('lineUserId', contact.lineUserId.startsWith('sheet:') ? '' : contact.lineUserId); if (!draft.customerName.trim()) updateField('customerName', contact.displayName) }}
               />
             </div>
             <label><span className="field-label">{t('detail.customer')} <span className="required-star">*</span></span><input value={draft.customerName} onChange={(event) => updateField('customerName', event.target.value)} required placeholder={t('createOrder.customerPlaceholder')} /></label>
@@ -1505,7 +1507,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
     <section className="app-screen detail-screen" aria-label={t('screen.detail')}>
       <div className="detail-scroll">
         <div className="detail-hero">
-          <span className="detail-hero-avatar" aria-label={t('detail.customer')}><LineAvatar lineName={order.lineName || order.customerName} size={52} /></span>
+          <span className="detail-hero-avatar" aria-label={t('detail.customer')}><LineAvatar lineName={order.lineName || order.customerName} lineUserId={order.lineUserId} size={52} /></span>
           <div className="detail-hero-top">
             <button type="button" className="icon-button" onClick={() => navigate(`/admin/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ArrowLeft size={26} strokeWidth={2.4} /></button>
             <p className="detail-hero-title display">{sheetTitle(sheet, t)}</p>
@@ -2343,6 +2345,7 @@ function App() {
       sheetRow: originalOrder?.sheetRow ?? 0,
       day: draft.day,
       lineName: draft.lineName.trim(),
+      lineUserId: draft.lineUserId.trim() || undefined,
       customerName: draft.customerName.trim(),
       paymentStatus: draft.paymentStatus || (bankTotal >= totalSales && totalSales > 0 ? 'จ่ายเต็ม' : bankTotal > 0 ? 'มัดจำ' : 'ยังไม่ได้ชำระ'),
       shippingStatus: draft.shippingStatus,

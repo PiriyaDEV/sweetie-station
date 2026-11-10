@@ -33,6 +33,7 @@ export type SheetOrder = {
   sheetRow: number
   day: string
   lineName: string
+  lineUserId?: string
   customerName: string
   paymentStatus: string
   shippingStatus: string
@@ -201,6 +202,7 @@ export function parseOrdersPage(csv: string, sheet: SheetDefinition, offset = 0,
   const column = {
     date: findHeaderIndex(headers, ['วันที่']),
     lineName: findHeaderIndex(headers, ['ชื่อไลน์']),
+    lineUserId: findHeaderIndex(headers, ['Sweetie LINE User ID']),
     customerName: findHeaderIndex(headers, ['ชื่อจริง', 'ชื่อลูกค้า']),
     itemName: findHeaderIndex(headers, ['รายการ']),
     quantity: findHeaderIndex(headers, ['จำนวน']),
@@ -246,6 +248,7 @@ export function parseOrdersPage(csv: string, sheet: SheetDefinition, offset = 0,
         sheetRow: rowNumber,
         day: currentDay,
         lineName,
+        lineUserId: cell(row, column.lineUserId) || undefined,
         customerName,
         exchangeRate: numberFromCell(cell(row, column.exchangeRate)) || undefined,
         isCampaign: ['true', 'yes', '1'].includes(cell(row, column.campaign).toLocaleLowerCase()),
