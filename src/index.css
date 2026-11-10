@@ -809,3 +809,19 @@ button.stat-tile svg { position: absolute; top: 11px; right: 10px; color: var(--
 }
 /* Anything behind the app (scroll bounce, rounding, safe areas) shows pink, never white */
 html, body, #root { background: #f6aec8 !important; }
+
+/* Bigger item photos so products are easy to recognise */
+.order-item { grid-template-columns: 84px minmax(0, 1fr) auto; gap: 12px; padding: 10px 0; }
+.order-item-photo { width: 84px; height: 84px; border-radius: 20px; }
+.order-item-text strong { font-size: 14.5px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.order-item-text small { font-size: 12.5px; }
+.order-item-price { font-size: 14px; }
+.detail-section .cart-row { grid-template-columns: 128px minmax(0, 1fr); gap: 16px; padding: 16px 0; }
+.detail-section .cart-thumb { width: 128px; height: 128px; border-radius: 26px; }
+@media (max-width: 360px) {
+  .order-item { grid-template-columns: 72px minmax(0, 1fr) auto; }
+  .order-item-photo { width: 72px; height: 72px; }
+  .detail-section .cart-row { grid-template-columns: 108px minmax(0, 1fr); }
+  .detail-section .cart-thumb { width: 108px; height: 108px; }
+}
+.analytics-chart-container { height: 270px; padding: 14px 8px 8px; }

@@ -1732,8 +1732,10 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
     const profit = getProfitSummary(sheetOrders, expenses)
     return {
       label: sheetTitle(sheet, t),
+      shortLabel: new Intl.DateTimeFormat(language, { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(sheet.year, MONTH_INDEX[sheet.monthKey] ?? 0, 1))),
       sales: sheetTotal(sheetOrders),
-      netProfit: profit.complete ? profit.amount : null,
+      netProfit: profit.amount,
+      profitPartial: profit.amount !== null && !profit.complete,
     }
   })
   const topItemTotals = new Map<string, { name: string; attributes: string; quantity: number; sales: number; profit: number; lineCount: number; knownProfitLines: number; image?: string }>()
@@ -1848,7 +1850,7 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
         <section className="analytics-section analytics-chart-section">
           <div className="section-head"><h2 className="display">{t('analytics.salesProfitGraph')}</h2></div>
           <div className="analytics-chart-container">
-            {analyticsDataLoading ? <SkeletonLine className="h-full w-full rounded-xl" /> : <Suspense fallback={<SkeletonLine className="h-full w-full rounded-xl" />}><AnalyticsChart data={monthlyChartData} salesLabel={t('analytics.sales')} profitLabel={t('analytics.totalProfit')} formatMoney={(value) => formatMoney(value, language)} /></Suspense>}
+            {analyticsDataLoading ? <SkeletonLine className="h-full w-full rounded-xl" /> : <Suspense fallback={<SkeletonLine className="h-full w-full rounded-xl" />}><AnalyticsChart data={monthlyChartData} salesLabel={t('analytics.sales')} profitLabel={t('analytics.totalProfit')} partialLabel={t('sheets.partialProfit')} formatMoney={(value) => formatMoney(value, language)} /></Suspense>}
           </div>
           <p className="chart-data-note">{hasSalesLoadError ? t('analytics.partialDataNote') : t('analytics.chartProfitNote')}</p>
         </section>
