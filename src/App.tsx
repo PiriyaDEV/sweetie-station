@@ -1,32 +1,37 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type InputHTMLAttributes } from 'react'
 import {
-  ArrowRight,
-  BarChart3,
+  ArrowLeft,
   CalendarDays,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ClipboardList,
   Download,
   Eye,
   EyeOff,
-  Home,
   ImagePlus,
+  Languages,
   LoaderCircle,
+  LogOut,
+  Minus,
   Package,
   Pencil,
+  Plane,
   Plus,
   Receipt,
   RefreshCw,
   Search,
-  SlidersHorizontal,
-  Settings,
+  ShieldCheck,
+  ShoppingBag,
+  UserRound,
+  WalletCards,
   X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import sweetieLogo from './assets/sweetie-logo.webp'
 import { LineAvatar, LineContactsProvider, LineNameField } from './lineContacts'
+import { BottomNavigation, ScreenHeader, SkeletonLine, Sparkle, StatusBadge } from './ui/components'
+import { paymentBadgeClass, paymentStatusLabel, shippingBadgeClass, shippingStatusLabel, statusFilterLabel, STATUS_FILTERS } from './ui/status'
 
 const AnalyticsChart = lazy(() => import('./AnalyticsChart'))
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
@@ -158,7 +163,6 @@ function usePullToRefresh(rootRef: { current: HTMLDivElement | null }, refreshin
     const onPointerDown = (event: PointerEvent) => {
       if (event.pointerType !== 'mouse' || refreshing || root.scrollTop > 0) return
       startY = event.clientY
-      try { root.setPointerCapture(event.pointerId) } catch { /* Pointer capture is optional. */ }
     }
     const onPointerMove = (event: PointerEvent) => {
       if (event.pointerType !== 'mouse' || startY === null || refreshing || event.buttons === 0) return
@@ -168,6 +172,10 @@ function usePullToRefresh(rootRef: { current: HTMLDivElement | null }, refreshin
         return
       }
       event.preventDefault()
+      // Capture only once a real drag starts, so plain clicks still reach buttons in the list.
+      if (delta > 6 && !root.hasPointerCapture(event.pointerId)) {
+        try { root.setPointerCapture(event.pointerId) } catch { /* Pointer capture is optional. */ }
+      }
       const nextDistance = Math.min(88, delta * 0.55)
       distanceRef.current = nextDistance
       setPullDistance(nextDistance)
@@ -202,7 +210,7 @@ function PullToRefreshIndicator({ distance, refreshing }: { distance: number; re
   const height = refreshing ? 44 : Math.min(48, distance)
   return (
     <div
-      className="flex shrink-0 items-center justify-center gap-2 overflow-hidden text-xs font-semibold text-rose-700 transition-[height] duration-150"
+      className="pull-indicator flex shrink-0 items-center justify-center gap-2 overflow-hidden text-xs font-semibold transition-[height] duration-150"
       style={{ height }}
       role="status"
       aria-live="polite"
@@ -212,10 +220,6 @@ function PullToRefreshIndicator({ distance, refreshing }: { distance: number; re
       <span>{refreshing ? t('orders.refreshing') : armed ? t('orders.releaseToRefresh') : t('orders.pullToRefresh')}</span>
     </div>
   )
-}
-
-function SkeletonLine({ className = '' }: { className?: string }) {
-  return <span aria-hidden="true" className={`block animate-pulse rounded-lg bg-gradient-to-r from-rose-50 via-rose-100 to-rose-50 ${className}`} />
 }
 
 function formatMoney(value: number, language: string) {
@@ -330,36 +334,6 @@ function sheetTitle(sheet: SheetDefinition, t: (key: string) => string) {
   return sheet.customName || t(sheet.titleKey)
 }
 
-function paymentStatusLabel(status: string, t: (key: string) => string) {
-  if (status === 'ยังไม่ได้ชำระ') return t('detail.paymentUnpaid')
-  if (status === 'จ่ายเต็ม') return t('detail.paymentFull')
-  if (status === 'มัดจำ') return t('detail.paymentDeposit')
-  return status || t('detail.notSet')
-}
-
-function shippingStatusLabel(status: string, t: (key: string) => string) {
-  if (status === 'ยังไม่ได้สั่ง') return t('detail.shippingNotOrdered')
-  if (status === 'สั่งแล้ว') return t('detail.shippingOrdered')
-  if (status === 'รอเข้าไทย') return t('detail.shippingInbound')
-  if (status === 'ส่งแล้ว') return t('detail.shippingSent')
-  return status || t('detail.notSet')
-}
-
-function paymentBadgeClass(status: string) {
-  if (status === 'ยังไม่ได้ชำระ') return 'unpaid'
-  if (status === 'จ่ายเต็ม') return 'paid'
-  if (status === 'มัดจำ') return 'deposit'
-  return 'neutral'
-}
-
-function shippingBadgeClass(status: string) {
-  if (status === 'ยังไม่ได้สั่ง') return 'not-ordered'
-  if (status === 'สั่งแล้ว') return 'ordered'
-  if (status === 'ส่งแล้ว') return 'shipped'
-  if (status === 'รอเข้าไทย') return 'inbound'
-  return 'neutral'
-}
-
 const translatedFieldLabels: Record<string, string> = {
   'ส่วนลด': 'detailFields.discount',
   'ราคาจีน': 'detailFields.chinaPrice',
@@ -399,35 +373,42 @@ function SettingsPage({ onExportBackup, backupLoading, backupMessage, onLogout }
   }
 
   return (
-    <section className="app-screen home-screen settings-screen" aria-label={t('settings.title')}>
-      <div className="screen-fixed-header">
-        <header className="sales-summary settings-summary">
-          <p>{t('settings.kicker')}</p>
-          <h1>{t('settings.title')}</h1>
-          <p className="sales-growth">{t('settings.subtitle')}</p>
-        </header>
-      </div>
-      <div className="home-scroll-area settings-scroll-area">
-        <section className="analytics-section settings-card">
-          <h2>{t('settings.preferences')}</h2>
-          <label className="settings-field">
-            <span>{t('settings.displayLanguage')}</span>
-            <select className="select select-bordered select-sm select-primary" value={language} onChange={(event) => changeLanguage(event.target.value)}>
-              <option value="en">English</option>
-              <option value="th">ไทย</option>
-            </select>
-          </label>
-        </section>
-        <section className="analytics-section settings-card">
-          <h2>{t('settings.data')}</h2>
-          <p>{t('settings.backupHint')}</p>
-          <button type="button" className="backup-download-button" onClick={onExportBackup} disabled={backupLoading}>{backupLoading ? <LoaderCircle size={15} className="animate-spin" /> : <Download size={15} />}{backupLoading ? t('backup.preparing') : t('backup.download')}</button>
-          {backupMessage && <small className="backup-status" role="status">{backupMessage}</small>}
-        </section>
-        <section className="analytics-section settings-card settings-account-card">
-          <h2>{t('settings.account')}</h2>
-          <button type="button" className="logout-button" onClick={() => void onLogout()}>{t('auth.logout')}</button>
-        </section>
+    <section className="app-screen settings-screen" aria-label={t('settings.title')}>
+      <ScreenHeader kicker={t('settings.kicker')} title={t('settings.title')} />
+      <div className="screen-surface">
+        <div className="surface-scroll">
+          <div className="settings-brand"><img src={sweetieLogo} alt="" /><div><strong>Sweetie Station</strong><span>{t('settings.subtitle')}</span></div></div>
+          <section className="settings-group">
+            <h2 className="display">{t('settings.preferences')}</h2>
+            <label className="info-bar">
+              <Languages size={21} />
+              <span className="info-bar-text"><strong>{t('settings.displayLanguage')}</strong></span>
+              <select value={language} onChange={(event) => changeLanguage(event.target.value)}>
+                <option value="en">English</option>
+                <option value="th">ไทย</option>
+              </select>
+              <ChevronDown size={16} className="info-bar-end" />
+            </label>
+          </section>
+          <section className="settings-group">
+            <h2 className="display">{t('settings.data')}</h2>
+            <p>{t('settings.backupHint')}</p>
+            <button type="button" className="info-bar" onClick={onExportBackup} disabled={backupLoading}>
+              {backupLoading ? <LoaderCircle size={21} className="animate-spin" /> : <Download size={21} />}
+              <span className="info-bar-text"><strong>{backupLoading ? t('backup.preparing') : t('backup.download')}</strong></span>
+              <ChevronRight size={18} className="info-bar-end" />
+            </button>
+            {backupMessage && <small className="backup-status" role="status">{backupMessage}</small>}
+          </section>
+          <section className="settings-group">
+            <h2 className="display">{t('settings.account')}</h2>
+            <button type="button" className="info-bar danger" onClick={() => void onLogout()}>
+              <LogOut size={21} />
+              <span className="info-bar-text"><strong>{t('auth.logout')}</strong></span>
+              <ChevronRight size={18} className="info-bar-end" />
+            </button>
+          </section>
+        </div>
       </div>
       <BottomNavigation />
     </section>
@@ -439,31 +420,14 @@ function SplashScreen({ showLoading = true }: { showLoading?: boolean }) {
 
   return (
     <section className="app-screen splash-screen" aria-label={t('screen.splash')} aria-busy={showLoading}>
+      <Sparkle className="sparkle-a" size={34} />
+      <Sparkle className="sparkle-b" size={22} />
       <div className="splash-content">
         <img className="sweetie-mark-image" src={sweetieLogo} alt={t('splash.logoAlt')} />
-        <p className="splash-tagline">{t('splash.tagline')}</p>
+        <p className="splash-tagline display">{t('splash.tagline')}</p>
       </div>
-      {showLoading && <div className="absolute inset-x-0 bottom-7 flex flex-col items-center gap-2 text-xs font-semibold text-white/90" role="status"><span>{t('splash.loading')}</span><span aria-hidden="true" className="h-1 w-8 animate-pulse rounded-full bg-white/75" /></div>}
+      {showLoading && <div className="splash-loading" role="status"><span className="splash-dots" aria-hidden="true"><span /><span /><span /></span><span>{t('splash.loading')}</span></div>}
     </section>
-  )
-}
-
-function BottomNavigation() {
-  const { t } = useTranslation()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const isHome = location.pathname === '/admin/home'
-  const isAnalytics = location.pathname === '/admin/analytics'
-  const isSettings = location.pathname === '/admin/settings'
-  const isOrders = location.pathname === '/admin/orders' || location.pathname.startsWith('/admin/sheets/')
-
-  return (
-    <nav className="bottom-nav" aria-label={t('nav.label')}>
-      <button type="button" className={`nav-item${isHome ? ' active' : ''}`} aria-label={t('nav.home')} aria-current={isHome ? 'page' : undefined} onClick={() => navigate('/admin/home')}><Home size={20} fill={isHome ? 'currentColor' : 'none'} /><span>{t('nav.home')}</span></button>
-      <button type="button" className={`nav-item${isOrders ? ' active' : ''}`} aria-label={t('nav.orders')} aria-current={isOrders ? 'page' : undefined} onClick={() => navigate('/admin/orders')}><ClipboardList size={20} /><span>{t('nav.orders')}</span></button>
-      <button type="button" className={`nav-item${isAnalytics ? ' active' : ''}`} aria-label={t('nav.analytics')} aria-current={isAnalytics ? 'page' : undefined} onClick={() => navigate('/admin/analytics')}><BarChart3 size={20} /><span>{t('nav.analytics')}</span></button>
-      <button type="button" className={`nav-item${isSettings ? ' active' : ''}`} aria-label={t('nav.settings')} aria-current={isSettings ? 'page' : undefined} onClick={() => navigate('/admin/settings')}><Settings size={20} /><span>{t('nav.settings')}</span></button>
-    </nav>
   )
 }
 
@@ -607,6 +571,7 @@ function CreateSheetDialog({ onClose, onCreate }: {
           </div>
           <label className="year-field"><span className="field-label">{t('createSheet.year')} <span className="required-star">*</span></span><NumericInput integer minValue={2000} maxValue={2100} value={year} onValueChange={setYear} required /></label>
           <section className="create-sheet-preview" aria-live="polite">
+            <span className={`create-sheet-preview-thumb ${kind}`} aria-hidden="true">{kind === 'haul' ? <Plane size={26} /> : <ShoppingBag size={26} />}</span>
             <span>{t('createSheet.preview')}</span>
             <strong>{previewName}</strong>
             <small>{t(`sheets.kind.${kind}`)} · {t(`sheets.${monthKey}`)} {year || now.getFullYear()}</small>
@@ -682,75 +647,113 @@ function HomePage({
     })
   const activeFilterCount = [Boolean(query.trim()), kindFilter !== 'all', statusFilter !== 'all', sortBy !== 'month'].filter(Boolean).length
 
+  const currentSheetId = getCurrentMonthSheet(dataBySheet, sheets).id
+  const previewFor = (kind?: SheetDefinition['kind']) => sheetRows.filter(({ sheet }) => !kind || sheet.kind === kind).map(({ orders }) => getPreviewImage(orders)).find(Boolean)
+  const chips = [
+    { key: 'all', label: t('sheets.chips.all'), active: kindFilter === 'all' && statusFilter === 'all', image: previewFor(), count: sheets.length, onSelect: () => { setKindFilter('all'); setStatusFilter('all') } },
+    { key: 'sales', label: t('sheets.chips.sales'), active: kindFilter === 'sales' && statusFilter === 'all', image: previewFor('sales'), onSelect: () => { setKindFilter('sales'); setStatusFilter('all') } },
+    { key: 'haul', label: t('sheets.chips.haul'), active: kindFilter === 'haul' && statusFilter === 'all', image: previewFor('haul'), onSelect: () => { setKindFilter('haul'); setStatusFilter('all') } },
+    { key: 'unpaid', label: t('sheets.chips.unpaid'), active: statusFilter === 'unpaid', icon: <WalletCards size={28} />, onSelect: () => { setKindFilter('all'); setStatusFilter('unpaid') } },
+  ]
+  const sortOptions = [
+    { value: 'month', label: t('filters.monthOrder') },
+    { value: 'sales-desc', label: t('filters.salesHighShort') },
+    { value: 'orders-desc', label: t('filters.ordersHigh') },
+    { value: 'name', label: t('filters.nameAZShort') },
+  ]
+
   return (
     <section className="app-screen home-screen sheets-home-screen" aria-label={t('screen.home')}>
-      <div className="screen-fixed-header">
-        <header className="sales-summary sheet-home-summary">
-          <p>{t('sheets.kicker')}</p>
-          <h1>{t('sheets.chooseMonth')}</h1>
-          <p className="sales-growth">{t('sheets.sheetCount', { count: sheets.length })}</p>
-        </header>
-        <div className="section-heading sheet-list-heading">
-          <button type="button" className="sheet-list-toggle" aria-expanded={sheetControlsOpen} aria-controls="sheet-list-controls" aria-label={t(sheetControlsOpen ? 'sheets.hideControls' : 'sheets.showControls')} onClick={() => setSheetControlsOpen((open) => !open)}>
-            <h2>{t('sheets.allSheets')}</h2>
-            <ChevronDown size={18} className={sheetControlsOpen ? 'is-open' : ''} />
-            {activeFilterCount > 0 && <span className="active-filter-count" aria-label={t('filters.activeCount', { count: activeFilterCount })}>{activeFilterCount}</span>}
+      <ScreenHeader
+        kicker={t('sheets.kicker')}
+        title={t('sheets.title')}
+        actions={<>
+          <button type="button" className={`icon-button${sheetControlsOpen ? ' is-active' : ''}`} aria-expanded={sheetControlsOpen} aria-controls="sheet-list-controls" aria-label={t(sheetControlsOpen ? 'sheets.hideControls' : 'sheets.showControls')} onClick={() => setSheetControlsOpen((open) => !open)}>
+            {sheetControlsOpen ? <X size={24} /> : <Search size={24} />}
+            {!sheetControlsOpen && activeFilterCount > 0 && <span className="icon-badge" aria-label={t('filters.activeCount', { count: activeFilterCount })}>{activeFilterCount}</span>}
           </button>
-        </div>
-        {sheetControlsOpen && <div className="sheet-controls-panel" id="sheet-list-controls" aria-label={t('filters.sheetControls')}>
-          <label className="order-search sheet-search-field" id="sheet-search">
-            <Search size={16} />
-            <span className="sr-only">{t('sheets.search')}</span>
-            <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('sheets.search')} />
-          </label>
-          <div className="sheet-filter-row">
-            <label><span>{t('filters.sheetType')}</span><select className="select select-bordered select-sm select-primary" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">{t('filters.allSheets')}</option><option value="sales">{t('sheets.kind.sales')}</option><option value="haul">{t('sheets.kind.haul')}</option></select></label>
-            <label><span>{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="unpaid">{t('detail.paymentUnpaid')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="not-ordered">{t('detail.shippingNotOrdered')}</option><option value="ordered">{t('detail.shippingOrdered')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
-            <label><span>{t('filters.sortSheets')}</span><select className="select select-bordered select-sm select-primary" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="month">{t('filters.monthOrder')}</option><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="orders-desc">{t('filters.ordersHigh')}</option><option value="name">{t('filters.nameAZ')}</option></select></label>
-            {activeFilterCount > 0 && <button type="button" className="clear-sheet-filters" onClick={() => { setQuery(''); setKindFilter('all'); setStatusFilter('all'); setSortBy('month') }}>{t('filters.clear')}</button>}
-          </div>
-        </div>}
-      </div>
+          <button type="button" className="icon-button" aria-label={t('nav.settings')} onClick={() => navigate('/admin/settings')}><UserRound size={24} /></button>
+        </>}
+      />
 
-      <div className="home-scroll-area sheet-list-scroll overscroll-y-contain" ref={scrollRootRef}>
-        <PullToRefreshIndicator distance={pullDistance} refreshing={refreshing} />
-        {loading && Object.keys(dataBySheet).length === 0 ? <div className="sheet-grid" aria-label={t('sheet.loading')} aria-busy="true">
-          {Array.from({ length: 6 }, (_, index) => <div className="relative aspect-square animate-pulse overflow-hidden rounded-3xl border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-rose-100 p-3" key={index} aria-hidden="true"><span className="absolute left-3 top-3 h-6 w-14 rounded-full bg-rose-100" /><div className="absolute inset-x-3 bottom-3 grid gap-2 rounded-2xl bg-white/80 p-3"><SkeletonLine className="h-4 w-2/3" /><SkeletonLine className="h-3 w-1/3" /><SkeletonLine className="h-3 w-1/2" /></div></div>)}
-        </div> : <div className="sheet-grid">
-          {visibleSheets.map(({ sheet, orders, error, profit }) => {
-            const image = getPreviewImage(orders)
-            return (
-              <button
-                type="button"
-                className="sheet-card"
-                key={sheet.id}
-                onClick={() => navigate(`/admin/sheets/${sheet.id}`, { state: { from: 'home' } })}
-                aria-label={`${sheetTitle(sheet, t)} · ${orders.length} ${t('orders.orders')}`}
-              >
-                {image
-                  ? <img className="sheet-card-image" src={image} alt="" loading="lazy" />
-                  : <span className={`sheet-card-placeholder ${sheet.kind}`}><CalendarDays size={25} /></span>}
-                <span className="sheet-card-topline">
-                  <span className={`sheet-kind ${sheet.kind}`}>{t(`sheets.kind.${sheet.kind}`)}</span>
-                  <ArrowRight size={15} />
+      <div className="screen-surface has-dock">
+        <div className="surface-scroll overscroll-y-contain" ref={scrollRootRef}>
+          <PullToRefreshIndicator distance={pullDistance} refreshing={refreshing} />
+          {sheetControlsOpen && <div className="search-panel" id="sheet-list-controls" aria-label={t('filters.sheetControls')}>
+            <label className="search-field" id="sheet-search">
+              <Search size={18} />
+              <span className="sr-only">{t('sheets.search')}</span>
+              <input autoFocus type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('sheets.search')} />
+            </label>
+            <div className="pill-row" role="group" aria-label={t('filters.sortSheets')}>
+              {sortOptions.map((option) => <button type="button" className="pill" key={option.value} aria-pressed={sortBy === option.value} onClick={() => setSortBy(option.value)}>{option.label}</button>)}
+              <label className="pill-select">
+                <span className="sr-only">{t('filters.status')}</span>
+                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                  {STATUS_FILTERS.map((filter) => <option key={filter} value={filter}>{statusFilterLabel(filter, t)}</option>)}
+                </select>
+                <ChevronDown size={14} />
+              </label>
+              {activeFilterCount > 0 && <button type="button" className="pill" onClick={() => { setQuery(''); setKindFilter('all'); setStatusFilter('all'); setSortBy('month') }}>{t('filters.clear')}</button>}
+            </div>
+          </div>}
+
+          <div className="chip-row" role="group" aria-label={t('filters.sheetType')}>
+            {chips.map((chip) => (
+              <button type="button" className={`chip${chip.active ? ' active' : ''}`} key={chip.key} aria-pressed={chip.active} onClick={chip.onSelect}>
+                <span className={`chip-media${chip.icon || !chip.image ? ' is-icon' : ''}`}>
+                  {chip.icon ?? (chip.image ? <img src={chip.image} alt="" loading="lazy" /> : <CalendarDays size={26} />)}
+                  {chip.count !== undefined && <span className="chip-count">{chip.count}</span>}
                 </span>
-                <span className="sheet-card-caption">
-                  <strong>{sheetTitle(sheet, t)}</strong>
-                  <span>{error ? t('sheet.errorShort') : dataBySheet[sheet.id]?.hasMore ? t('sheets.partialOrderCount', { count: orders.length }) : t('sheets.orderCount', { count: orders.length })}</span>
-                  <b>{error ? '—' : `${formatMoney(sheetTotal(orders), language)} THB`}</b>
-                  <small className={`sheet-card-profit${profit.amount === null ? ' unavailable' : profit.amount < 0 ? ' negative' : ' positive'}`}>
-                    <span className="sheet-card-profit-label">{t(profit.amount !== null && !profit.complete ? 'sheets.partialProfit' : 'sheets.profit')}: </span>
-                    <strong className="sheet-card-profit-value">{profit.amount === null ? '—' : `${formatMoney(profit.amount, language)} THB`}</strong>
-                  </small>
-                </span>
+                <span className="chip-label">{chip.label}</span>
               </button>
-            )
-          })}
-          {visibleSheets.length === 0 && <p className="sheet-message">{t('sheets.noMatch')}</p>}
-        </div>}
-      </div>
-      <div className="create-order-dock create-sheet-dock">
-        <button type="button" className="create-order-list-button btn btn-primary" onClick={() => setCreateSheetOpen(true)}><Plus size={17} /> {t('createSheet.open')}</button>
+            ))}
+          </div>
+
+          <div className="section-head">
+            <h2 className="display">{t('sheets.chooseMonth')}</h2>
+            <span>{t('sheets.sheetCountShort', { count: visibleSheets.length })}</span>
+          </div>
+
+          {loading && Object.keys(dataBySheet).length === 0 ? <div className="product-grid" aria-label={t('sheet.loading')} aria-busy="true">
+            {Array.from({ length: 4 }, (_, index) => <div className="grid gap-2" key={index} aria-hidden="true"><SkeletonLine className="aspect-square w-full rounded-[28px]" /><SkeletonLine className="h-5 w-3/4" /><SkeletonLine className="h-3 w-1/2" /><SkeletonLine className="h-5 w-2/3" /></div>)}
+          </div> : <div className="product-grid">
+            {visibleSheets.map(({ sheet, orders, error, profit }) => {
+              const image = getPreviewImage(orders)
+              const unpaid = orders.filter((order) => order.paymentStatus === 'ยังไม่ได้ชำระ').length
+              const profitTone = profit.amount === null ? ' unavailable' : profit.amount < 0 ? ' negative' : ''
+              return (
+                <button
+                  type="button"
+                  className="product-card"
+                  key={sheet.id}
+                  onClick={() => navigate(`/admin/sheets/${sheet.id}`, { state: { from: 'home' } })}
+                  aria-label={`${sheetTitle(sheet, t)} · ${orders.length} ${t('orders.orders')}`}
+                >
+                  <span className={`product-media ${sheet.kind}`}>
+                    {image ? <img src={image} alt="" loading="lazy" /> : <span className="product-media-placeholder"><CalendarDays size={36} /></span>}
+                    <span className={`product-tag ${sheet.kind}`}>{t(`sheets.kind.${sheet.kind}`)}</span>
+                    {sheet.id === currentSheetId && <span title={t('sheets.current')}><Sparkle size={26} /></span>}
+                    <span className="product-fab" aria-hidden="true">{sheet.kind === 'haul' ? <Plane size={19} /> : <ShoppingBag size={19} />}</span>
+                  </span>
+                  <span className="product-title display">{sheetTitle(sheet, t)}</span>
+                  <span className="product-meta">
+                    {error ? t('sheet.errorShort') : dataBySheet[sheet.id]?.hasMore ? t('sheets.partialOrderCount', { count: orders.length }) : t('sheets.orderCount', { count: orders.length })}
+                    {unpaid > 0 && <> · <b>{t('sheets.unpaidCount', { count: unpaid })}</b></>}
+                  </span>
+                  <span className="product-price display">{error ? '—' : `${formatMoney(sheetTotal(orders), language)} THB`}</span>
+                  <span className={`profit-chip${profitTone}`}>
+                    {t(profit.amount !== null && !profit.complete ? 'sheets.partialProfit' : 'sheets.profit')} {profit.amount === null ? '—' : `${profit.amount > 0 ? '+' : ''}${formatMoney(profit.amount, language)}`}
+                  </span>
+                </button>
+              )
+            })}
+            {visibleSheets.length === 0 && <p className="sheet-message">{t('sheets.noMatch')}</p>}
+          </div>}
+        </div>
+        <div className="action-dock">
+          <button type="button" className="cta" onClick={() => setCreateSheetOpen(true)}><Plus size={21} /> {t('createSheet.open')}</button>
+        </div>
       </div>
       <BottomNavigation />
       {createSheetOpen && <CreateSheetDialog onClose={() => setCreateSheetOpen(false)} onCreate={async (sheet) => { const created = await onCreateSheet(sheet); setCreateSheetOpen(false); navigate(`/admin/sheets/${created.id}`, { state: { from: 'home' } }) }} />}
@@ -758,48 +761,36 @@ function HomePage({
   )
 }
 
-function StatusBadge({ status = '', type, label }: { status?: string; type: 'payment' | 'shipping' | 'quantity'; label?: string }) {
-  const { t } = useTranslation()
-  if (type === 'quantity') return <span className="status-badge quantity">{label}</span>
-  const text = type === 'payment' ? paymentStatusLabel(status, t) : shippingStatusLabel(status, t)
-  const className = type === 'payment' ? paymentBadgeClass(status) : shippingBadgeClass(status)
-  return <span className={`status-badge ${type} ${className}`}>{text}</span>
-}
-
 function OrderListRow({ order, sheet }: { order: SheetOrder; sheet: SheetDefinition }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const language = i18n.resolvedLanguage ?? 'en'
+  const image = order.lines.find((line) => line.images[0])?.images[0]
+  const itemNames = order.lines.map((line, index) => line.itemName || t('detail.itemNumber', { number: index + 1 })).join(' · ')
+  const profitTone = order.profitAmount === null ? ' unavailable' : order.profitAmount < 0 ? ' negative' : ''
   return (
     <button
       type="button"
-      className="order-list-row order-row-open"
+      className="cart-row"
       onClick={() => navigate(`/admin/sheets/${sheet.id}/orders/${order.id}`)}
       aria-label={`${t('orders.open')} ${order.customerName || order.lineName} · ${t('orders.profit')}: ${order.profitAmount === null ? '—' : `${formatMoney(order.profitAmount, language)} THB`}`}
     >
-      <span className="order-row-photo mock-user-avatar" aria-hidden="true"><LineAvatar lineName={order.lineName} size={22} /></span>
-      <span className="order-row-main">
-        <span className="order-row-title">{order.customerName || order.lineName}</span>
-        <span className="order-row-subtitle">{order.lineName} · {formatOrderDate(order.day, sheet, language)}</span>
-        <span className="order-row-badges">
+      <span className="cart-thumb" aria-hidden="true">
+        {image ? <img src={image} alt="" loading="lazy" /> : <LineAvatar lineName={order.lineName} size={34} />}
+        {order.lines.length > 1 && <span className="cart-thumb-count">+{order.lines.length - 1}</span>}
+      </span>
+      <span className="cart-body">
+        <span className="cart-title display">{order.customerName || order.lineName}</span>
+        <span className="cart-sub">{order.lineName} · {formatOrderDate(order.day, sheet, language)} · {t('detail.quantity', { count: order.quantity, unit: order.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</span>
+        <span className="cart-sub">{itemNames}</span>
+        <span className="cart-price-row">
+          <span className="cart-price display">{formatMoney(order.totalSales, language)} THB</span>
+          <span className={`profit-chip${profitTone}`}>{t('orders.profit')} {order.profitAmount === null ? '—' : `${order.profitAmount > 0 ? '+' : ''}${formatMoney(order.profitAmount, language)}`}</span>
+        </span>
+        <span className="cart-badges">
           <StatusBadge type="payment" status={order.paymentStatus} />
           <StatusBadge type="shipping" status={order.shippingStatus} />
         </span>
-      </span>
-      <span className="order-row-total">
-        {formatMoney(order.totalSales, language)}<small>THB</small>
-        <span className={`order-row-profit${order.profitAmount === null ? ' unavailable' : order.profitAmount < 0 ? ' negative' : ' positive'}`}>
-          <small>{t('orders.profit')}</small><strong>{order.profitAmount === null ? '—' : `${formatMoney(order.profitAmount, language)} THB`}</strong>
-        </span>
-      </span>
-      <span className="order-row-items" aria-label={t('detail.items')}>
-        {order.lines.map((line, index) => (
-          <span className="order-item-preview" key={`${order.id}-${line.row || index}`}>
-            <span className="order-item-preview-photo">{line.images[0] ? <img src={line.images[0]} alt="" loading="lazy" /> : <Package size={14} />}</span>
-            <span className="order-item-preview-name"><strong>{line.itemName || t('detail.itemNumber', { number: index + 1 })}</strong><small>{t('detail.quantity', { count: line.quantity, unit: line.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</small></span>
-            <strong className="order-item-preview-price">{formatMoney(line.salePrice, language)} THB</strong>
-          </span>
-        ))}
       </span>
     </button>
   )
@@ -1088,7 +1079,7 @@ function CreateOrderDialog({
                     <label><span className="field-label">{t('createOrder.itemName')} <span className="required-star">*</span></span><input value={line.itemName} onChange={(event) => updateLine(index, 'itemName', event.target.value)} required /></label>
                     <div className="form-grid two-columns">
                       <label><span className="field-label">{t('createOrder.price')} <span className="required-star">*</span></span><NumericInput minValue={0} value={line.salePrice} onValueChange={(value) => updateLine(index, 'salePrice', value)} required /></label>
-                      <label><span className="field-label">{t('createOrder.quantity')} <span className="required-star">*</span></span><NumericInput integer minValue={1} value={line.quantity} onValueChange={(value) => updateLine(index, 'quantity', value)} required /></label>
+                      <div className="field-block"><span className="field-label">{t('createOrder.quantity')} <span className="required-star">*</span></span><QuantityStepper label={t('createOrder.quantity')} value={line.quantity} onChange={(value) => updateLine(index, 'quantity', value)} /></div>
                     </div>
                   </div>
                 </div>
@@ -1142,13 +1133,25 @@ function CreateOrderDialog({
               <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose} disabled={saving}>{t('createOrder.cancel')}</button>
               {currentStep > 0 && <button type="button" className="back-order-button btn btn-ghost" onClick={() => goToStep(currentStep - 1)} disabled={saving}><ChevronLeft size={15} />{t('createOrder.back')}</button>}
               {currentStep < 2
-                ? <button type="button" className="save-order-button btn btn-primary" onClick={goToNextStep} disabled={saving}>{t('createOrder.next')}<ChevronRight size={15} /></button>
-                : <button type="submit" className="save-order-button btn btn-primary" disabled={saving}>{saving ? <LoaderCircle size={16} className="animate-spin" /> : <Check size={16} />} {saving ? t('createOrder.saving') : t(initialOrder ? 'createOrder.update' : 'createOrder.create')}</button>}
+                ? <button key="next-step" type="button" className="save-order-button btn btn-primary" onClick={goToNextStep} disabled={saving}>{t('createOrder.next')}<ChevronRight size={15} /></button>
+                : <button key="submit-order" type="submit" className="save-order-button btn btn-primary" disabled={saving}>{saving ? <LoaderCircle size={16} className="animate-spin" /> : <Check size={16} />} {saving ? t('createOrder.saving') : t(initialOrder ? 'createOrder.update' : 'createOrder.create')}</button>}
             </div>
           </footer>
         </form>
       </section>
     </div>
+  )
+}
+
+function QuantityStepper({ value, onChange, label }: { value: string; onChange: (value: string) => void; label: string }) {
+  const { t } = useTranslation()
+  const current = Math.max(1, Number(value) || 1)
+  return (
+    <span className="qty-stepper">
+      <button type="button" aria-label={t('createOrder.decrease')} onClick={() => onChange(String(Math.max(1, current - 1)))} disabled={current <= 1}><Minus size={18} strokeWidth={3} /></button>
+      <NumericInput integer minValue={1} value={value} onValueChange={onChange} aria-label={label} required />
+      <button type="button" aria-label={t('createOrder.increase')} onClick={() => onChange(String(current + 1))}><Plus size={18} strokeWidth={3} /></button>
+    </span>
   )
 }
 
@@ -1243,12 +1246,10 @@ function SheetOrdersPage({
   const pullDistance = usePullToRefresh(scrollRootRef, loading, onRefresh)
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
-  const [summaryOpen, setSummaryOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
   const [visibleCount, setVisibleCount] = useState(10)
   const [createOpen, setCreateOpen] = useState(false)
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const [expensesOpen, setExpensesOpen] = useState(false)
   const [notice, setNotice] = useState('')
   const orders = sheetData?.orders ?? EMPTY_ORDERS
@@ -1294,12 +1295,6 @@ function SheetOrdersPage({
     return () => observer.disconnect()
   }, [hasMore, sortedOrders.length, visibleCount, sheetData?.hasMore, sheetData?.loadingMore, sheetData?.loadMoreError, onLoadMoreData, sheet.id])
 
-  const toggleSummary = () => {
-    setSummaryOpen((open) => !open)
-    setSearchOpen(false)
-    setFiltersOpen(false)
-  }
-
   const updateQuery = (value: string) => { setQuery(value); setVisibleCount(10) }
   const updateStatus = (value: string) => { setStatusFilter(value); setVisibleCount(10) }
   const updateSort = (value: string) => { setSortBy(value); setVisibleCount(10) }
@@ -1322,73 +1317,79 @@ function SheetOrdersPage({
     window.setTimeout(() => setNotice(''), 3000)
   }
 
+  const profitReady = !sheetData?.hasMore && totalProfit.amount !== null
+  const profitNote = sheetData?.hasMore ? t('sheet.loadingShort') : totalProfit.amount === null ? t('analytics.noPeriodProfitShort') : !totalProfit.complete ? `${totalProfit.knownLines}/${totalProfit.totalLines}` : ''
+  const sortOptions = [
+    { value: 'newest', label: t('filters.newest') },
+    { value: 'oldest', label: t('filters.oldest') },
+    { value: 'sales-desc', label: t('filters.salesHigh') },
+    { value: 'sales-asc', label: t('filters.salesLow') },
+    { value: 'status', label: t('filters.statusAZ') },
+  ]
+
   return (
-    <section className={`app-screen home-screen orders-screen${summaryOpen ? ' summary-open' : ''}`} aria-label={t('screen.sheetOrders')}>
-      <div className="screen-fixed-header orders-fixed-header">
-        {cameFromHome && <button type="button" className="screen-back-button" onClick={() => navigate(-1)} aria-label={t('nav.backToSheets')}><ChevronLeft size={18} /> {t('nav.allSheets')}</button>}
-        <header className="sales-summary month-summary">
-          <p>{t(`sheets.kind.${sheet.kind}`)}</p>
-          <div className="month-title-row">
-            <h1>{sheetTitle(sheet, t)}</h1>
-            <button type="button" className="month-summary-toggle" aria-label={t(summaryOpen ? 'orders.hideSummary' : 'orders.showSummary')} aria-expanded={summaryOpen} aria-controls="month-summary-content order-tools-content" onClick={toggleSummary}>
-              <ChevronDown size={17} className={summaryOpen ? 'is-open' : ''} />
-            </button>
-          </div>
-          {summaryOpen && <div className="month-summary-details" id="month-summary-content">
-            {loading && !sheetData ? <div className="grid grid-cols-2 gap-2" aria-busy="true" aria-label={t('sheet.loading')}><SkeletonLine className="h-14 w-full rounded-xl" /><SkeletonLine className="h-14 w-full rounded-xl" /></div> : sheet.kind === 'sales' ? <div className="month-sales-summary">
-              <div><span>{t('analytics.totalSales')}</span><strong>{formatMoney(sheetTotal(orders), language)} <small>THB</small></strong></div>
-              <div><span>{t('analytics.totalProfit')}</span><strong className={sheetData?.hasMore || totalProfit.amount === null ? 'profit-unavailable' : 'profit-summary-value'}>{sheetData?.hasMore || totalProfit.amount === null ? '—' : `${formatMoney(totalProfit.amount, language)} THB`}</strong>{sheetData?.hasMore ? <em className="profit-data-note">{t('sheet.loadingMoreData')}</em> : totalProfit.amount === null ? <em className="profit-data-note">{t('analytics.noPeriodProfitShort')}</em> : !totalProfit.complete ? <em className="profit-data-note">{t('analytics.partialProfitNote', { known: totalProfit.knownLines, total: totalProfit.totalLines })}</em> : <em className="profit-data-note">{t('analytics.netProfitNote', { amount: formatMoney(expenseTotal, language) })}</em>}</div>
-              <button type="button" className="month-expense-tile" onClick={() => setExpensesOpen(true)}>
-                <span>{t('expenses.open')}</span><strong>{formatMoney(expenseTotal, language)} <small>THB</small></strong>
-              </button>
-            </div> : <p className="sales-growth">{t('sheets.monthSummary', { orders: orders.length, total: formatMoney(sheetTotal(orders), language) })}</p>}
+    <section className="app-screen orders-screen" aria-label={t('screen.sheetOrders')}>
+      <ScreenHeader
+        kicker={`${t(`sheets.kind.${sheet.kind}`)} · ${t('sheets.orderCount', { count: orders.length })}`}
+        title={sheetTitle(sheet, t)}
+        onBack={cameFromHome ? () => navigate(-1) : undefined}
+        backLabel={t('nav.backToSheets')}
+        actions={<>
+          <button type="button" className={`icon-button${searchOpen ? ' is-active' : ''}`} aria-label={t(searchOpen ? 'orders.closeSearch' : 'orders.search')} aria-expanded={searchOpen} aria-controls="order-search-field" onClick={() => setSearchOpen((open) => !open)}>
+            {searchOpen ? <X size={24} /> : <Search size={24} />}
+          </button>
+          {sheet.kind === 'sales' && <button type="button" className="icon-button" aria-label={exportingReport ? t('backup.preparing') : t('backup.exportMonthly')} onClick={() => onExportMonthlyReport(sheet.id)} disabled={exportingReport}>{exportingReport ? <LoaderCircle size={22} className="animate-spin" /> : <Download size={23} />}</button>}
+        </>}
+      />
+
+      <div className="screen-surface has-dock">
+        <div className="surface-scroll overscroll-y-contain" ref={scrollRootRef}>
+          <PullToRefreshIndicator distance={pullDistance} refreshing={loading} />
+          {searchOpen && <div className="search-panel">
+            <label className="search-field">
+              <Search size={18} />
+              <span className="sr-only">{t('orders.search')}</span>
+              <input id="order-search-field" type="search" autoFocus value={query} onChange={(event) => updateQuery(event.target.value)} placeholder={t('orders.search')} />
+            </label>
           </div>}
-        </header>
 
-        <div className="order-list-heading">
-          <div><h2>{t('orders.title')}</h2><span>{sheetData?.hasMore ? t('orders.resultCountPartial', { shown: visibleOrders.length, total: sortedOrders.length }) : t('orders.resultCount', { shown: visibleOrders.length, total: sortedOrders.length })}</span></div>
-        </div>
+          {loading && !sheetData ? <div className="stat-strip" aria-busy="true" aria-label={t('sheet.loading')}>{Array.from({ length: 3 }, (_, index) => <SkeletonLine className="h-[68px] w-full rounded-[20px]" key={index} />)}</div> : <div className={`stat-strip${sheet.kind === 'sales' ? '' : ' two'}`}>
+            <div className="stat-tile accent"><span>{t('analytics.totalSales')}</span><strong>{formatMoney(sheetTotal(orders), language)}</strong><em>THB</em></div>
+            {sheet.kind === 'sales' ? <>
+              <div className={`stat-tile${profitReady ? (totalProfit.amount! < 0 ? ' bad' : ' good') : ''}`}><span>{t('analytics.totalProfit')}</span><strong>{profitReady ? formatMoney(totalProfit.amount!, language) : '—'}</strong><em>{profitNote || 'THB'}</em></div>
+              <button type="button" className="stat-tile" onClick={() => setExpensesOpen(true)}><Pencil size={13} /><span>{t('expenses.open')}</span><strong>{formatMoney(expenseTotal, language)}</strong><em>THB</em></button>
+            </> : <div className="stat-tile"><span>{t('analytics.orders')}</span><strong>{orders.length}</strong><em>{t('orders.orders')}</em></div>}
+          </div>}
 
-        {summaryOpen && <div className="order-summary-tools" id="order-tools-content">
-        <div className={`search-filter-row${searchOpen ? ' is-search-open' : ' is-search-closed'}`}>
-          {searchOpen && <label className="order-search">
-            <Search size={16} />
-            <span className="sr-only">{t('orders.search')}</span>
-            <input id="order-search-field" autoFocus value={query} onChange={(event) => updateQuery(event.target.value)} placeholder={t('orders.search')} />
-          </label>}
-          <div className="search-filter-actions">
-            <button type="button" className={`order-search-toggle${searchOpen ? ' is-open' : ''}`} aria-label={t(searchOpen ? 'orders.closeSearch' : 'orders.search')} aria-expanded={searchOpen} aria-controls="order-search-field" onClick={() => setSearchOpen((open) => !open)}>
-              {searchOpen ? <X size={16} /> : <Search size={16} />}
-            </button>
-            {sheet.kind === 'sales' && <button type="button" className="export-report-button" aria-label={t('backup.exportMonthly')} onClick={() => onExportMonthlyReport(sheet.id)} disabled={exportingReport}>{exportingReport ? <LoaderCircle size={14} className="animate-spin" /> : <Download size={14} />}<span>{exportingReport ? t('backup.preparing') : t('backup.exportMonthly')}</span></button>}
-            <button type="button" className={`filter-toggle${filtersOpen ? ' is-open' : ''}`} aria-expanded={filtersOpen} aria-controls="order-filters" onClick={() => setFiltersOpen((open) => !open)}>
-              <SlidersHorizontal size={15} /> {t(filtersOpen ? 'filters.hide' : 'filters.show')}
-            </button>
+          <div className="orders-toolbar">
+            <div className="pill-row" role="group" aria-label={t('filters.status')}>
+              {STATUS_FILTERS.map((filter) => <button type="button" className="pill" key={filter} aria-pressed={statusFilter === filter} onClick={() => updateStatus(filter)}>{statusFilterLabel(filter, t)}</button>)}
+            </div>
           </div>
-        </div>
-        {filtersOpen && <div className="order-filter-row" id="order-filters">
-          <label><span className="sr-only">{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => updateStatus(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="unpaid">{t('detail.paymentUnpaid')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="not-ordered">{t('detail.shippingNotOrdered')}</option><option value="ordered">{t('detail.shippingOrdered')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
-          <label><span className="sr-only">{t('filters.sort')}</span><select className="select select-bordered select-sm select-primary" value={sortBy} onChange={(event) => updateSort(event.target.value)}><option value="newest">{t('filters.newest')}</option><option value="oldest">{t('filters.oldest')}</option><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="status">{t('filters.statusAZ')}</option></select></label>
-        </div>}
-        </div>}
-        {sheetData?.error && <div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div>}
-      </div>
+          <div className="order-list-meta">
+            <span>{sheetData?.hasMore ? t('orders.resultCountPartial', { shown: visibleOrders.length, total: sortedOrders.length }) : t('orders.resultCount', { shown: visibleOrders.length, total: sortedOrders.length })}</span>
+            <label className="pill-select">
+              <span className="sr-only">{t('filters.sort')}</span>
+              <select value={sortBy} onChange={(event) => updateSort(event.target.value)}>
+                {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+              <ChevronDown size={14} />
+            </label>
+          </div>
 
-      <div className="home-scroll-area order-list-scroll overscroll-y-contain" ref={scrollRootRef}>
-        <PullToRefreshIndicator distance={pullDistance} refreshing={loading} />
-        {!sheetData && loading && <div className="order-list-table" aria-busy="true" aria-label={t('sheet.loading')}>{Array.from({ length: 6 }, (_, index) => <div className="grid min-h-[76px] grid-cols-[48px_minmax(0,1fr)_48px] items-center gap-3 rounded-2xl border border-rose-100 bg-white p-3" key={index} aria-hidden="true"><SkeletonLine className="size-12 rounded-xl" /><div className="grid gap-2"><SkeletonLine className="h-3 w-2/3" /><SkeletonLine className="h-3 w-1/2" /><SkeletonLine className="h-5 w-1/3 rounded-full" /></div><SkeletonLine className="h-4 w-12 justify-self-end" /></div>)}</div>}
-        {sheetData && !sheetData.error && orders.length === 0 && !sheetData.hasMore && <p className="sheet-message">{t('sheet.empty')}</p>}
-        {sortedOrders.length === 0 && !loading && orders.length > 0 && !sheetData?.hasMore && <p className="sheet-message">{t('orders.noMatch')}</p>}
-        {query && sortedOrders.length === 0 && !sheetData?.hasMore && <p className="sheet-message">{t('orders.noMatch')}</p>}
-        <div className="order-list-table">
-          {visibleOrders.map((order) => <OrderListRow key={order.id} order={order} sheet={sheet} />)}
+          {sheetData?.error && <div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div>}
+          {!sheetData && loading && <div className="cart-list" aria-busy="true" aria-label={t('sheet.loading')}>{Array.from({ length: 5 }, (_, index) => <div className="cart-row" key={index} aria-hidden="true"><SkeletonLine className="size-[92px] rounded-3xl" /><div className="grid gap-2"><SkeletonLine className="h-5 w-3/4" /><SkeletonLine className="h-3 w-1/2" /><SkeletonLine className="h-5 w-1/3" /></div></div>)}</div>}
+          {sheetData && !sheetData.error && orders.length === 0 && !sheetData.hasMore && <p className="sheet-message">{t('sheet.empty')}</p>}
+          {sortedOrders.length === 0 && !loading && orders.length > 0 && !sheetData?.hasMore && <p className="sheet-message">{t('orders.noMatch')}</p>}
+          <div className="cart-list">
+            {visibleOrders.map((order) => <OrderListRow key={order.id} order={order} sheet={sheet} />)}
+          </div>
+          {sheetData?.loadMoreError && <div className="sheet-error" role="alert">{t('sheet.loadMoreError')} <button type="button" onClick={() => onLoadMoreData(sheet.id)}>{t('sheet.retry')}</button></div>}
+          {hasMore && <div className="load-more-sentinel flex items-center justify-center gap-2 py-3 text-xs font-medium" ref={sentinelRef} aria-live="polite"><LoaderCircle size={14} className="animate-spin" /> {sheetData?.loadingMore ? t('sheet.loadingMoreData') : t('orders.loadingMore')}</div>}
+          {!hasMore && sortedOrders.length > 10 && <p className="list-end-note">{t('orders.endOfList')}</p>}
         </div>
-        {sheetData?.loadMoreError && <div className="sheet-error" role="alert">{t('sheet.loadMoreError')} <button type="button" onClick={() => onLoadMoreData(sheet.id)}>{t('sheet.retry')}</button></div>}
-        {hasMore && <div className="load-more-sentinel flex items-center justify-center gap-2 py-3 text-xs font-medium text-rose-700" ref={sentinelRef} aria-live="polite"><LoaderCircle size={14} className="animate-spin" /> {sheetData?.loadingMore ? t('sheet.loadingMoreData') : t('orders.loadingMore')}</div>}
-        {!hasMore && sortedOrders.length > 10 && <p className="list-end-note">{t('orders.endOfList')}</p>}
+        <div className="action-dock"><button type="button" className="cta" onClick={() => setCreateOpen(true)}><Plus size={21} /> {t('createOrder.open')}</button></div>
       </div>
-
-      <div className="create-order-dock"><button type="button" className="create-order-list-button btn btn-primary" onClick={() => setCreateOpen(true)}><Plus size={17} /> {t('createOrder.open')}</button></div>
       <BottomNavigation />
       {createOpen && <CreateOrderDialog sheet={sheet} imageChoices={imageChoices} defaultExchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onClose={() => setCreateOpen(false)} onSave={saveOrder} />}
       {expensesOpen && <MonthlyExpensesDialog sheetName={sheetTitle(sheet, t)} expenses={monthlyExpenses} onClose={() => setExpensesOpen(false)} onSave={(expenses) => onSaveMonthlyExpenses(sheet.id, expenses)} />}
@@ -1419,9 +1420,9 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
   }, [sheetData?.orders, t])
   const needsOrderPage = !order && Boolean(sheetData?.hasMore) && !sheetData?.loadingMore && !sheetData?.loadMoreError
   useEffect(() => { if (needsOrderPage) onLoadMoreData(sheet.id) }, [needsOrderPage, onLoadMoreData, sheet.id])
-  if (loading && !sheetData) return <section className="app-screen detail-screen" aria-busy="true" aria-label={t('sheet.loading')}><div className="detail-scroll-area"><SkeletonLine className="mb-5 h-36 w-full rounded-3xl" /><div className="grid gap-3"><SkeletonLine className="h-16 w-full rounded-2xl" /><SkeletonLine className="h-24 w-full rounded-2xl" /><SkeletonLine className="h-40 w-full rounded-2xl" /></div></div></section>
+  if (loading && !sheetData) return <section className="app-screen detail-screen" aria-busy="true" aria-label={t('sheet.loading')}><div className="detail-scroll p-5"><SkeletonLine className="mb-5 h-36 w-full rounded-3xl" /><div className="grid gap-3"><SkeletonLine className="h-16 w-full rounded-2xl" /><SkeletonLine className="h-24 w-full rounded-2xl" /><SkeletonLine className="h-40 w-full rounded-2xl" /></div></div></section>
   if (sheetData?.error) return <section className="app-screen detail-screen"><div className="sheet-error" role="alert">{t('sheet.error')} <button type="button" onClick={onRefresh}>{t('sheet.retry')}</button></div></section>
-  if (!order && sheetData?.hasMore) return <section className="app-screen detail-screen" aria-busy="true" aria-label={t('sheet.loadingMoreData')}><div className="detail-scroll-area"><SkeletonLine className="mb-5 h-36 w-full rounded-3xl" /><div className="grid gap-3"><SkeletonLine className="h-16 w-full rounded-2xl" /><SkeletonLine className="h-24 w-full rounded-2xl" /></div>{sheetData.loadMoreError && <div className="sheet-error" role="alert">{t('sheet.loadMoreError')} <button type="button" onClick={() => onLoadMoreData(sheet.id)}>{t('sheet.retry')}</button></div>}</div></section>
+  if (!order && sheetData?.hasMore) return <section className="app-screen detail-screen" aria-busy="true" aria-label={t('sheet.loadingMoreData')}><div className="detail-scroll p-5"><SkeletonLine className="mb-5 h-36 w-full rounded-3xl" /><div className="grid gap-3"><SkeletonLine className="h-16 w-full rounded-2xl" /><SkeletonLine className="h-24 w-full rounded-2xl" /></div>{sheetData.loadMoreError && <div className="sheet-error" role="alert">{t('sheet.loadMoreError')} <button type="button" onClick={() => onLoadMoreData(sheet.id)}>{t('sheet.retry')}</button></div>}</div></section>
   if (!order) return <Navigate to={`/admin/sheets/${sheet.id}`} replace />
 
   const grossSales = order.grossSales ?? order.lines.reduce((sum, line) => sum + line.salePrice, 0)
@@ -1463,74 +1464,83 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
     return b.salePrice - a.salePrice
   })
 
+  const heroImage = order.lines.find((line) => line.images[0])?.images[0]
+  const profitTone = orderProfit.amount === null ? ' unavailable' : orderProfit.amount < 0 ? ' negative' : ''
+
   return (
     <section className="app-screen detail-screen" aria-label={t('screen.detail')}>
-      <div className="detail-hero">
-        <div className="detail-avatar-mock" aria-label={t('detail.mockCustomerImage')}><LineAvatar lineName={order.lineName} size={40} /></div>
-        <button type="button" className="back-button" onClick={() => navigate(`/admin/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ChevronLeft size={20} /></button>
-        <div className="hero-label">
-          <h1>{order.customerName || order.lineName}</h1>
-          <p>{sheetTitle(sheet, t)} · {formatOrderDate(order.day, sheet, language)} · {formatMoney(order.totalSales, language)} THB</p>
-        </div>
-      </div>
-      <div className="detail-scroll-area">
-        <div className="detail-body">
-          <div className="detail-title-row">
-            <h2>{t('details.title')}</h2>
-            <div className="detail-title-actions">
-              {order.sheetRow > 0 && <span className="sheet-row-number">#{order.sheetRow}</span>}
-              <button type="button" className="edit-order-button btn btn-outline btn-sm" onClick={() => setEditOpen(true)}><Pencil size={14} /> {t('orders.edit')}</button>
-            </div>
+      <div className="detail-scroll">
+        <div className="detail-hero">
+          {heroImage ? <img src={heroImage} alt="" /> : <span className="detail-hero-avatar" aria-label={t('detail.mockCustomerImage')}><LineAvatar lineName={order.lineName} size={56} /></span>}
+          <div className="detail-hero-top">
+            <button type="button" className="icon-button" onClick={() => navigate(`/admin/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ArrowLeft size={26} strokeWidth={2.4} /></button>
+            <p className="detail-hero-title display">{sheetTitle(sheet, t)}</p>
+            <button type="button" className="icon-button" onClick={() => setEditOpen(true)} aria-label={t('orders.edit')}><Pencil size={21} strokeWidth={2.4} /></button>
           </div>
+          <div className="detail-hero-bottom">
+            <p className="detail-hero-price display">{formatMoney(netSales, language)}<small>THB</small></p>
+            <span className={`rating-pill${profitTone}`}>
+              {order.profitPercent !== null && <><span>{formatProfitPercent(order.profitPercent, language)}</span><i aria-hidden="true" /></>}
+              <span>{t('orders.profit')} {orderProfit.amount === null ? '—' : formatMoney(orderProfit.amount, language)}</span>
+            </span>
+          </div>
+        </div>
 
-          <section className="detail-card customer-card">
-            <div><span>{t('detail.lineName')}</span><strong>{order.lineName || t('detail.notSet')}</strong></div>
-            <div><span>{t('detail.customer')}</span><strong>{order.customerName || t('detail.notSet')}</strong></div>
-          </section>
-
-          <section className="detail-status-controls" aria-labelledby="detail-status-heading">
-            <div className="detail-status-heading">
-              <h3 id="detail-status-heading">{t('details.status')}</h3>
-              <span className="flex items-center gap-1.5">{savingStatus && <LoaderCircle size={13} className="animate-spin" />}{savingStatus ? t('details.saving') : t('details.statusHint')}</span>
-            </div>
+        <div className="detail-main-card">
+          <Sparkle size={34} />
+          <h1 className="detail-name display">{order.customerName || order.lineName}</h1>
+          <p className="detail-lead">{order.lineName || t('detail.notSet')} · {formatOrderDate(order.day, sheet, language)} · {t('detail.quantity', { count: order.quantity, unit: order.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}{order.sheetRow > 0 && ` · #${order.sheetRow}`}</p>
+          <div className="detail-status-grid" aria-label={t('details.status')}>
             <label>{t('createOrder.paymentStatus')}<select disabled={savingStatus} className={`select select-bordered select-sm select-primary detail-status-select payment-${paymentBadgeClass(order.paymentStatus)}`} value={order.paymentStatus} onChange={(event) => saveStatus('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้ชำระ">{t('detail.paymentUnpaid')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option></select></label>
             <label>{t('createOrder.shippingStatus')}<select disabled={savingStatus} className={`select select-bordered select-sm select-primary detail-status-select shipping-${shippingBadgeClass(order.shippingStatus)}`} value={order.shippingStatus} onChange={(event) => saveStatus('shippingStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้สั่ง">{t('detail.shippingNotOrdered')}</option><option value="สั่งแล้ว">{t('detail.shippingOrdered')}</option><option value="รอเข้าไทย">{t('detail.shippingInbound')}</option><option value="ส่งแล้ว">{t('detail.shippingSent')}</option></select></label>
-          </section>
+          </div>
+          <p className="detail-status-note">{savingStatus && <LoaderCircle size={13} className="animate-spin" />}{savingStatus ? t('details.saving') : t('details.statusHint')}</p>
+          <button type="button" className="cta" onClick={() => setEditOpen(true)}><Pencil size={19} /> {t('orders.edit')}</button>
+        </div>
 
-          <section className="detail-section">
-            <div className="detail-section-heading"><h3>{t('detail.items')}</h3><span className="order-quantity-chip">{t('detail.quantity', { count: order.quantity, unit: order.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</span></div>
-            <div className="item-list-controls">
-              <input value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder={t('orders.searchItems')} aria-label={t('orders.searchItems')} />
-              <select className="select select-bordered select-sm select-primary" value={itemSort} onChange={(event) => setItemSort(event.target.value)} aria-label={t('filters.sortItems')}><option value="sales-desc">{t('filters.salesHighShort')}</option><option value="sales-asc">{t('filters.salesLowShort')}</option><option value="name">{t('filters.nameAZShort')}</option></select>
-            </div>
-            <div className="item-list">
-              {visibleLines.map((line, index) => (
-                <article className="item-row" key={`${order.id}-${line.row || index}`}>
-                  {line.images.length > 0
-                    ? <div className="item-images">{line.images.slice(0, 3).map((image, imageIndex) => <img key={`${image.slice(0, 48)}-${imageIndex}`} src={image} alt={t('detail.itemImage', { number: index + 1, image: imageIndex + 1 })} loading="lazy" />)}{line.images.length > 3 && <span>+{line.images.length - 3}</span>}</div>
-                    : <span className="item-index"><Package size={15} /></span>}
-                  <div className="item-description">
-                    <strong>{line.itemName || t('detail.itemNumber', { number: index + 1 })}</strong>
-                    {line.imageName && <span className="item-photo-name">{t('detail.photoName')}: {line.imageName}</span>}
-                    <span>{t('detail.quantity', { count: line.quantity, unit: line.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</span>
-                    {line.costRMB != null && <span className="item-cost-line">{t('createOrder.costRMB')}: {formatMoney(line.costRMB, language)} CNY{line.costTHB != null && ` · ${t('createOrder.costTHBPreview')}: ${formatMoney(line.costTHB, language)} THB`}</span>}
-                    {line.attributes.length > 0 && <div className="item-attributes">{line.attributes.slice(0, 3).map((attribute) => <span key={`${attribute.key}-${attribute.value}`}>{fieldLabel(attribute.key, t)}: {attribute.value}</span>)}</div>}
-                  </div>
-                  <strong className="item-price">{line.salePrice ? `${formatMoney(line.salePrice, language)} THB` : '—'}</strong>
-                </article>
-              ))}
-              {visibleLines.length === 0 && <p className="picker-empty">{t('orders.noMatch')}</p>}
-            </div>
-          </section>
+        <section className="detail-section">
+          <div className="section-head"><h2 className="display">{t('detail.items')}</h2><span>{t('detail.quantity', { count: order.quantity, unit: order.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</span></div>
+          {order.lines.length > 3 && <div className="item-list-controls">
+            <input value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder={t('orders.searchItems')} aria-label={t('orders.searchItems')} />
+            <select className="select" value={itemSort} onChange={(event) => setItemSort(event.target.value)} aria-label={t('filters.sortItems')}><option value="sales-desc">{t('filters.salesHighShort')}</option><option value="sales-asc">{t('filters.salesLowShort')}</option><option value="name">{t('filters.nameAZShort')}</option></select>
+          </div>}
+          <div className="cart-list">
+            {visibleLines.map((line, index) => (
+              <article className="cart-row" key={`${order.id}-${line.row || index}`}>
+                <span className="cart-thumb">
+                  {line.images[0] ? <img src={line.images[0]} alt={t('detail.itemImage', { number: index + 1, image: 1 })} loading="lazy" /> : <Package size={28} />}
+                  {line.images.length > 1 && <span className="cart-thumb-count">+{line.images.length - 1}</span>}
+                </span>
+                <div className="cart-body">
+                  <h3 className="cart-title display">{line.itemName || t('detail.itemNumber', { number: index + 1 })}</h3>
+                  {line.imageName && <span className="cart-sub">{t('detail.photoName')}: {line.imageName}</span>}
+                  <span className="cart-price-row">
+                    <span className="cart-price display">{line.salePrice ? `${formatMoney(line.salePrice, language)} THB` : '—'}</span>
+                    <span className="status-badge quantity">× {line.quantity}</span>
+                  </span>
+                  {line.costRMB != null && <span className="cart-sub">{t('createOrder.costRMB')}: {formatMoney(line.costRMB, language)} CNY{line.costTHB != null && ` · ${formatMoney(line.costTHB, language)} THB`}</span>}
+                  {line.attributes.length > 0 && <div className="item-attributes">{line.attributes.slice(0, 3).map((attribute) => <span key={`${attribute.key}-${attribute.value}`}>{fieldLabel(attribute.key, t)}: {attribute.value}</span>)}</div>}
+                </div>
+              </article>
+            ))}
+            {visibleLines.length === 0 && <p className="picker-empty">{t('orders.noMatch')}</p>}
+          </div>
+        </section>
 
-          <section className="detail-card payment-card">
-            <div><span>{t('detail.totalSales')}</span><strong>{formatMoney(netSales, language)} THB</strong></div>
-            <div><span>{t('detail.totalProfit')}</span><strong className={orderProfit.amount === null ? 'profit-unavailable' : orderProfit.amount < 0 ? 'negative-text' : 'positive-text'}>{orderProfit.amount === null ? '—' : `${formatMoney(orderProfit.amount, language)} THB`}</strong>{orderProfit.amount === null ? <em className="profit-data-note">{t('analytics.noPeriodProfit')}</em> : orderProfit.knownLines < orderProfit.totalLines && <em className="profit-data-note">{t('analytics.profitCoverage', { known: orderProfit.knownLines, total: orderProfit.totalLines })}</em>}</div>
-            {order.profitPercent !== null && <div><span>{t('detail.profitMargin')}</span><strong className={`profit-text ${order.profitPercent < 0 ? 'negative' : 'positive'}`}>{formatProfitPercent(order.profitPercent, language)}</strong></div>}
-            {getPaidTotal(order) > 0 && <div><span>{t('detail.bank')}</span><strong>{formatMoney(getPaidTotal(order), language)} THB</strong></div>}
-            {depositDue !== null && (depositDue > 0 || order.paymentStatus === 'จ่ายเต็ม') && <div><span>{t('detail.deposit')}</span><strong>{formatMoney(depositDue, language)} THB</strong></div>}
-          </section>
+        <section className="detail-section">
+          <div className="section-head"><h2 className="display">{t('details.summary')}</h2></div>
+          <div className="summary-rows">
+            <div className="summary-row"><span>{t('detail.lineName')}</span><b>{order.lineName || t('detail.notSet')}</b></div>
+            <div className="summary-row"><span>{t('detail.customer')}</span><b>{order.customerName || t('detail.notSet')}</b></div>
+            {getPaidTotal(order) > 0 && <div className="summary-row"><span>{t('detail.bank')}</span><strong>{formatMoney(getPaidTotal(order), language)} THB</strong></div>}
+            {depositDue !== null && (depositDue > 0 || order.paymentStatus === 'จ่ายเต็ม') && <div className="summary-row"><span>{t('detail.deposit')}</span><strong>{formatMoney(depositDue, language)} THB</strong></div>}
+            {order.profitPercent !== null && <div className="summary-row"><span>{t('detail.profitMargin')}</span><strong className={order.profitPercent < 0 ? 'negative-text' : 'positive-text'}>{formatProfitPercent(order.profitPercent, language)}</strong></div>}
+            <div className="summary-row"><span>{t('detail.totalProfit')}{orderProfit.amount === null && <small>{t('analytics.noPeriodProfit')}</small>}</span><strong className={orderProfit.amount === null ? 'profit-unavailable' : orderProfit.amount < 0 ? 'negative-text' : 'positive-text'}>{orderProfit.amount === null ? '—' : `${formatMoney(orderProfit.amount, language)} THB`}</strong></div>
+            <div className="summary-row total"><span>{t('detail.totalSales')}</span><strong>{formatMoney(netSales, language)} THB</strong></div>
+          </div>
+        </section>
 
+        <section className="detail-section">
           <section className="campaign-detail-card">
             <label className="campaign-toggle"><input type="checkbox" checked={campaignEnabled} onChange={(event) => setCampaignEnabled(event.target.checked)} />{t('detail.campaign')}</label>
             {campaignEnabled && <label className="campaign-discount-field">
@@ -1540,9 +1550,9 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
             <div className="campaign-net-total"><span>{t('detail.totalBeforeDiscount')}</span><strong>{formatMoney(grossSales, language)} THB</strong></div>
             {campaignEnabled && <div className="campaign-net-total"><span>{t('detail.discount')}</span><strong>−{formatMoney(discountAmount, language)} THB</strong></div>}
             <div className="campaign-net-total campaign-final-total"><span>{t('detail.totalAfterDiscount')}</span><strong>{formatMoney(netSales, language)} THB</strong></div>
-            <button type="button" className="save-campaign-button btn btn-primary btn-sm" onClick={saveCampaign} disabled={savingCampaign}>{savingCampaign && <LoaderCircle size={14} className="animate-spin" />}{savingCampaign ? t('detail.savingCampaign') : t('detail.saveCampaign')}</button>
+            <button type="button" className="cta cta-small" onClick={saveCampaign} disabled={savingCampaign}>{savingCampaign && <LoaderCircle size={14} className="animate-spin" />}{savingCampaign ? t('detail.savingCampaign') : t('detail.saveCampaign')}</button>
           </section>
-        </div>
+        </section>
       </div>
       {editOpen && order && <CreateOrderDialog sheet={sheet} initialOrder={order} imageChoices={imageChoices} defaultExchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onClose={() => setEditOpen(false)} onSave={async (draft) => { await onSaveOrder(sheet.id, draft, order); setEditOpen(false); showEditNotice(t('orders.editSaved')) }} />}
       {editNotice && <p className="app-toast" role="status">{editNotice}</p>}
@@ -1574,17 +1584,19 @@ function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: str
 
   return (
     <section className="app-screen admin-login-screen" aria-label={t('auth.title')}>
-      <div className="admin-login-card">
-        <img src={sweetieLogo} alt={t('splash.logoAlt')} />
-        <p>{t('auth.kicker')}</p>
-        <h1>{t('auth.title')}</h1>
-        <form onSubmit={submit}>
-          <label>{t('auth.username')}<input className="input input-bordered" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></label>
-          <label>{t('auth.password')}<span className="login-password-field"><input className="input input-bordered" autoComplete="current-password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" className="password-visibility-toggle" aria-label={t(showPassword ? 'auth.hidePassword' : 'auth.showPassword')} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>
-          {error && <p className="login-error" role="alert">{error}</p>}
-          <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? <LoaderCircle size={16} className="animate-spin" /> : null}{submitting ? t('auth.signingIn') : t('auth.signIn')}</button>
-          <small>{t('auth.secureSession')}</small>
-        </form>
+      <ScreenHeader kicker={t('auth.kicker')} title={t('auth.signIn')} />
+      <div className="screen-surface login-surface">
+        <div className="surface-scroll">
+          <img className="login-logo" src={sweetieLogo} alt={t('splash.logoAlt')} />
+          <p className="login-intro">{t('auth.title')}</p>
+          <form className="login-form" onSubmit={submit}>
+            <label className="field">{t('auth.username')}<input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></label>
+            <label className="field">{t('auth.password')}<span className="login-password-field"><input autoComplete="current-password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" className="password-visibility-toggle" aria-label={t(showPassword ? 'auth.hidePassword' : 'auth.showPassword')} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={19} /> : <Eye size={19} />}</button></span></label>
+            {error && <p className="login-error" role="alert">{error}</p>}
+            <button type="submit" className="cta" disabled={submitting}>{submitting && <LoaderCircle size={18} className="animate-spin" />}{submitting ? t('auth.signingIn') : t('auth.signIn')}</button>
+            <small className="login-note"><ShieldCheck size={14} />{t('auth.secureSession')}</small>
+          </form>
+        </div>
       </div>
     </section>
   )
@@ -1667,21 +1679,22 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
   })
 
   return (
-    <section className="app-screen home-screen analytics-screen" aria-label={t('screen.analytics')}>
-      <div className="screen-fixed-header analytics-fixed-header">
-        <header className="sales-summary analytics-summary">
-          <p>{t('sheets.kind.sales')} · {sheetTitle(currentSheet, t)}</p>
-          <h1>{t('analytics.title')}</h1>
-          <p className="sales-growth flex items-center justify-center gap-1.5">{loading || analyticsDataLoading ? <><LoaderCircle size={13} className="animate-spin" />{t('sheet.loadingShort')}</> : t('analytics.currentMonth')}</p>
-        </header>
-        <label className="analytics-status-filter"><span>{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="unpaid">{t('detail.paymentUnpaid')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="not-ordered">{t('detail.shippingNotOrdered')}</option><option value="ordered">{t('detail.shippingOrdered')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
-      </div>
-      <div className="home-scroll-area analytics-scroll-area">
-        {loading || analyticsDataLoading ? <div className="analytics-metrics" aria-busy="true" aria-label={t('sheet.loading')}>
-          {Array.from({ length: 4 }, (_, index) => <div className="grid min-h-[88px] content-center gap-3 rounded-2xl border border-rose-100 bg-white p-3" key={index} aria-hidden="true"><SkeletonLine className="h-3 w-2/5" /><SkeletonLine className="h-6 w-3/4" /><SkeletonLine className="h-2.5 w-1/2" /></div>)}
+    <section className="app-screen analytics-screen" aria-label={t('screen.analytics')}>
+      <ScreenHeader
+        kicker={`${t('sheets.kind.sales')} · ${sheetTitle(currentSheet, t)}`}
+        title={t('analytics.title')}
+        actions={loading || analyticsDataLoading ? <span className="icon-button" role="status" aria-label={t('sheet.loadingShort')}><LoaderCircle size={22} className="animate-spin" /></span> : undefined}
+      />
+      <div className="screen-surface">
+      <div className="surface-scroll">
+        <div className="pill-row mb-4" role="group" aria-label={t('filters.status')}>
+          {STATUS_FILTERS.map((filter) => <button type="button" className="pill" key={filter} aria-pressed={statusFilter === filter} onClick={() => setStatusFilter(filter)}>{statusFilterLabel(filter, t)}</button>)}
+        </div>
+        {loading || analyticsDataLoading ? <div className="metric-grid" aria-busy="true" aria-label={t('sheet.loading')}>
+          {Array.from({ length: 4 }, (_, index) => <div className="grid min-h-[96px] content-center gap-3 rounded-3xl bg-mist p-4" key={index} aria-hidden="true"><SkeletonLine className="h-3 w-2/5" /><SkeletonLine className="h-6 w-3/4" /><SkeletonLine className="h-2.5 w-1/2" /></div>)}
         </div> : <>
-          <div className="analytics-metrics analytics-primary-metrics">
-            <article className="metric-card featured"><span>{statusFilter === 'all' ? t('analytics.thisMonth') : t('analytics.filteredSales')}</span><strong>{formatMoney(sheetTotal(scopedOrders), language)} <small>THB</small></strong></article>
+          <div className="metric-grid">
+            <article className="metric-card featured"><Sparkle size={26} /><span>{statusFilter === 'all' ? t('analytics.thisMonth') : t('analytics.filteredSales')}</span><strong>{formatMoney(sheetTotal(scopedOrders), language)} <small>THB</small></strong></article>
             <article className="metric-card"><span>{t('analytics.totalProfit')}</span><strong className={scopedProfit.amount === null ? 'profit-unavailable' : scopedProfit.amount < 0 ? 'negative-text' : 'positive-text'}>{scopedProfit.amount === null ? '—' : `${formatMoney(scopedProfit.amount, language)} THB`}</strong><em>{scopedProfit.amount === null ? t('analytics.noPeriodProfit') : scopedProfit.knownLines < scopedProfit.totalLines ? t('analytics.profitCoverage', { known: scopedProfit.knownLines, total: scopedProfit.totalLines }) : statusFilter === 'all' ? t('analytics.currentScopeProfit') : t('analytics.filteredScopeProfit')}</em></article>
             <article className={`metric-card trend-card${currentSalesChange === null ? ' unavailable' : currentSalesChange < 0 ? ' negative' : ' positive'}`}>
               <span>{t('analytics.monthlyChange')}</span>
@@ -1692,7 +1705,7 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
           </div>
           <details className="analytics-more-metrics">
             <summary>{t('analytics.moreMetrics')}</summary>
-            <div className="analytics-metrics analytics-secondary-metrics">
+            <div className="metric-grid">
               <article className={`metric-card trend-card${yearOverYearChange === null ? ' unavailable' : yearOverYearChange < 0 ? ' negative' : ' positive'}`}>
                 <span>{t('analytics.yearlyChange')}</span>
                 <strong>{formatSignedPercent(yearOverYearChange, language)}</strong>
@@ -1707,19 +1720,19 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
         </>}
 
         <section className="analytics-section">
-          <h2>{t('analytics.statusTitle')}</h2>
-          {analyticsDataLoading ? <div className="grid gap-3" aria-busy="true" aria-label={t('sheet.loading')}>{Array.from({ length: 6 }, (_, index) => <div className="flex items-center justify-between gap-3" key={index} aria-hidden="true"><SkeletonLine className="h-6 w-28 rounded-full" /><SkeletonLine className="h-4 w-8" /></div>)}</div> : <>
+          <div className="section-head"><h2 className="display">{t('analytics.statusTitle')}</h2></div>
+          {analyticsDataLoading ? <div className="grid gap-3" aria-busy="true" aria-label={t('sheet.loading')}>{Array.from({ length: 6 }, (_, index) => <div className="flex items-center justify-between gap-3" key={index} aria-hidden="true"><SkeletonLine className="h-6 w-28 rounded-full" /><SkeletonLine className="h-4 w-8" /></div>)}</div> : <div className="status-summary-grid">
           <div className="status-summary-row"><span className="status-badge paid">{t('detail.paymentFull')}</span><strong>{paid}</strong></div>
           <div className="status-summary-row"><span className="status-badge deposit">{t('detail.paymentDeposit')}</span><strong>{deposits}</strong></div>
           <div className="status-summary-row"><span className="status-badge shipped">{t('detail.shippingSent')}</span><strong>{shipped}</strong></div>
           <div className="status-summary-row"><span className="status-badge not-ordered">{t('detail.shippingNotOrdered')}</span><strong>{scopedOrders.filter((order) => order.shippingStatus === 'ยังไม่ได้สั่ง').length}</strong></div>
           <div className="status-summary-row"><span className="status-badge ordered">{t('detail.shippingOrdered')}</span><strong>{scopedOrders.filter((order) => order.shippingStatus === 'สั่งแล้ว').length}</strong></div>
           <div className="status-summary-row"><span className="status-badge inbound">{t('detail.shippingInbound')}</span><strong>{inbound}</strong></div>
-          </>}
+          </div>}
         </section>
 
         <section className="analytics-section analytics-chart-section">
-          <h2>{t('analytics.salesProfitGraph')}</h2>
+          <div className="section-head"><h2 className="display">{t('analytics.salesProfitGraph')}</h2></div>
           <div className="analytics-chart-container">
             {analyticsDataLoading ? <SkeletonLine className="h-full w-full rounded-xl" /> : <Suspense fallback={<SkeletonLine className="h-full w-full rounded-xl" />}><AnalyticsChart data={monthlyChartData} salesLabel={t('analytics.sales')} profitLabel={t('analytics.totalProfit')} formatMoney={(value) => formatMoney(value, language)} /></Suspense>}
           </div>
@@ -1727,8 +1740,8 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
         </section>
 
         <section className="analytics-section sales-by-month">
-          <div className="analytics-heading"><h2>{t('analytics.monthlySales')}</h2><label><span className="sr-only">{t('filters.sort')}</span><select className="select select-bordered select-sm select-primary" value={monthlySort} onChange={(event) => setMonthlySort(event.target.value)}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="month">{t('filters.monthOrder')}</option></select></label></div>
-          {analyticsDataLoading ? <div className="grid gap-1" aria-busy="true" aria-label={t('sheet.loading')}>{Array.from({ length: 6 }, (_, index) => <div className="flex min-h-10 items-center gap-3 border-b border-rose-50" key={index} aria-hidden="true"><SkeletonLine className="h-3 w-16" /><SkeletonLine className="h-2 flex-1 rounded-full" /><SkeletonLine className="h-3 w-12" /></div>)}</div> : sortedSalesSheets.map((sheet) => {
+          <div className="section-head"><h2 className="display">{t('analytics.monthlySales')}</h2><label className="pill-select"><span className="sr-only">{t('filters.sort')}</span><select value={monthlySort} onChange={(event) => setMonthlySort(event.target.value)}><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="month">{t('filters.monthOrder')}</option></select><ChevronDown size={14} /></label></div>
+          {analyticsDataLoading ? <div className="grid gap-1" aria-busy="true" aria-label={t('sheet.loading')}>{Array.from({ length: 6 }, (_, index) => <div className="flex min-h-10 items-center gap-3" key={index} aria-hidden="true"><SkeletonLine className="h-3 w-16" /><SkeletonLine className="h-2 flex-1 rounded-full" /><SkeletonLine className="h-3 w-12" /></div>)}</div> : sortedSalesSheets.map((sheet) => {
             const sheetOrders = filteredOrdersForSheet(sheet)
             const amount = sheetTotal(sheetOrders)
             const sheetIndex = salesSheets.findIndex((item) => item.id === sheet.id)
@@ -1747,6 +1760,7 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
             return <button type="button" className="monthly-bar-row" key={sheet.id} onClick={() => navigate(`/admin/sheets/${sheet.id}`)}><span className="monthly-bar-month">{sheetTitle(sheet, t)}<small className={change === null ? 'trend-unavailable' : change < 0 ? 'negative-text' : 'positive-text'}>{change === null ? '—' : `${formatSignedPercent(change, language)}${isThisMonth ? ' MTD' : ' MoM'}`}</small></span><span className="monthly-bar"><i style={{ width: `${width}%` }} /></span><strong>{formatMoney(amount, language)}</strong></button>
           })}
         </section>
+      </div>
       </div>
       <BottomNavigation />
     </section>

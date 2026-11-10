@@ -74,7 +74,7 @@ export function LineNameField({ value, onChange, onPick, placeholder, newLabel }
       />
       {open && (loading || matches.length > 0 || showNew) && (
         <ul className="line-picker-list">
-          {loading && <li className="flex items-center gap-2 px-3 py-2 text-xs text-rose-700" role="status"><LoaderCircle size={15} className="animate-spin" />{t('lineContacts.loading')}</li>}
+          {loading && <li className="flex items-center gap-2 px-3 py-2 text-xs text-pink-ink" role="status"><LoaderCircle size={15} className="animate-spin" />{t('lineContacts.loading')}</li>}
           {matches.map((contact) => (
             <li key={contact.lineUserId}>
               <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { onPick(contact); setOpen(false) }}>
