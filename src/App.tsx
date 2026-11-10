@@ -38,6 +38,8 @@ import { useDialogAccessibility } from './ui/hooks'
 import { orderMatchesStatus, paymentBadgeClass, paymentStatusLabel, shippingBadgeClass, shippingStatusLabel, statusFilterLabel, STATUS_FILTERS } from './ui/status'
 
 const AnalyticsChart = lazy(() => import('./AnalyticsChart'))
+const salesCategoryImage = new URL('./assets/0065ab6781eed4ec716c07294dbb3933.PNG', import.meta.url).href
+const haulCategoryImage = new URL('./assets/haul-category.png', import.meta.url).href
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
 import {
   fetchAllSheets,
@@ -328,6 +330,10 @@ function getCurrentDate() {
   return new Date()
 }
 
+function formatDateInputValue(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 function getCurrentMonthSheet(dataBySheet: Record<string, SheetDataState>, sheets: SheetDefinition[] = SHEETS): SheetDefinition {
   const now = getCurrentDate()
   const monthKey = ['jan', 'feb', 'mar', 'apr', 'may', 'june', 'july', 'aug', 'sep', 'oct', 'nov', 'dec'][now.getMonth()]
@@ -363,9 +369,25 @@ function fieldLabel(key: string, t: (key: string) => string) {
 }
 
 
-function SettingsPage({ onExportBackup, backupLoading, backupMessage, onLogout }: { onExportBackup: () => void; backupLoading: boolean; backupMessage: string; onLogout: () => void }) {
+function SettingsPage({ onExportBackup, backupLoading, backupMessage, onExportDateRange, rangeExportLoading, rangeExportMessage, onLogout }: {
+  onExportBackup: () => void
+  backupLoading: boolean
+  backupMessage: string
+  onExportDateRange: (fromDate: string, toDate: string) => void
+  rangeExportLoading: boolean
+  rangeExportMessage: string
+  onLogout: () => void
+}) {
   const { i18n, t } = useTranslation()
   const language = i18n.resolvedLanguage ?? 'en'
+  const today = getCurrentDate()
+  const [rangeTo, setRangeTo] = useState(() => formatDateInputValue(today))
+  const [rangeFrom, setRangeFrom] = useState(() => {
+    const yearAgo = new Date(today)
+    yearAgo.setFullYear(yearAgo.getFullYear() - 1)
+    return formatDateInputValue(yearAgo)
+  })
+  const canExportRange = Boolean(rangeFrom && rangeTo && rangeFrom <= rangeTo)
 
   const changeLanguage = (nextLanguage: string) => {
     void i18n.changeLanguage(nextLanguage)
@@ -401,6 +423,20 @@ function SettingsPage({ onExportBackup, backupLoading, backupMessage, onLogout }
               <ChevronRight size={18} className="info-bar-end" />
             </button>
             {backupMessage && <small className="backup-status" role="status">{backupMessage}</small>}
+            <div className="settings-range-export">
+              <h3 className="display">{t('backup.rangeTitle')}</h3>
+              <p>{t('backup.rangeHint')}</p>
+              <div className="settings-date-range">
+                <label className="field"><span>{t('backup.dateFrom')}</span><input className="input input-bordered" type="date" value={rangeFrom} max={rangeTo || undefined} onChange={(event) => setRangeFrom(event.target.value)} /></label>
+                <label className="field"><span>{t('backup.dateTo')}</span><input className="input input-bordered" type="date" value={rangeTo} min={rangeFrom || undefined} max={formatDateInputValue(today)} onChange={(event) => setRangeTo(event.target.value)} /></label>
+              </div>
+              <button type="button" className="cta cta-small" onClick={() => onExportDateRange(rangeFrom, rangeTo)} disabled={rangeExportLoading || !canExportRange}>
+                {rangeExportLoading ? <LoaderCircle size={19} className="animate-spin" /> : <Download size={19} />}
+                {rangeExportLoading ? t('backup.rangePreparing') : t('backup.exportRange')}
+              </button>
+              {!canExportRange && <small className="backup-status" role="alert">{t('backup.invalidRange')}</small>}
+              {rangeExportMessage && <small className="backup-status" role="status">{rangeExportMessage}</small>}
+            </div>
           </section>
           <section className="settings-group">
             <h2 className="display">{t('settings.account')}</h2>
@@ -667,11 +703,10 @@ function HomePage({
   const activeFilterCount = [Boolean(query.trim()), kindFilter !== 'all', statusFilter !== 'all', sortBy !== 'month'].filter(Boolean).length
 
   const currentSheetId = getCurrentMonthSheet(dataBySheet, sheets).id
-  const previewFor = (kind: SheetDefinition['kind']) => sheetRows.filter(({ sheet }) => !kind || sheet.kind === kind).map(({ orders }) => getPreviewImages(orders, 1)[0]).find(Boolean)
   const chips = [
     { key: 'all', label: t('sheets.chips.all'), active: kindFilter === 'all' && statusFilter === 'all', icon: <LayoutGrid size={28} />, count: sheets.length, onSelect: () => { setKindFilter('all'); setStatusFilter('all') } },
-    { key: 'sales', label: t('sheets.chips.sales'), active: kindFilter === 'sales' && statusFilter === 'all', image: previewFor('sales'), onSelect: () => { setKindFilter('sales'); setStatusFilter('all') } },
-    { key: 'haul', label: t('sheets.chips.haul'), active: kindFilter === 'haul' && statusFilter === 'all', image: previewFor('haul'), onSelect: () => { setKindFilter('haul'); setStatusFilter('all') } },
+    { key: 'sales', label: t('sheets.chips.sales'), active: kindFilter === 'sales' && statusFilter === 'all', image: salesCategoryImage, onSelect: () => { setKindFilter('sales'); setStatusFilter('all') } },
+    { key: 'haul', label: t('sheets.chips.haul'), active: kindFilter === 'haul' && statusFilter === 'all', image: haulCategoryImage, onSelect: () => { setKindFilter('haul'); setStatusFilter('all') } },
     { key: 'unpaid', label: t('sheets.chips.unpaid'), active: statusFilter === 'unpaid', icon: <WalletCards size={28} />, onSelect: () => { setKindFilter('all'); setStatusFilter('unpaid') } },
   ]
   const sortOptions = [
@@ -772,7 +807,7 @@ function HomePage({
           </div>}
         </div>
         <div className="action-dock">
-          <button type="button" className="cta" onClick={() => setCreateSheetOpen(true)}><Plus size={21} /> {t('createSheet.open')}</button>
+          <button type="button" className="cta cta-icon-only" aria-label={t('createSheet.open')} title={t('createSheet.open')} onClick={() => setCreateSheetOpen(true)}><Plus size={24} aria-hidden="true" /></button>
         </div>
       </div>
       <BottomNavigation />
@@ -1430,7 +1465,7 @@ function SheetOrdersPage({
           {hasMore && <div className="load-more-sentinel flex items-center justify-center gap-2 py-3 text-xs font-medium" ref={sentinelRef} aria-live="polite"><LoaderCircle size={14} className="animate-spin" /> {sheetData?.loadingMore ? t('sheet.loadingMoreData') : t('orders.loadingMore')}</div>}
           {!hasMore && sortedOrders.length > 10 && <p className="list-end-note">{t('orders.endOfList')}</p>}
         </div>
-        <div className="action-dock"><button type="button" className="cta" onClick={() => setCreateOpen(true)}><Plus size={21} /> {t('createOrder.open')}</button></div>
+        <div className="action-dock"><button type="button" className="cta cta-icon-only" aria-label={t('createOrder.open')} title={t('createOrder.open')} onClick={() => setCreateOpen(true)}><Plus size={24} aria-hidden="true" /></button></div>
       </div>
       <BottomNavigation />
       {createOpen && <CreateOrderDialog sheet={sheet} imageChoices={imageChoices} defaultExchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onClose={() => setCreateOpen(false)} onSave={saveOrder} />}
@@ -1878,6 +1913,8 @@ function App() {
   const [analyticsDataLoading, setAnalyticsDataLoading] = useState(false)
   const [backupLoading, setBackupLoading] = useState(false)
   const [backupMessage, setBackupMessage] = useState('')
+  const [rangeExportLoading, setRangeExportLoading] = useState(false)
+  const [rangeExportMessage, setRangeExportMessage] = useState('')
   const [exportingReportId, setExportingReportId] = useState<string | null>(null)
   const [exportMessage, setExportMessage] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
@@ -2305,6 +2342,84 @@ function App() {
     }
   }, [allSheets, exchangeRate, i18n.resolvedLanguage, localOrdersBySheet, monthlyExpensesBySheet, monthlyExpenseRevisionsBySheet, t])
 
+  const exportDateRange = useCallback(async (fromDate: string, toDate: string) => {
+    if (!fromDate || !toDate || fromDate > toDate) return
+    setRangeExportLoading(true)
+    setRangeExportMessage('')
+    try {
+      const fromMonth = fromDate.slice(0, 7)
+      const toMonth = toDate.slice(0, 7)
+      const exportSheets = allSheets.filter((sheet) => {
+        const monthIndex = MONTH_INDEX[sheet.monthKey]
+        if (!Number.isInteger(monthIndex)) return false
+        const sheetMonth = `${sheet.year}-${String(monthIndex + 1).padStart(2, '0')}`
+        return sheetMonth >= fromMonth && sheetMonth <= toMonth
+      })
+      const ordersBySheet: Record<string, SheetOrder[]> = {}
+      let nextIndex = 0
+      const worker = async () => {
+        while (nextIndex < exportSheets.length) {
+          const sheet = exportSheets[nextIndex]
+          nextIndex += 1
+          ordersBySheet[sheet.id] = await getCompleteOrdersForSheet(sheet.id)
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(3, exportSheets.length) }, worker))
+      const exportOrders = exportSheets.flatMap((sheet) => (ordersBySheet[sheet.id] ?? [])
+        .map((order) => ({ sheet, order, date: getDateInputValue(order.day, sheet) }))
+        .filter(({ date }) => date >= fromDate && date <= toDate))
+        .sort((a, b) => a.date.localeCompare(b.date) || a.sheet.id.localeCompare(b.sheet.id) || a.order.sheetRow - b.order.sheetRow)
+      const grossTotal = exportOrders.reduce((sum, { order }) => sum + (order.grossSales ?? order.lines.reduce((lineSum, line) => lineSum + line.salePrice, 0)), 0)
+      const discountTotal = exportOrders.reduce((sum, { order }) => sum + (order.campaignDiscount ?? 0), 0)
+      const salesTotal = exportOrders.reduce((sum, { order }) => sum + order.totalSales, 0)
+      const rows: Array<Array<string | number | null | undefined>> = [
+        ['Sweetie Station order export'],
+        ['Date range', fromDate, toDate],
+        ['Exported at', new Date().toISOString()],
+        ['Orders', exportOrders.length],
+        ['Gross sales (THB)', grossTotal],
+        ['Campaign discounts (THB)', discountTotal],
+        ['Net sales (THB)', salesTotal],
+        [],
+        ['Sheet', 'Order date', 'Customer', 'LINE', 'Items', 'Quantity', 'Gross sales (THB)', 'Campaign', 'Discount (THB)', 'Net sales (THB)', 'Paid (THB)', 'Deposit due (THB)', 'Unit cost (CNY)', 'Product cost (THB)', 'Product profit (THB)', 'FX rate (THB/CNY)', 'Payment status', 'Shipping status'],
+        ...exportOrders.map(({ sheet, order }) => {
+          const grossSales = order.grossSales ?? order.lines.reduce((sum, line) => sum + line.salePrice, 0)
+          const unitCostRMB = order.lines.reduce((sum, line) => sum + (line.costRMB ?? 0) * line.quantity, 0)
+          const costTHB = order.lines.reduce((sum, line) => sum + (line.costTHB ?? 0), 0)
+          const orderProfit = getProfitSummary([order])
+          return [
+            sheetTitle(sheet, t),
+            formatOrderDate(order.day, sheet, i18n.resolvedLanguage ?? 'en'),
+            order.customerName,
+            order.lineName,
+            order.lines.map((line) => `${line.itemName || 'Item'} × ${line.quantity}`).join('; '),
+            order.quantity,
+            grossSales,
+            order.isCampaign ? 'Yes' : 'No',
+            order.campaignDiscount ?? 0,
+            order.totalSales,
+            getPaidTotal(order),
+            getDepositDue(order, order.totalSales),
+            unitCostRMB,
+            costTHB,
+            orderProfit.amount,
+            order.exchangeRate ?? '',
+            paymentStatusLabel(order.paymentStatus, t),
+            shippingStatusLabel(order.shippingStatus, t),
+          ]
+        }),
+      ]
+      const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`
+      downloadFile(`sweetie-orders-${fromDate}-to-${toDate}.csv`, csv, 'text/csv;charset=utf-8')
+      setRangeExportMessage(t('backup.rangeSuccess'))
+    } catch {
+      setRangeExportMessage(t('backup.rangeError'))
+    } finally {
+      setRangeExportLoading(false)
+      window.setTimeout(() => setRangeExportMessage(''), 5000)
+    }
+  }, [allSheets, getCompleteOrdersForSheet, i18n.resolvedLanguage, t])
+
   const refresh = useCallback(() => {
     if (refreshInFlightRef.current) return
     homeLoadAbortRef.current?.abort()
@@ -2514,7 +2629,7 @@ function App() {
           <Route path="/admin/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={saveOrderToSheet} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} onExportMonthlyReport={exportMonthlyReport} exportingReport={exportingReportId === (location.pathname.split('/')[3] ?? '')} exportMessage={exportMessage} />} />
           <Route path="/admin/sheets/:sheetId/orders/:orderId" element={<OrderDetailsRoute dataBySheet={mergedDataBySheet} sheets={allSheets} loading={loading} onRefresh={refresh} onSaveOrder={saveOrderToSheet} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} onLoadMoreData={loadMoreSheetData} />} />
           <Route path="/admin/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} monthlyExpensesBySheet={monthlyExpensesBySheet} sheets={allSheets} loading={loading} analyticsDataLoading={analyticsDataLoading} onLoadAllSalesSheets={loadAllSalesSheets} />} />
-          <Route path="/admin/settings" element={<SettingsPage onExportBackup={exportFullBackup} backupLoading={backupLoading} backupMessage={backupMessage} onLogout={logout} />} />
+          <Route path="/admin/settings" element={<SettingsPage onExportBackup={exportFullBackup} backupLoading={backupLoading} backupMessage={backupMessage} onExportDateRange={exportDateRange} rangeExportLoading={rangeExportLoading} rangeExportMessage={rangeExportMessage} onLogout={logout} />} />
           <Route path="*" element={<Navigate to="/admin/home" replace />} />
         </Routes>
         <BottomNavigation desktop />
