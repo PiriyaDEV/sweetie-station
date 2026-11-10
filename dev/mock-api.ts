@@ -5,8 +5,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 
 const SHEET_GIDS = ['246786947', '2065480441', '767554552', '1487621265', '1083277464', '1314167799', '51699199', '1666163539', '402607796', '905302264']
 
-const LINE_NAMES = ['mintyy', 'Ploy 🍓', 'June.c', 'nampetch', 'Fah ☁️', 'Bam bam', 'aomsin', 'Kaewkaew', 'Nicha', 'pangpond', 'Mook 🎀', 'Earn', 'Bow', 'Praew', 'Toey']
-const CUSTOMERS = ['มินตรา ใจดี', 'พลอย ศรีสุข', 'จูน ชัยวัฒน์', 'น้ำเพชร ทองดี', 'ฟ้า รุ่งเรือง', 'แบม วงศ์ใหญ่', 'ออมสิน แก้วใส', 'แก้วตา มณี', 'ณิชา พรหมมา', 'ปังปอนด์ สายสุข', 'มุก ดาวเรือง', 'เอิร์น ใจงาม', 'โบว์ สีชมพู', 'แพรว นิลสุวรรณ', 'เตย ศรีวงศ์']
+const LINE_NAMES = ['mintyy', 'Ploy 🍓', 'June.c', 'nampetch', 'Fah ☁️', 'Bam bam', 'aomsin', 'Kaewkaew', 'Nicha', 'pangpond', 'Mook 🎀', 'Earn', 'Bow', 'Praew', 'Toey', 'pound']
+const CUSTOMERS = ['มินตรา ใจดี', 'พลอย ศรีสุข', 'จูน ชัยวัฒน์', 'น้ำเพชร ทองดี', 'ฟ้า รุ่งเรือง', 'แบม วงศ์ใหญ่', 'ออมสิน แก้วใส', 'แก้วตา มณี', 'ณิชา พรหมมา', 'ปังปอนด์ สายสุข', 'มุก ดาวเรือง', 'เอิร์น ใจงาม', 'โบว์ สีชมพู', 'แพรว นิลสุวรรณ', 'เตย ศรีวงศ์', 'ปอนด์ รักดี']
 const ITEMS = ['Melody flower keychain', 'Stella Lou plush bag', 'Kuromi hair clip set', 'Miffy charm', 'Duffy & ShellieMay plush', 'Hello Kitty sandals', 'Cinnamoroll pouch', 'LinaBell headband', 'Pochacco mini figure', 'Lotso tote bag', 'Blind box · Sweet series', 'Ribbon phone strap']
 const PAYMENT = ['จ่ายเต็ม', 'จ่ายเต็ม', 'มัดจำ', 'ยังไม่ได้ชำระ']
 const SHIPPING = ['ส่งแล้ว', 'รอเข้าไทย', 'สั่งแล้ว', 'ยังไม่ได้สั่ง']
@@ -15,6 +15,25 @@ function seeded(seed: number) {
   let value = seed % 2147483647
   if (value <= 0) value += 2147483646
   return () => (value = (value * 16807) % 2147483647) / 2147483647
+}
+
+// LINE OA contacts: about half have a profile photo. Some display names differ from the
+// sheet name on purpose ("Pound 🐻" vs "pound") to exercise loose name matching.
+const CONTACTS = [
+  ['Pound 🐻', true], ['Ploy 🍓', true], ['mintyy', true], ['Mook 🎀', false], ['june.c', true], ['Nicha', false], ['Bow', true], ['Toey', false],
+].map(([displayName, hasPhoto], index) => ({
+  lineUserId: `U-mock-${index}`,
+  displayName: String(displayName),
+  pictureUrl: hasPhoto ? `/api/mock-avatar/${index}.svg` : '',
+  updatedAt: Date.now(),
+}))
+const AVATAR_COLORS = ['#f4a3bf', '#a8d5f2', '#b9e3b2', '#ffd59e', '#cdb8f5', '#f7b7a3', '#9fd8d2', '#f2c1e0']
+
+function avatarSvg(index: number) {
+  const name = CONTACTS[index]?.displayName ?? '?'
+  const letter = Array.from(name.replace(/[^\p{L}\p{N}]/gu, ''))[0]?.toUpperCase() ?? '?'
+  const color = AVATAR_COLORS[index % AVATAR_COLORS.length]
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" fill="${color}"/><circle cx="60" cy="48" r="22" fill="#fff" opacity=".85"/><path d="M20 118c4-26 20-38 40-38s36 12 40 38z" fill="#fff" opacity=".85"/><text x="60" y="56" text-anchor="middle" font-family="Arial" font-weight="700" font-size="24" fill="${color}">${letter}</text></svg>`
 }
 
 function csvCell(value: string | number) {
@@ -97,7 +116,7 @@ export function mockApi(): Plugin {
           if (!body.username || !body.password) return json(response, 401, { error: 'Invalid' })
           return json(response, 200, { ok: true }, { 'set-cookie': 'sweetie_mock=1; Path=/; HttpOnly; SameSite=Lax' })
         }
-        if (!signedIn) return json(response, 401, { error: 'Your session has expired. Please sign in again.' })
+        if (!signedIn && !url.pathname.startsWith('/api/mock-avatar/')) return json(response, 401, { error: 'Your session has expired. Please sign in again.' })
 
         if (url.pathname === '/api/data') {
           if (method === 'GET') return json(response, 200, { snapshot })
@@ -122,7 +141,12 @@ export function mockApi(): Plugin {
           await readBody(request)
           return json(response, 200, { ok: true, orderId: `mock-${Date.now()}`, rowNumbers: [] })
         }
-        if (url.pathname === '/api/line-contacts') return json(response, 200, { contacts: [] })
+        if (url.pathname === '/api/line-contacts') return json(response, 200, { contacts: CONTACTS })
+        const avatar = /^\/api\/mock-avatar\/(\d+)\.svg$/.exec(url.pathname)
+        if (avatar) {
+          response.writeHead(200, { 'content-type': 'image/svg+xml' })
+          return response.end(avatarSvg(Number(avatar[1])))
+        }
         return json(response, 404, { error: 'Not mocked' })
       })
     },

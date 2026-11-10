@@ -1499,14 +1499,13 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
     return b.salePrice - a.salePrice
   })
 
-  const heroImage = order.lines.find((line) => line.images[0])?.images[0]
   const profitTone = orderProfit.amount === null ? ' unavailable' : orderProfit.amount < 0 ? ' negative' : ''
 
   return (
     <section className="app-screen detail-screen" aria-label={t('screen.detail')}>
       <div className="detail-scroll">
         <div className="detail-hero">
-          {heroImage ? <button type="button" className="detail-hero-image image-preview-trigger" aria-label={t('detail.previewImage')} onClick={() => setPreviewImage({ src: heroImage, alt: order.lines.find((line) => line.images[0])?.itemName ?? '' })}><ProductImage src={heroImage} alt="" /></button> : <span className="detail-hero-avatar" aria-label={t('detail.mockCustomerImage')}><LineAvatar lineName={order.customerName || order.lineName} size={52} initials /></span>}
+          <span className="detail-hero-avatar" aria-label={t('detail.customer')}><LineAvatar lineName={order.lineName || order.customerName} size={52} /></span>
           <div className="detail-hero-top">
             <button type="button" className="icon-button" onClick={() => navigate(`/admin/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ArrowLeft size={26} strokeWidth={2.4} /></button>
             <p className="detail-hero-title display">{sheetTitle(sheet, t)}</p>
