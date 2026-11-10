@@ -26,8 +26,8 @@ export default function AnalyticsChart({
         <YAxis yAxisId="profit" orientation="right" tickFormatter={(value) => formatMoney(Number(value))} tick={{ fill: '#9a8f8c', fontSize: 8 }} tickLine={false} axisLine={false} width={48} />
         <Tooltip formatter={(value) => [`${formatMoney(Number(value))} THB`]} labelStyle={{ color: '#453d3b', fontSize: 10 }} contentStyle={{ border: '1px solid #eee3e1', borderRadius: 10, fontSize: 9 }} />
         <Legend wrapperStyle={{ fontSize: 9 }} />
-        <Bar yAxisId="sales" dataKey="sales" name={salesLabel} fill="#f482a3" radius={[4, 4, 0, 0]} />
-        <Line yAxisId="profit" type="monotone" dataKey="netProfit" name={profitLabel} stroke="#258553" strokeWidth={2} dot={{ r: 3, fill: '#258553' }} connectNulls={false} />
+        <Bar yAxisId="sales" dataKey="sales" name={salesLabel} fill="#c66a86" radius={[4, 4, 0, 0]} />
+        <Line yAxisId="profit" type="monotone" dataKey="netProfit" name={profitLabel} stroke="#5c8d3a" strokeWidth={2.5} dot={{ r: 3.5, fill: '#5c8d3a' }} connectNulls={false} />
       </ComposedChart>
     </ResponsiveContainer>
   )
