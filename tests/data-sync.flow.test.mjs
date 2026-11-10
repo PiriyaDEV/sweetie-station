@@ -105,8 +105,8 @@ test('synthetic order, sheet, image sync and read flows', async () => {
     const snapshot = {
       version: 1,
       localOrdersBySheet: { [sheetId]: [order] },
-      monthlyExpensesBySheet: {},
-      monthlyExpenseRevisionsBySheet: {},
+      monthlyExpensesBySheet: { [sheetId]: [{ id: 'qa-expense-1', category: 'shipping', description: 'Synthetic shipping', amount: 25 }] },
+      monthlyExpenseRevisionsBySheet: { [sheetId]: 1 },
       localSheets: [{ id: sheetId, gid: '', titleKey: '', customName: 'QA November' }],
       exchangeRate: 5.02,
       language: 'en',
@@ -128,11 +128,15 @@ test('synthetic order, sheet, image sync and read flows', async () => {
     assert.equal(afterCreate.localSheets[0].id, sheetId)
     assert.equal(afterCreate.localOrdersBySheet[sheetId][0].id, 'qa-order-1')
     assert.equal(afterCreate.localOrdersBySheet[sheetId][0].lines[0].images[0], dataUrl)
+    assert.deepEqual(afterCreate.monthlyExpensesBySheet[sheetId], [{ id: 'qa-expense-1', category: 'shipping', description: 'Synthetic shipping', amount: 25 }])
+    assert.equal(afterCreate.monthlyExpenseRevisionsBySheet[sheetId], 1)
 
     const updatedSnapshot = structuredClone(snapshot)
     updatedSnapshot.localOrdersBySheet[sheetId][0].totalSales = 175
     updatedSnapshot.localOrdersBySheet[sheetId][0].updatedAt = 2
     updatedSnapshot.localSheets[0].customName = 'QA November Updated'
+    updatedSnapshot.monthlyExpensesBySheet[sheetId][0].amount = 30
+    updatedSnapshot.monthlyExpenseRevisionsBySheet[sheetId] = 2
     updatedSnapshot.updatedAt = 2
     const updated = await put(updatedSnapshot)
     assert.equal(updated.status, 200)
@@ -142,6 +146,8 @@ test('synthetic order, sheet, image sync and read flows', async () => {
     assert.equal(afterUpdate.localOrdersBySheet[sheetId][0].totalSales, 175)
     assert.equal(afterUpdate.localSheets[0].customName, 'QA November Updated')
     assert.equal(afterUpdate.localOrdersBySheet[sheetId][0].lines[0].images[0], dataUrl)
+    assert.equal(afterUpdate.monthlyExpensesBySheet[sheetId][0].amount, 30)
+    assert.equal(afterUpdate.monthlyExpenseRevisionsBySheet[sheetId], 2)
 
     const csv = await sheetsHandler(new Request('https://synthetic.local/.netlify/functions/sheets?gid=42&offset=0&limit=10', { headers: { cookie } }))
     assert.equal(csv.status, 200)
