@@ -1,6 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { LoaderCircle, Plus, UserRound } from 'lucide-react'
+import { LoaderCircle, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import sweetieAvatar from './assets/sweetie-avatar.webp'
+
+/** Compare LINE names ignoring case, spaces, emoji and punctuation ("Pound 🐻" matches "pound"). */
+function normalizeLineName(name: string) {
+  return name.normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{M}\p{N}]/gu, '')
+}
 
 export type LineContact = { lineUserId: string; displayName: string; pictureUrl: string; updatedAt: number }
 
@@ -29,37 +35,27 @@ export function useLineContacts() {
   return useContext(LineContactsContext)
 }
 
-// An order is mapped to a contact when its LINE name equals the contact's display name.
+// An order is mapped to a contact when its LINE name matches the contact's display name.
 export function useLineContactByName(lineName: string) {
   const { contacts } = useLineContacts()
   return useMemo(() => {
-    const key = lineName.trim().toLocaleLowerCase()
-    return key ? contacts.find((contact) => contact.displayName.trim().toLocaleLowerCase() === key) : undefined
+    const exactKey = lineName.trim().toLocaleLowerCase()
+    if (!exactKey) return undefined
+    const exact = contacts.find((contact) => contact.displayName.trim().toLocaleLowerCase() === exactKey)
+    if (exact) return exact
+    const looseKey = normalizeLineName(lineName)
+    return looseKey ? contacts.find((contact) => normalizeLineName(contact.displayName) === looseKey) : undefined
   }, [contacts, lineName])
 }
 
-const AVATAR_TINTS = [['#ffe1ee', '#b83a63'], ['#e5f1ff', '#2f5f9e'], ['#e8f6e7', '#2f7a2b'], ['#fff0d9', '#8a5a00'], ['#efe7ff', '#5b3aa6'], ['#ffe9e3', '#b4472c']]
-const THAI_LEADING_VOWELS = new Set(['เ', 'แ', 'โ', 'ใ', 'ไ'])
-
-function initialsFor(name: string) {
-  const letters = Array.from(name.trim()).filter((character) => /[\p{L}\p{N}]/u.test(character))
-  if (letters.length === 0) return ''
-  const first = THAI_LEADING_VOWELS.has(letters[0]) && letters[1] ? letters[1] : letters[0]
-  return first.toLocaleUpperCase()
-}
-
-export function LineAvatar({ lineName, size, initials = false }: { lineName: string; size: number; initials?: boolean }) {
+export function LineAvatar({ lineName }: { lineName: string; size?: number; initials?: boolean }) {
   const contact = useLineContactByName(lineName)
   const [failed, setFailed] = useState(false)
   if (contact?.pictureUrl && !failed) {
     return <img src={contact.pictureUrl} alt="" referrerPolicy="no-referrer" onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
   }
-  const letter = initials ? initialsFor(lineName) : ''
-  if (letter) {
-    const [background, color] = AVATAR_TINTS[[...lineName].reduce((sum, character) => sum + (character.codePointAt(0) ?? 0), 0) % AVATAR_TINTS.length]
-    return <span className="avatar-initials" style={{ background, color, fontSize: size }}>{letter}</span>
-  }
-  return <UserRound size={size} />
+  // No LINE photo: show the Sweetie Station logo.
+  return <img src={sweetieAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
 }
 
 export function LineNameField({ id, value, onChange, onPick, placeholder, newLabel }: {
@@ -76,10 +72,10 @@ export function LineNameField({ id, value, onChange, onPick, placeholder, newLab
   const key = value.trim().toLocaleLowerCase()
   // LINE OA contacts first, then names already used in the sheets that are not contacts yet.
   const pool = useMemo(() => {
-    const seen = new Set(contacts.map((contact) => contact.displayName.trim().toLocaleLowerCase()))
+    const seen = new Set(contacts.map((contact) => normalizeLineName(contact.displayName)))
     const fromSheets: LineContact[] = []
     for (const name of knownNames) {
-      const normalized = name.trim().toLocaleLowerCase()
+      const normalized = normalizeLineName(name)
       if (!normalized || seen.has(normalized)) continue
       seen.add(normalized)
       fromSheets.push({ lineUserId: `sheet:${normalized}`, displayName: name.trim(), pictureUrl: '', updatedAt: 0 })
@@ -111,7 +107,7 @@ export function LineNameField({ id, value, onChange, onPick, placeholder, newLab
           {matches.map((contact) => (
             <li key={contact.lineUserId}>
               <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { onPick(contact); setOpen(false) }}>
-                <span className="line-picker-avatar">{contact.pictureUrl ? <img src={contact.pictureUrl} alt="" referrerPolicy="no-referrer" /> : <UserRound size={16} />}</span>
+                <span className="line-picker-avatar">{contact.pictureUrl ? <img src={contact.pictureUrl} alt="" referrerPolicy="no-referrer" /> : <img src={sweetieAvatar} alt="" />}</span>
                 <span className="line-picker-name">{contact.displayName}</span>
               </button>
             </li>
