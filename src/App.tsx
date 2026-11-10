@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff,
   ImagePlus,
+  LayoutGrid,
   LayoutList,
   Languages,
   LoaderCircle,
@@ -33,7 +34,7 @@ import sweetieLogo from './assets/sweetie-logo.webp'
 import { LineAvatar, LineContactsProvider, LineNameField } from './lineContacts'
 import { BottomNavigation, ImagePreviewDialog, ProductImage, ScreenHeader, SkeletonLine, Sparkle, StatusBadge } from './ui/components'
 import { useDialogAccessibility } from './ui/hooks'
-import { paymentBadgeClass, paymentStatusLabel, shippingBadgeClass, shippingStatusLabel, statusFilterLabel, STATUS_FILTERS } from './ui/status'
+import { orderMatchesStatus, paymentBadgeClass, paymentStatusLabel, shippingBadgeClass, shippingStatusLabel, statusFilterLabel, STATUS_FILTERS } from './ui/status'
 
 const AnalyticsChart = lazy(() => import('./AnalyticsChart'))
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
@@ -667,9 +668,9 @@ function HomePage({
   const activeFilterCount = [Boolean(query.trim()), kindFilter !== 'all', statusFilter !== 'all', sortBy !== 'month'].filter(Boolean).length
 
   const currentSheetId = getCurrentMonthSheet(dataBySheet, sheets).id
-  const previewFor = (kind?: SheetDefinition['kind']) => sheetRows.filter(({ sheet }) => !kind || sheet.kind === kind).map(({ orders }) => getPreviewImages(orders, 1)[0]).find(Boolean)
+  const previewFor = (kind: SheetDefinition['kind']) => sheetRows.filter(({ sheet }) => !kind || sheet.kind === kind).map(({ orders }) => getPreviewImages(orders, 1)[0]).find(Boolean)
   const chips = [
-    { key: 'all', label: t('sheets.chips.all'), active: kindFilter === 'all' && statusFilter === 'all', image: previewFor(), count: sheets.length, onSelect: () => { setKindFilter('all'); setStatusFilter('all') } },
+    { key: 'all', label: t('sheets.chips.all'), active: kindFilter === 'all' && statusFilter === 'all', icon: <LayoutGrid size={28} />, count: sheets.length, onSelect: () => { setKindFilter('all'); setStatusFilter('all') } },
     { key: 'sales', label: t('sheets.chips.sales'), active: kindFilter === 'sales' && statusFilter === 'all', image: previewFor('sales'), onSelect: () => { setKindFilter('sales'); setStatusFilter('all') } },
     { key: 'haul', label: t('sheets.chips.haul'), active: kindFilter === 'haul' && statusFilter === 'all', image: previewFor('haul'), onSelect: () => { setKindFilter('haul'); setStatusFilter('all') } },
     { key: 'unpaid', label: t('sheets.chips.unpaid'), active: statusFilter === 'unpaid', icon: <WalletCards size={28} />, onSelect: () => { setKindFilter('all'); setStatusFilter('unpaid') } },
@@ -738,7 +739,7 @@ function HomePage({
             {Array.from({ length: 4 }, (_, index) => <div className="grid gap-2" key={index} aria-hidden="true"><SkeletonLine className="aspect-square w-full rounded-[28px]" /><SkeletonLine className="h-5 w-3/4" /><SkeletonLine className="h-3 w-1/2" /><SkeletonLine className="h-5 w-2/3" /></div>)}
           </div> : <div className="product-grid">
             {visibleSheets.map(({ sheet, orders, error, profit }) => {
-              const images = getPreviewImages(orders)
+              const images = getPreviewImages(orders, 3)
               const unpaid = orders.filter((order) => order.paymentStatus === 'ยังไม่ได้ชำระ').length
               const profitTone = profit.amount === null ? ' unavailable' : profit.amount < 0 ? ' negative' : ''
               return (
@@ -751,7 +752,7 @@ function HomePage({
                 >
                   <span className={`product-media ${sheet.kind}`}>
                     <span className={`product-collage count-${Math.max(1, images.length)}`} aria-hidden="true">{images.length > 0 ? images.map((image, index) => <ProductImage key={`${sheet.id}-${index}`} src={image} alt="" />) : <ProductImage alt="" />}</span>
-                    <span className={`product-tag ${sheet.kind}`}>{t(`sheets.kind.${sheet.kind}`)}</span>
+                    {sheet.kind === 'haul' && <span className="product-tag haul">{t(`sheets.kind.${sheet.kind}`)}</span>}
                     {sheet.id === currentSheetId && <span title={t('sheets.current')}><Sparkle size={26} /></span>}
                     <span className="product-fab" aria-hidden="true">{sheet.kind === 'haul' ? <Plane size={19} /> : <ShoppingBag size={19} />}</span>
                   </span>
@@ -795,18 +796,18 @@ function OrderListRow({ order, sheet, compact = false }: { order: SheetOrder; sh
         onClick={openOrder}
         aria-label={`${t('orders.open')} ${order.customerName || order.lineName} · ${t('orders.profit')}: ${order.profitAmount === null ? '—' : `${formatMoney(order.profitAmount, language)} THB`}`}
       >
-        <span className="order-avatar" aria-hidden="true"><LineAvatar lineName={order.lineName} size={compact ? 20 : 26} /></span>
+        <span className="order-avatar" aria-hidden="true"><LineAvatar lineName={order.customerName || order.lineName} size={compact ? 17 : 21} initials /></span>
         <span className="order-card-main">
           <span className="cart-title display">{order.customerName || order.lineName}</span>
           <span className="cart-sub">{order.lineName} · {formatOrderDate(order.day, sheet, language)} · {t('detail.quantity', { count: order.quantity, unit: order.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</span>
-          <span className="cart-badges">
-            <StatusBadge type="payment" status={order.paymentStatus} />
-            <StatusBadge type="shipping" status={order.shippingStatus} />
-          </span>
         </span>
         <span className="order-card-total">
           <span className="cart-price display">{formatMoney(order.totalSales, language)}<small> THB</small></span>
           <span className={`profit-chip${profitTone}`}>{t('orders.profit')} {order.profitAmount === null ? '—' : `${order.profitAmount > 0 ? '+' : ''}${formatMoney(order.profitAmount, language)} THB`}</span>
+        </span>
+        <span className="cart-badges order-card-badges">
+          <StatusBadge type="payment" status={order.paymentStatus} />
+          <StatusBadge type="shipping" status={order.shippingStatus} />
         </span>
       </button>
       {!compact && order.lines.length > 0 && <ul className="order-item-list" aria-label={t('detail.items')}>
@@ -1309,15 +1310,7 @@ function SheetOrdersPage({
     const matching = orders.filter((order) => {
       const searchText = `${order.lineName} ${order.customerName} ${order.lines.map((line) => line.itemName).join(' ')} ${order.paymentStatus} ${order.shippingStatus}`.toLocaleLowerCase()
       if (!searchText.includes(query.toLocaleLowerCase())) return false
-      if (statusFilter === 'paid') return order.paymentStatus === 'จ่ายเต็ม'
-      if (statusFilter === 'unpaid') return order.paymentStatus === 'ยังไม่ได้ชำระ'
-      if (statusFilter === 'deposit') return order.paymentStatus === 'มัดจำ'
-      if (statusFilter === 'shipped') return order.shippingStatus === 'ส่งแล้ว'
-      if (statusFilter === 'not-ordered') return order.shippingStatus === 'ยังไม่ได้สั่ง'
-      if (statusFilter === 'ordered') return order.shippingStatus === 'สั่งแล้ว'
-      if (statusFilter === 'inbound') return order.shippingStatus === 'รอเข้าไทย'
-      if (statusFilter === 'unlisted') return !order.paymentStatus && !order.shippingStatus
-      return true
+      return orderMatchesStatus(order, statusFilter)
     })
     return matching.sort((a, b) => {
       if (sortBy === 'sales-asc') return a.totalSales - b.totalSales
@@ -1403,20 +1396,20 @@ function SheetOrdersPage({
           </div>}
 
           {loading && !sheetData ? <div className="stat-strip" aria-busy="true" aria-label={t('sheet.loading')}>{Array.from({ length: 3 }, (_, index) => <SkeletonLine className="h-[68px] w-full rounded-[20px]" key={index} />)}</div> : <div className={`stat-strip${sheet.kind === 'sales' ? '' : ' two'}`}>
-            <div className="stat-tile accent"><span>{t('analytics.totalSales')}</span><strong>{formatMoney(sheetTotal(orders), language)} THB</strong></div>
+            <div className="stat-tile accent"><span>{t('orders.statSales')}</span><strong>{formatMoney(sheetTotal(orders), language)} <small>THB</small></strong></div>
             {sheet.kind === 'sales' ? <>
-              <div className={`stat-tile${profitReady ? (totalProfit.amount! < 0 ? ' bad' : ' good') : ''}`}><span>{t('analytics.totalProfit')}</span><strong>{profitReady ? `${formatMoney(totalProfit.amount!, language)} THB` : '—'}</strong>{profitNote && <em>{profitNote}</em>}</div>
-              <button type="button" className="stat-tile" onClick={() => setExpensesOpen(true)}><Pencil size={13} /><span>{t('expenses.open')}</span><strong>{formatMoney(expenseTotal, language)} THB</strong></button>
+              <div className={`stat-tile${profitReady ? (totalProfit.amount! < 0 ? ' bad' : ' good') : ''}`}><span>{t('orders.statProfit')}</span><strong>{profitReady ? <>{formatMoney(totalProfit.amount!, language)} <small>THB</small></> : '—'}</strong>{profitNote && <em>{profitNote}</em>}</div>
+              <button type="button" className="stat-tile" onClick={() => setExpensesOpen(true)}><Pencil size={13} /><span>{t('expenses.open')}</span><strong>{formatMoney(expenseTotal, language)} <small>THB</small></strong></button>
             </> : <div className="stat-tile"><span>{t('analytics.orders')}</span><strong>{orders.length}</strong><em>{t('orders.orders')}</em></div>}
           </div>}
 
           <div className="orders-toolbar">
             <div className="pill-row" role="group" aria-label={t('filters.status')}>
-              {STATUS_FILTERS.map((filter) => <button type="button" className="pill" key={filter} aria-pressed={statusFilter === filter} onClick={() => updateStatus(filter)}>{statusFilterLabel(filter, t)}</button>)}
+              {STATUS_FILTERS.map((filter) => <button type="button" className="pill" key={filter} aria-pressed={statusFilter === filter} onClick={() => updateStatus(filter)}>{statusFilterLabel(filter, t)}<span className="pill-count">{orders.filter((order) => orderMatchesStatus(order, filter)).length}</span></button>)}
             </div>
           </div>
           <div className="order-list-meta">
-            <span>{sheetData?.hasMore ? t('orders.resultCountPartial', { shown: visibleOrders.length, total: sortedOrders.length }) : t('orders.resultCount', { shown: visibleOrders.length, total: sortedOrders.length })}</span>
+            <span>{visibleOrders.length}/{sortedOrders.length}{sheetData?.hasMore ? '+' : ''} {t('orders.orders')}</span>
             <span className="order-list-actions">
             <button type="button" className="pill pill-small" aria-pressed={compactList} onClick={() => setCompactList((compact) => !compact)}>{compactList ? <LayoutList size={15} /> : <Rows3 size={15} />}<span className="sr-only">{t(compactList ? 'orders.cardView' : 'orders.compactView')}</span></button>
             <label className="pill-select">
@@ -1524,7 +1517,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
     <section className="app-screen detail-screen" aria-label={t('screen.detail')}>
       <div className="detail-scroll">
         <div className="detail-hero">
-          {heroImage ? <button type="button" className="detail-hero-image image-preview-trigger" aria-label={t('detail.previewImage')} onClick={() => setPreviewImage({ src: heroImage, alt: order.lines.find((line) => line.images[0])?.itemName ?? '' })}><ProductImage src={heroImage} alt="" /></button> : <span className="detail-hero-avatar" aria-label={t('detail.mockCustomerImage')}><LineAvatar lineName={order.lineName} size={56} /></span>}
+          {heroImage ? <button type="button" className="detail-hero-image image-preview-trigger" aria-label={t('detail.previewImage')} onClick={() => setPreviewImage({ src: heroImage, alt: order.lines.find((line) => line.images[0])?.itemName ?? '' })}><ProductImage src={heroImage} alt="" /></button> : <span className="detail-hero-avatar" aria-label={t('detail.mockCustomerImage')}><LineAvatar lineName={order.customerName || order.lineName} size={52} initials /></span>}
           <div className="detail-hero-top">
             <button type="button" className="icon-button" onClick={() => navigate(`/admin/sheets/${sheet.id}`)} aria-label={t('nav.backToOrders')}><ArrowLeft size={26} strokeWidth={2.4} /></button>
             <p className="detail-hero-title display">{sheetTitle(sheet, t)}</p>
@@ -1671,17 +1664,7 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
   const language = i18n.resolvedLanguage ?? 'en'
   const [statusFilter, setStatusFilter] = useState('all')
   const [monthlySort, setMonthlySort] = useState('sales-desc')
-  const matchesStatus = (order: SheetOrder) => {
-    if (statusFilter === 'paid') return order.paymentStatus === 'จ่ายเต็ม'
-    if (statusFilter === 'unpaid') return order.paymentStatus === 'ยังไม่ได้ชำระ'
-    if (statusFilter === 'deposit') return order.paymentStatus === 'มัดจำ'
-    if (statusFilter === 'shipped') return order.shippingStatus === 'ส่งแล้ว'
-    if (statusFilter === 'not-ordered') return order.shippingStatus === 'ยังไม่ได้สั่ง'
-    if (statusFilter === 'ordered') return order.shippingStatus === 'สั่งแล้ว'
-    if (statusFilter === 'inbound') return order.shippingStatus === 'รอเข้าไทย'
-    if (statusFilter === 'unlisted') return !order.paymentStatus && !order.shippingStatus
-    return true
-  }
+  const matchesStatus = (order: SheetOrder) => orderMatchesStatus(order, statusFilter)
   const filteredOrdersForSheet = (sheet: SheetDefinition) => (dataBySheet[sheet.id]?.orders ?? EMPTY_ORDERS).filter(matchesStatus)
   const scopedOrders = currentOrders.filter(matchesStatus)
   const currentExpenseTotal = (monthlyExpensesBySheet[currentSheet.id] ?? []).reduce((sum, expense) => sum + expense.amount, 0)
@@ -1780,7 +1763,7 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
           <ChevronDown size={16} className="info-bar-end" />
         </label>
         <div className="pill-row mb-4" role="group" aria-label={t('filters.status')}>
-          {STATUS_FILTERS.map((filter) => <button type="button" className="pill" key={filter} aria-pressed={statusFilter === filter} onClick={() => setStatusFilter(filter)}>{statusFilterLabel(filter, t)}</button>)}
+          {STATUS_FILTERS.map((filter) => <button type="button" className="pill" key={filter} aria-pressed={statusFilter === filter} onClick={() => setStatusFilter(filter)}>{statusFilterLabel(filter, t)}<span className="pill-count">{currentOrders.filter((order) => orderMatchesStatus(order, filter)).length}</span></button>)}
         </div>
         {loading || analyticsDataLoading ? <div className="metric-grid" aria-busy="true" aria-label={t('sheet.loading')}>
           {Array.from({ length: 4 }, (_, index) => <div className="grid min-h-[96px] content-center gap-3 rounded-3xl bg-mist p-4" key={index} aria-hidden="true"><SkeletonLine className="h-3 w-2/5" /><SkeletonLine className="h-6 w-3/4" /><SkeletonLine className="h-2.5 w-1/2" /></div>)}

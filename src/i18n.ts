@@ -15,7 +15,7 @@ const resources = {
         haulSep: 'Guangzhou · 16–23 Sep', oct: 'October', nov: 'November', dec: 'December',
       },
       orders: {
-        title: 'Orders', orders: 'orders', refresh: 'Refresh', refreshing: 'Updating', pullToRefresh: 'Pull down to refresh', releaseToRefresh: 'Release to refresh', open: 'Open order', showSummary: 'Show month summary', hideSummary: 'Hide month summary',
+        title: 'Orders', orders: 'orders', statSales: 'Sales', statProfit: 'Net profit', refresh: 'Refresh', refreshing: 'Updating', pullToRefresh: 'Pull down to refresh', releaseToRefresh: 'Release to refresh', open: 'Open order', showSummary: 'Show month summary', hideSummary: 'Hide month summary',
         item: 'item', items: 'items', oneItem: '1 item', manyItems: '{{count}} items', itemCount: '{{count}} items', resultCount: '{{shown}} of {{total}} orders', resultCountPartial: '{{shown}} shown · {{total}}+ loaded', search: 'Search customer or item', closeSearch: 'Close search', searchItems: 'Search items', noMatch: 'No matching orders', compactView: 'Compact list', cardView: 'Detailed cards', edit: 'Edit', editSaved: 'Order changes saved to Google Sheets.', loadingMore: 'Loading more orders…', endOfList: 'You’re all caught up.', profit: 'Profit', profitUnavailable: '—',
       },
       details: { title: 'Order details', summary: 'Order summary', status: 'Order status', statusHint: 'Update payment and shipping here.', saving: 'Saving status…', itemCount: '{{count}} items' },
@@ -75,7 +75,7 @@ const resources = {
         haulSep: 'กวางโจว · 16–23 ก.ย.', oct: 'ตุลาคม', nov: 'พฤศจิกายน', dec: 'ธันวาคม',
       },
       orders: {
-        title: 'รายการคำสั่งซื้อ', orders: 'ออเดอร์', refresh: 'รีเฟรช', refreshing: 'กำลังอัปเดต', pullToRefresh: 'ดึงลงเพื่อรีเฟรช', releaseToRefresh: 'ปล่อยเพื่อรีเฟรช', open: 'เปิดคำสั่งซื้อ', showSummary: 'แสดงสรุปรายเดือน', hideSummary: 'ซ่อนสรุปรายเดือน',
+        title: 'รายการคำสั่งซื้อ', orders: 'ออเดอร์', statSales: 'ยอดขาย', statProfit: 'กำไรสุทธิ', refresh: 'รีเฟรช', refreshing: 'กำลังอัปเดต', pullToRefresh: 'ดึงลงเพื่อรีเฟรช', releaseToRefresh: 'ปล่อยเพื่อรีเฟรช', open: 'เปิดคำสั่งซื้อ', showSummary: 'แสดงสรุปรายเดือน', hideSummary: 'ซ่อนสรุปรายเดือน',
         item: 'ชิ้น', items: 'ชิ้น', oneItem: '1 ชิ้น', manyItems: '{{count}} ชิ้น', itemCount: '{{count}} รายการ', resultCount: 'แสดง {{shown}} จาก {{total}} ออเดอร์', resultCountPartial: 'แสดง {{shown}} · โหลดแล้ว {{total}}+ ออเดอร์', search: 'ค้นหาลูกค้าหรือสินค้า', closeSearch: 'ปิดช่องค้นหา', searchItems: 'ค้นหารายการสินค้า', noMatch: 'ไม่พบออเดอร์ที่ตรงกัน', compactView: 'รายการแบบย่อ', cardView: 'การ์ดแบบละเอียด', edit: 'แก้ไข', editSaved: 'บันทึกการแก้ไขออเดอร์ลง Google Sheets แล้ว', loadingMore: 'กำลังโหลดออเดอร์เพิ่ม…', endOfList: 'แสดงครบแล้ว', profit: 'กำไร', profitUnavailable: '—',
       },
       details: { title: 'รายละเอียดคำสั่งซื้อ', summary: 'สรุปคำสั่งซื้อ', status: 'สถานะออเดอร์', statusHint: 'เปลี่ยนสถานะชำระเงินและจัดส่งได้ที่นี่', saving: 'กำลังบันทึกสถานะ…', itemCount: '{{count}} ชิ้น' },

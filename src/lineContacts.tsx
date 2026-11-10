@@ -36,11 +36,26 @@ export function useLineContactByName(lineName: string) {
   }, [contacts, lineName])
 }
 
-export function LineAvatar({ lineName, size }: { lineName: string; size: number }) {
+const AVATAR_TINTS = [['#ffe1ee', '#b83a63'], ['#e5f1ff', '#2f5f9e'], ['#e8f6e7', '#2f7a2b'], ['#fff0d9', '#8a5a00'], ['#efe7ff', '#5b3aa6'], ['#ffe9e3', '#b4472c']]
+const THAI_LEADING_VOWELS = new Set(['เ', 'แ', 'โ', 'ใ', 'ไ'])
+
+function initialsFor(name: string) {
+  const letters = Array.from(name.trim()).filter((character) => /[\p{L}\p{N}]/u.test(character))
+  if (letters.length === 0) return ''
+  const first = THAI_LEADING_VOWELS.has(letters[0]) && letters[1] ? letters[1] : letters[0]
+  return first.toLocaleUpperCase()
+}
+
+export function LineAvatar({ lineName, size, initials = false }: { lineName: string; size: number; initials?: boolean }) {
   const contact = useLineContactByName(lineName)
   const [failed, setFailed] = useState(false)
   if (contact?.pictureUrl && !failed) {
     return <img src={contact.pictureUrl} alt="" referrerPolicy="no-referrer" onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+  }
+  const letter = initials ? initialsFor(lineName) : ''
+  if (letter) {
+    const [background, color] = AVATAR_TINTS[[...lineName].reduce((sum, character) => sum + (character.codePointAt(0) ?? 0), 0) % AVATAR_TINTS.length]
+    return <span className="avatar-initials" style={{ background, color, fontSize: size }}>{letter}</span>
   }
   return <UserRound size={size} />
 }

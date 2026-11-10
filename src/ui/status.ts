@@ -51,3 +51,15 @@ export function statusFilterLabel(filter: string, t: Translate) {
   }
   return t(keys[filter] ?? filter)
 }
+
+export function orderMatchesStatus(order: { paymentStatus: string; shippingStatus: string }, filter: string) {
+  if (filter === 'paid') return order.paymentStatus === 'จ่ายเต็ม'
+  if (filter === 'unpaid') return order.paymentStatus === 'ยังไม่ได้ชำระ'
+  if (filter === 'deposit') return order.paymentStatus === 'มัดจำ'
+  if (filter === 'shipped') return order.shippingStatus === 'ส่งแล้ว'
+  if (filter === 'not-ordered') return order.shippingStatus === 'ยังไม่ได้สั่ง'
+  if (filter === 'ordered') return order.shippingStatus === 'สั่งแล้ว'
+  if (filter === 'inbound') return order.shippingStatus === 'รอเข้าไทย'
+  if (filter === 'unlisted') return !order.paymentStatus && !order.shippingStatus
+  return true
+}
