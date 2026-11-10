@@ -1357,3 +1357,147 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
   .order-row-subtitle { font-size: 11px; }
   .monthly-expense-row { grid-template-columns: 80px minmax(0, 1fr) 70px 25px; gap: 4px; }
 }
+
+/* UX refresh: clearer hierarchy, stronger touch targets, and explicit settings. */
+.sheet-list-heading { margin: 18px 0 10px; }
+.sheet-list-heading h2 { margin: 0; font-size: 16px; }
+.sheet-search-field { margin-bottom: 10px; }
+.sheet-filter-row { align-items: end; gap: 8px; margin: 0 0 10px; }
+.sheet-filter-row label { display: grid; min-width: 0; gap: 4px; color: #6f6264; font-size: 10px; font-weight: 650; }
+.sheet-filter-row .select { min-width: 0; min-height: 40px; height: 40px; padding-inline: 9px; font-size: 11px; }
+.clear-sheet-filters { align-self: center; min-height: 34px; border: 0; padding: 6px 4px; background: transparent; color: #a34e68; font-size: 11px; font-weight: 700; cursor: pointer; }
+.sheet-card-caption { min-height: 98px; gap: 5px; padding: 11px 12px; background: rgb(36 27 31 / 86%); }
+.sheet-card-caption strong { font-size: 14px; }
+.sheet-card-caption span, .sheet-card-caption b { font-size: 11px; }
+.sheet-card-caption .sheet-card-profit { font-size: 10px; }
+.sheet-card-caption .sheet-card-profit-value { font-size: 10px; }
+
+/* Four labeled destinations remain legible on narrow phones. */
+.bottom-nav { height: 72px; margin-inline: -16px; border-top: 1px solid #f2eceb; padding: 5px 8px max(5px, env(safe-area-inset-bottom)); }
+.nav-item { display: flex; width: auto; height: 58px; flex: 1 1 0; flex-direction: column; justify-content: center; gap: 4px; border-radius: 12px; color: #777071; }
+.nav-item span { max-width: 100%; overflow: hidden; font-size: 10px; font-weight: 600; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+.nav-item.active { background: #fff1f5; color: #a34e68; }
+.nav-item:focus-visible { outline: 2px solid #cc4779; outline-offset: 1px; }
+
+/* Details: one editable status area instead of duplicate badges and controls. */
+.detail-hero { height: 152px; }
+.detail-status-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.detail-status-heading { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 1px; }
+.detail-status-heading h3 { margin: 0; color: #393331; font-size: 13px; }
+.detail-status-heading span { color: #887c79; font-size: 10px; }
+.detail-status-controls label { font-size: 11px; }
+.detail-status-controls .select { min-height: 42px; height: 42px; font-size: 13px; }
+.detail-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.detail-section-heading h3 { margin: 0; }
+.order-quantity-chip { flex: none; border-radius: 999px; padding: 5px 9px; background: #fff2f5; color: #9d5269; font-size: 10px; font-weight: 700; }
+
+/* Order form: grouped sections, persistent total, and readable form labels. */
+.order-form label { gap: 6px; font-size: 11px; }
+.order-form input:not([type=file]), .order-form select:not(.select) { min-height: 42px; height: 42px; font-size: 13px; }
+.form-section-heading { scroll-margin-top: 12px; margin-top: 20px; }
+.form-section-heading-first { margin-top: 0; }
+.form-section-heading h3, .campaign-card-heading h3 { font-size: 14px; }
+.form-section-heading span, .campaign-card-heading span { color: #776e6b; font-size: 10px; }
+.campaign-card-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.campaign-card-heading h3 { margin: 0; }
+.order-modal-actions { display: grid; grid-template-columns: 1fr 1fr; }
+.form-total-summary { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 3px 8px; border-radius: 10px; padding: 8px 10px; background: #fff5f7; color: #76686b; font-size: 11px; }
+.form-total-summary strong { color: #9d5269; font-size: 15px; }
+.form-total-summary small { grid-column: 1 / -1; color: #817678; font-size: 10px; }
+
+/* Explicit create-sheet preview and destination. */
+.create-sheet-preview { display: grid; gap: 4px; margin-top: 14px; border: 1px solid #f0dfe4; border-radius: 12px; padding: 11px 12px; background: #fff7f9; }
+.create-sheet-preview > span { color: #8a777b; font-size: 10px; font-weight: 700; }
+.create-sheet-preview strong { overflow: hidden; color: #413538; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.create-sheet-preview small, .create-sheet-destination { color: #796d6b; font-size: 11px; }
+.create-sheet-destination { margin: 9px 0 0; line-height: 1.4; }
+
+/* Expense changes are staged until an explicit confirmation. */
+.monthly-expenses-modal-body { min-height: 0; flex: 1 1 auto; overflow-y: auto; }
+.modal-subtitle { display: block; margin-top: 5px; color: #796d6b; font-size: 11px; line-height: 1.35; }
+.expense-modal-actions { position: static; margin: 0; padding: 12px 18px max(14px, env(safe-area-inset-bottom)); }
+.expense-modal-actions button:disabled { cursor: default; opacity: .58; }
+
+/* Analytics keeps the main KPIs visible and tucks secondary metrics behind a labeled disclosure. */
+.analytics-metrics { gap: 10px; }
+.analytics-more-metrics { margin: 0 0 8px; border: 1px solid #f0e8e6; border-radius: 13px; background: #fff; }
+.analytics-more-metrics > summary { min-height: 42px; padding: 12px 14px; color: #8f4058; font-size: 12px; font-weight: 700; cursor: pointer; }
+.analytics-secondary-metrics { margin: 0; border-top: 1px solid #f2e9e7; padding: 10px; }
+.analytics-summary h1 { font-size: clamp(27px, 7vw, 33px); }
+
+/* Settings is a dedicated destination rather than an interruption in analytics. */
+.settings-summary h1 { font-size: 32px; }
+.settings-scroll-area { padding-top: 8px; }
+.settings-card { display: grid; gap: 12px; }
+.settings-card h2 { margin-bottom: 0; font-size: 15px; }
+.settings-card p { margin: 0; color: #746a68; font-size: 12px; line-height: 1.45; }
+.settings-field { display: grid; gap: 7px; color: #665d5a; font-size: 12px; font-weight: 650; }
+.settings-field .select { width: 100%; min-height: 42px; height: 42px; font-size: 13px; }
+.settings-card .backup-download-button, .settings-card .logout-button { min-height: 44px; border-radius: 11px; font-size: 12px; }
+.settings-account-card { border-color: #f2e1e5; }
+
+/* Sign-in support text and password visibility affordance. */
+.admin-login-card > p { font-size: 11px; }
+.admin-login-card label { gap: 7px; font-size: 12px; }
+.admin-login-card .input { height: 48px; padding-right: 44px; font-size: 16px; }
+.login-password-field { position: relative; display: block; }
+.login-password-field .input { padding-right: 46px; }
+.password-visibility-toggle { position: absolute; top: 50%; right: 8px; display: grid; width: 34px; height: 34px; place-items: center; transform: translateY(-50%); border: 0; border-radius: 8px; background: transparent; color: #71676a; cursor: pointer; }
+.password-visibility-toggle:focus-visible { outline: 2px solid #cc4779; outline-offset: 1px; }
+.admin-login-card small { color: #766b6d; font-size: 10px; }
+
+/* Keep the splash accessible and calm, including on reduced-motion devices. */
+.splash-loading { min-height: 24px; align-items: center; }
+
+@media (max-width: 390px) {
+  .sheet-filter-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sheet-filter-row label:last-of-type { grid-column: 1 / -1; }
+  .sheet-filter-row .select { font-size: 10px; }
+  .clear-sheet-filters { grid-column: 1 / -1; justify-self: end; }
+  .sheet-card-caption { min-height: 90px; }
+  .sheet-card-caption strong { font-size: 13px; }
+  .detail-hero { height: 132px; }
+  .detail-status-heading { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .analytics-secondary-metrics { grid-template-columns: minmax(0, 1fr); }
+}
+.splash-loading { bottom: 28px; flex-direction: column; align-items: center; gap: 8px; color: rgb(255 255 255 / 92%); font-size: 11px; font-weight: 600; }
+.splash-loading i { width: 32px; height: 3px; }
+
+.sheet-list-toggle { min-height: 38px; }
+.sheet-list-toggle svg { flex: none; color: #8f4058; }
+.active-filter-count { display: inline-flex; min-width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 999px; padding: 0 6px; background: #fff0f4; color: #9d5269; font-size: 10px; font-weight: 750; }
+.sheet-controls-panel { animation: controls-reveal 160ms ease-out both; }
+@keyframes controls-reveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .sheet-controls-panel { animation: none; } }
+
+/* Three-step create/edit order flow. */
+.order-stepper { margin: -2px 0 18px; }
+.order-stepper ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
+.order-stepper li { position: relative; min-width: 0; }
+.order-stepper li:not(:last-child)::after { position: absolute; top: 15px; right: 0; left: 56%; z-index: 0; height: 2px; background: #eee4e7; content: ''; }
+.order-stepper li.complete:not(:last-child)::after { background: #e4a5b6; }
+.order-stepper li button { position: relative; z-index: 1; display: flex; width: 100%; min-height: 48px; align-items: center; gap: 7px; border: 0; padding: 0 4px; background: transparent; color: #817779; text-align: left; }
+.order-stepper li button:disabled { cursor: default; opacity: 1; }
+.order-step-number { display: grid; width: 30px; height: 30px; flex: none; place-items: center; border: 1px solid #e6d9dd; border-radius: 50%; background: #fff; color: #806f74; font-size: 12px; font-weight: 750; }
+.order-step-label { overflow: hidden; color: inherit; font-size: 10px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.order-stepper li.current .order-step-number { border-color: #d87594; background: #d87594; color: #fff; box-shadow: 0 0 0 3px #fdebf0; }
+.order-stepper li.current .order-step-label { color: #913d58; }
+.order-stepper li.complete .order-step-number { border-color: #e4a5b6; background: #fff5f7; color: #9d5269; }
+.order-step-panel { min-width: 0; margin: 0; border: 0; padding: 0; }
+.order-step-panel[hidden] { display: none; }
+.order-step-actions { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.order-step-actions.two-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.back-order-button { background: #f5f1f0; color: #756c6a; }
+.order-step-actions .save-order-button { background: #d87594; }
+@media (max-width: 390px) {
+  .order-stepper { margin-bottom: 14px; }
+  .order-stepper li button { flex-direction: column; justify-content: center; gap: 3px; }
+  .order-stepper li:not(:last-child)::after { top: 14px; left: 62%; }
+  .order-step-label { max-width: 100%; font-size: 9px; }
+}
+
+/* Product image actions lead each item step so saved photos can prefill its fields. */
+.image-source-row-first { margin: 2px 0 0; }
+.image-source-row-first .upload-image-button,
+.image-source-row-first .choose-month-image { min-height: 42px; font-size: 11px !important; }
+.image-source-hint { display: block; margin-top: -4px; color: #776e6b; font-size: 10px; line-height: 1.4; }

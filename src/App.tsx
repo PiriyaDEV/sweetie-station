@@ -6,8 +6,11 @@ import {
   Check,
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Download,
+  Eye,
+  EyeOff,
   Home,
   ImagePlus,
   Package,
@@ -17,6 +20,7 @@ import {
   RefreshCw,
   Search,
   SlidersHorizontal,
+  Settings,
   X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -276,7 +280,7 @@ function fieldLabel(key: string, t: (key: string) => string) {
 }
 
 
-function AnalyticsUtilities({ onExportBackup, backupLoading, backupMessage, onLogout }: { onExportBackup: () => void; backupLoading: boolean; backupMessage: string; onLogout: () => void }) {
+function SettingsPage({ onExportBackup, backupLoading, backupMessage, onLogout }: { onExportBackup: () => void; backupLoading: boolean; backupMessage: string; onLogout: () => void }) {
   const { i18n, t } = useTranslation()
   const language = i18n.resolvedLanguage ?? 'en'
 
@@ -292,16 +296,37 @@ function AnalyticsUtilities({ onExportBackup, backupLoading, backupMessage, onLo
   }
 
   return (
-    <section className="analytics-utilities" aria-label={t('settings.title')}>
-      <div className="analytics-utility-actions">
-        <button type="button" className="backup-download-button" onClick={onExportBackup} disabled={backupLoading}><Download size={14} />{backupLoading ? t('backup.preparing') : t('backup.download')}</button>
-        <button type="button" className="logout-button" onClick={() => void onLogout()}>{t('auth.logout')}</button>
-        <select className="select select-bordered select-sm select-primary" value={language} onChange={(event) => changeLanguage(event.target.value)} aria-label={t('settings.displayLanguage')}>
-          <option value="en">English</option>
-          <option value="th">ไทย</option>
-        </select>
+    <section className="app-screen home-screen settings-screen" aria-label={t('settings.title')}>
+      <div className="screen-fixed-header">
+        <header className="sales-summary settings-summary">
+          <p>{t('settings.kicker')}</p>
+          <h1>{t('settings.title')}</h1>
+          <p className="sales-growth">{t('settings.subtitle')}</p>
+        </header>
       </div>
-      {backupMessage && <small className="backup-status" role="status">{backupMessage}</small>}
+      <div className="home-scroll-area settings-scroll-area">
+        <section className="analytics-section settings-card">
+          <h2>{t('settings.preferences')}</h2>
+          <label className="settings-field">
+            <span>{t('settings.displayLanguage')}</span>
+            <select className="select select-bordered select-sm select-primary" value={language} onChange={(event) => changeLanguage(event.target.value)}>
+              <option value="en">English</option>
+              <option value="th">ไทย</option>
+            </select>
+          </label>
+        </section>
+        <section className="analytics-section settings-card">
+          <h2>{t('settings.data')}</h2>
+          <p>{t('settings.backupHint')}</p>
+          <button type="button" className="backup-download-button" onClick={onExportBackup} disabled={backupLoading}><Download size={15} />{backupLoading ? t('backup.preparing') : t('backup.download')}</button>
+          {backupMessage && <small className="backup-status" role="status">{backupMessage}</small>}
+        </section>
+        <section className="analytics-section settings-card settings-account-card">
+          <h2>{t('settings.account')}</h2>
+          <button type="button" className="logout-button" onClick={() => void onLogout()}>{t('auth.logout')}</button>
+        </section>
+      </div>
+      <BottomNavigation />
     </section>
   )
 }
@@ -310,12 +335,12 @@ function SplashScreen({ showLoading = true }: { showLoading?: boolean }) {
   const { t } = useTranslation()
 
   return (
-    <section className="app-screen splash-screen" aria-label={t('screen.splash')}>
+    <section className="app-screen splash-screen" aria-label={t('screen.splash')} aria-busy={showLoading}>
       <div className="splash-content">
         <img className="sweetie-mark-image" src={sweetieLogo} alt={t('splash.logoAlt')} />
         <p className="splash-tagline">{t('splash.tagline')}</p>
       </div>
-      {showLoading && <span className="splash-loading" aria-hidden="true"><i /></span>}
+      {showLoading && <div className="splash-loading" role="status"><span>{t('splash.loading')}</span><i aria-hidden="true" /></div>}
     </section>
   )
 }
@@ -326,12 +351,15 @@ function BottomNavigation() {
   const location = useLocation()
   const isHome = location.pathname === '/admin/home'
   const isAnalytics = location.pathname === '/admin/analytics'
+  const isSettings = location.pathname === '/admin/settings'
+  const isOrders = location.pathname === '/admin/orders' || location.pathname.startsWith('/admin/sheets/')
 
   return (
     <nav className="bottom-nav" aria-label={t('nav.label')}>
-      <button type="button" className={`nav-item${isHome ? ' active' : ''}`} aria-label={t('nav.home')} onClick={() => navigate('/admin/home')}><Home size={22} fill={isHome ? 'currentColor' : 'none'} /></button>
-      <button type="button" className={`nav-item${!isHome && !isAnalytics ? ' active' : ''}`} aria-label={t('nav.orders')} onClick={() => navigate('/admin/orders')}><ClipboardList size={22} /></button>
-      <button type="button" className={`nav-item${isAnalytics ? ' active' : ''}`} aria-label={t('nav.analytics')} onClick={() => navigate('/admin/analytics')}><BarChart3 size={22} /></button>
+      <button type="button" className={`nav-item${isHome ? ' active' : ''}`} aria-label={t('nav.home')} aria-current={isHome ? 'page' : undefined} onClick={() => navigate('/admin/home')}><Home size={20} fill={isHome ? 'currentColor' : 'none'} /><span>{t('nav.home')}</span></button>
+      <button type="button" className={`nav-item${isOrders ? ' active' : ''}`} aria-label={t('nav.orders')} aria-current={isOrders ? 'page' : undefined} onClick={() => navigate('/admin/orders')}><ClipboardList size={20} /><span>{t('nav.orders')}</span></button>
+      <button type="button" className={`nav-item${isAnalytics ? ' active' : ''}`} aria-label={t('nav.analytics')} aria-current={isAnalytics ? 'page' : undefined} onClick={() => navigate('/admin/analytics')}><BarChart3 size={20} /><span>{t('nav.analytics')}</span></button>
+      <button type="button" className={`nav-item${isSettings ? ' active' : ''}`} aria-label={t('nav.settings')} aria-current={isSettings ? 'page' : undefined} onClick={() => navigate('/admin/settings')}><Settings size={20} /><span>{t('nav.settings')}</span></button>
     </nav>
   )
 }
@@ -441,6 +469,7 @@ function CreateSheetDialog({ onClose, onCreate }: {
   const [year, setYear] = useState(String(now.getFullYear()))
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
+  const previewName = name.trim() || t('createSheet.namePlaceholder')
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -474,6 +503,12 @@ function CreateSheetDialog({ onClose, onCreate }: {
             <label>{t('createSheet.month')}<select className="select select-bordered select-sm select-primary" value={monthKey} onChange={(event) => setMonthKey(event.target.value)}>{Object.keys(MONTH_INDEX).map((key) => <option key={key} value={key}>{t(`sheets.${key}`)}</option>)}</select></label>
           </div>
           <label className="year-field"><span className="field-label">{t('createSheet.year')} <span className="required-star">*</span></span><NumericInput integer minValue={2000} maxValue={2100} value={year} onValueChange={setYear} required /></label>
+          <section className="create-sheet-preview" aria-live="polite">
+            <span>{t('createSheet.preview')}</span>
+            <strong>{previewName}</strong>
+            <small>{t(`sheets.kind.${kind}`)} · {t(`sheets.${monthKey}`)} {year || now.getFullYear()}</small>
+          </section>
+          <p className="create-sheet-destination">{t('createSheet.destination')}</p>
           <p className="local-save-note">{t('createSheet.localOnly')}</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <footer className="modal-actions">
@@ -512,8 +547,7 @@ function HomePage({
   const [kindFilter, setKindFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('month')
-  const [sheetFiltersOpen, setSheetFiltersOpen] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
+  const [sheetControlsOpen, setSheetControlsOpen] = useState(false)
   const [createSheetOpen, setCreateSheetOpen] = useState(false)
 
   useEffect(() => {
@@ -547,6 +581,7 @@ function HomePage({
       if (sortBy === 'name') return sheetTitle(a.sheet, t).localeCompare(sheetTitle(b.sheet, t))
       return a.index - b.index
     })
+  const activeFilterCount = [Boolean(query.trim()), kindFilter !== 'all', statusFilter !== 'all', sortBy !== 'month'].filter(Boolean).length
 
   return (
     <section className="app-screen home-screen sheets-home-screen" aria-label={t('screen.home')}>
@@ -556,29 +591,31 @@ function HomePage({
           <h1>{t('sheets.chooseMonth')}</h1>
           <p className="sales-growth">{t('sheets.sheetCount', { count: sheets.length })}</p>
         </header>
-        <div className="section-heading">
-          <button type="button" className="sheet-list-toggle" aria-expanded={sheetFiltersOpen} aria-controls="sheet-list-controls" onClick={() => setSheetFiltersOpen((open) => !open)}>
-            <h2>{t('sheets.allSheets')}</h2><ChevronDown size={16} className={sheetFiltersOpen ? 'is-open' : ''} />
+        <div className="section-heading sheet-list-heading">
+          <button type="button" className="sheet-list-toggle" aria-expanded={sheetControlsOpen} aria-controls="sheet-list-controls" aria-label={t(sheetControlsOpen ? 'sheets.hideControls' : 'sheets.showControls')} onClick={() => setSheetControlsOpen((open) => !open)}>
+            <h2>{t('sheets.allSheets')}</h2>
+            <ChevronDown size={18} className={sheetControlsOpen ? 'is-open' : ''} />
+            {activeFilterCount > 0 && <span className="active-filter-count" aria-label={t('filters.activeCount', { count: activeFilterCount })}>{activeFilterCount}</span>}
           </button>
           <div className="sheet-heading-actions">
-            <button type="button" className={`sheet-search-toggle${searchOpen ? ' is-open' : ''}`} aria-label={t('sheets.search')} aria-expanded={searchOpen} aria-controls="sheet-search" onClick={() => setSearchOpen((open) => !open)}>
-              {searchOpen ? <X size={17} /> : <Search size={17} />}
-            </button>
             <button type="button" className="view-all" onClick={onRefresh} disabled={refreshing}>
               <RefreshCw size={13} className={refreshing ? 'refreshing-icon' : ''} />
               {refreshing ? t('orders.refreshing') : t('orders.refresh')}
             </button>
           </div>
         </div>
-        {searchOpen && <label className="order-search" id="sheet-search">
-          <Search size={16} />
-          <span className="sr-only">{t('sheets.search')}</span>
-          <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('sheets.search')} />
-        </label>}
-        {sheetFiltersOpen && <div className="sheet-filter-row" id="sheet-list-controls">
-          <label><span className="sr-only">{t('filters.sheetType')}</span><select className="select select-bordered select-sm select-primary" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">{t('filters.allSheets')}</option><option value="sales">{t('sheets.kind.sales')}</option><option value="haul">{t('sheets.kind.haul')}</option></select></label>
-          <label><span className="sr-only">{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="unpaid">{t('detail.paymentUnpaid')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="not-ordered">{t('detail.shippingNotOrdered')}</option><option value="ordered">{t('detail.shippingOrdered')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
-          <label><span className="sr-only">{t('filters.sortSheets')}</span><select className="select select-bordered select-sm select-primary" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="month">{t('filters.monthOrder')}</option><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="orders-desc">{t('filters.ordersHigh')}</option><option value="name">{t('filters.nameAZ')}</option></select></label>
+        {sheetControlsOpen && <div className="sheet-controls-panel" id="sheet-list-controls" aria-label={t('filters.sheetControls')}>
+          <label className="order-search sheet-search-field" id="sheet-search">
+            <Search size={16} />
+            <span className="sr-only">{t('sheets.search')}</span>
+            <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('sheets.search')} />
+          </label>
+          <div className="sheet-filter-row">
+            <label><span>{t('filters.sheetType')}</span><select className="select select-bordered select-sm select-primary" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">{t('filters.allSheets')}</option><option value="sales">{t('sheets.kind.sales')}</option><option value="haul">{t('sheets.kind.haul')}</option></select></label>
+            <label><span>{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="unpaid">{t('detail.paymentUnpaid')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="not-ordered">{t('detail.shippingNotOrdered')}</option><option value="ordered">{t('detail.shippingOrdered')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
+            <label><span>{t('filters.sortSheets')}</span><select className="select select-bordered select-sm select-primary" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="month">{t('filters.monthOrder')}</option><option value="sales-desc">{t('filters.salesHigh')}</option><option value="sales-asc">{t('filters.salesLow')}</option><option value="orders-desc">{t('filters.ordersHigh')}</option><option value="name">{t('filters.nameAZ')}</option></select></label>
+            {activeFilterCount > 0 && <button type="button" className="clear-sheet-filters" onClick={() => { setQuery(''); setKindFilter('all'); setStatusFilter('all'); setSortBy('month') }}>{t('filters.clear')}</button>}
+          </div>
         </div>}
       </div>
 
@@ -790,6 +827,8 @@ function CreateOrderDialog({
   const [imageError, setImageError] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [currentStep, setCurrentStep] = useState(0)
+  const formRef = useRef<HTMLFormElement>(null)
   const exchangeRate = Number(draft.exchangeRate) || defaultExchangeRate
   const grossSales = draft.lines.reduce((sum, line) => sum + (Number(line.salePrice) || 0), 0)
   const campaignDiscount = draft.isCampaign ? Math.min(grossSales, Math.max(0, Number(draft.campaignDiscount) || 0)) : 0
@@ -824,9 +863,34 @@ function CreateOrderDialog({
 
   const filteredImages = imageChoices.filter((choice) => `${choice.label} ${choice.itemName}`.toLocaleLowerCase().includes(imageQuery.toLocaleLowerCase()))
 
+  const validateCurrentStep = () => {
+    const activePanel = formRef.current?.querySelector<HTMLElement>(`[data-order-step="${currentStep}"]`)
+    const firstInvalid = activePanel?.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(':invalid')
+    if (!firstInvalid) return true
+    firstInvalid.reportValidity()
+    firstInvalid.focus()
+    return false
+  }
+
+  const goToStep = (step: number) => {
+    if (step < currentStep) {
+      setCurrentStep(step)
+      formRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+    if (step === currentStep + 1 && validateCurrentStep()) {
+      setCurrentStep(step)
+      window.requestAnimationFrame(() => formRef.current?.scrollTo({ top: 0, behavior: 'smooth' }))
+    }
+  }
+
+  const goToNextStep = () => {
+    if (currentStep < 2) goToStep(currentStep + 1)
+  }
+
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (saving) return
+    if (saving || currentStep !== 2 || !validateCurrentStep()) return
     setSaving(true)
     setSaveError('')
     try {
@@ -849,7 +913,25 @@ function CreateOrderDialog({
           <button type="button" className="modal-close" onClick={onClose} aria-label={t('createOrder.close')}><X size={20} /></button>
         </header>
 
-        <form className="order-form" onSubmit={submit}>
+        <form className="order-form" ref={formRef} onSubmit={submit}>
+          <nav className="order-stepper" aria-label={t('createOrder.stepProgress', { current: currentStep + 1, total: 3 })}>
+            <ol>
+              {[
+                t('createOrder.stepInfo'),
+                t('createOrder.stepItems'),
+                t('createOrder.stepReview'),
+              ].map((label, index) => (
+                <li className={index === currentStep ? 'current' : index < currentStep ? 'complete' : ''} key={label}>
+                  <button type="button" onClick={() => goToStep(index)} disabled={index >= currentStep} aria-current={index === currentStep ? 'step' : undefined}>
+                    <span className="order-step-number">{index < currentStep ? <Check size={13} /> : index + 1}</span>
+                    <span className="order-step-label">{label}</span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </nav>
+          <fieldset className="order-step-panel" data-order-step="0" disabled={currentStep !== 0} hidden={currentStep !== 0}>
+          <div className="form-section-heading form-section-heading-first"><h3>{t('createOrder.orderInfo')}</h3><span>{t('createOrder.requiredFieldsNote')}</span></div>
           <div className="form-grid two-columns">
             <div>
               <span className="field-label">{t('detail.lineName')}</span>
@@ -869,7 +951,9 @@ function CreateOrderDialog({
             <label><span className="field-label">{t('createOrder.exchangeRate')} <span className="required-star">*</span></span><NumericInput minValue={0.01} value={draft.exchangeRate} onValueChange={(value) => { updateField('exchangeRate', value); const nextRate = Number(value); if (nextRate > 0) onExchangeRateChange(nextRate) }} required /></label>
             <small>{t('createOrder.exchangeRateHint')}</small>
           </div>
+          </fieldset>
 
+          <fieldset className="order-step-panel" data-order-step="1" disabled={currentStep !== 1} hidden={currentStep !== 1}>
           <div className="form-section-heading"><h3>{t('detail.items')}</h3><span>{t('createOrder.monthOnlyImages', { month: sheetTitle(sheet, t) })}</span></div>
 
           {draft.lines.map((line, index) => {
@@ -883,6 +967,23 @@ function CreateOrderDialog({
             return (
               <section className="draft-line-card" key={index}>
                 <div className="draft-line-heading"><strong>{t('createOrder.itemNumber', { number: index + 1 })}</strong>{draft.lines.length > 1 && <button type="button" className="remove-line" onClick={() => setDraft((current) => ({ ...current, paymentStatus: '', lines: current.lines.filter((_, lineIndex) => lineIndex !== index) }))}>{t('createOrder.remove')}</button>}</div>
+                <div className="image-source-row image-source-row-first">
+                  <label className="upload-image-button btn btn-outline btn-sm">
+                    <ImagePlus size={16} /> {t('createOrder.uploadPhoto')}
+                    <input type="file" accept="image/*" onChange={(event) => void handleFile(index, event.target.files?.[0])} />
+                  </label>
+                  <button type="button" className="choose-month-image btn btn-outline btn-sm" onClick={() => { setOpenPicker(openPicker === index ? null : index); setImageQuery('') }} disabled={imageChoices.length === 0}>
+                    {t('createOrder.chooseMonthImage')}
+                  </button>
+                </div>
+                <small className="image-source-hint">{t('createOrder.imagePrefillHint')}</small>
+                {openPicker === index && <div className="month-image-picker">
+                  <input value={imageQuery} onChange={(event) => setImageQuery(event.target.value)} placeholder={t('createOrder.filterMonthImages')} aria-label={t('createOrder.filterMonthImages')} />
+                  <div className="month-image-grid">
+                    {filteredImages.map((choice) => <button type="button" key={choice.url} title={`${choice.label} · ${formatMoney(choice.salePrice, language)} THB`} onClick={() => { setDraft((current) => ({ ...current, lines: current.lines.map((currentLine, lineIndex) => lineIndex === index ? { ...currentLine, image: choice.url, images: [choice.url], imageName: '', imageIsNew: false, itemName: choice.itemName || currentLine.itemName, salePrice: choice.salePrice > 0 ? String(choice.salePrice) : currentLine.salePrice } : currentLine) })); setOpenPicker(null) }}><img src={choice.url} alt={choice.label} /><span>{choice.itemName || choice.label}<small>{formatMoney(choice.salePrice, language)} THB</small></span></button>)}
+                    {filteredImages.length === 0 && <span className="picker-empty">{t('createOrder.noMonthImages')}</span>}
+                  </div>
+                </div>}
                 <div className="draft-item-main">
                   <div className="draft-item-photo">{line.image ? <img src={line.image} alt={line.itemName || t('createOrder.selectedImage')} /> : <Package size={22} />}</div>
                   <div className="draft-item-fields">
@@ -902,34 +1003,23 @@ function CreateOrderDialog({
                   {line.costRMB.trim() && <span>{t('createOrder.costTHBPreview')} <strong>{formatMoney(costTHB, language)} THB</strong></span>}
                   {previewProfit !== null && <span>{t('createOrder.estimatedProfit')} <strong className={previewProfit < 0 ? 'negative-text' : 'positive-text'}>{formatMoney(previewProfit, language)} THB</strong></span>}
                 </div>
-                <div className="image-source-row">
-                  <label className="upload-image-button btn btn-outline btn-sm">
-                    <ImagePlus size={16} /> {t('createOrder.uploadPhoto')}
-                    <input type="file" accept="image/*" onChange={(event) => void handleFile(index, event.target.files?.[0])} />
-                  </label>
-                  <button type="button" className="choose-month-image btn btn-outline btn-sm" onClick={() => { setOpenPicker(openPicker === index ? null : index); setImageQuery('') }} disabled={imageChoices.length === 0}>
-                    {t('createOrder.chooseMonthImage')}
-                  </button>
-                </div>
                 {line.image && <button type="button" className="remove-photo-button" onClick={() => setDraft((current) => ({ ...current, lines: current.lines.map((item, lineIndex) => lineIndex === index ? { ...item, image: '', images: [], imageName: '', imageIsNew: false } : item) }))}>{t('createOrder.removeImage')}</button>}
-                {openPicker === index && <div className="month-image-picker">
-                  <input value={imageQuery} onChange={(event) => setImageQuery(event.target.value)} placeholder={t('createOrder.filterMonthImages')} aria-label={t('createOrder.filterMonthImages')} />
-                  <div className="month-image-grid">
-                    {filteredImages.map((choice) => <button type="button" key={choice.url} title={`${choice.label} · ${formatMoney(choice.salePrice, language)} THB`} onClick={() => { setDraft((current) => ({ ...current, lines: current.lines.map((currentLine, lineIndex) => lineIndex === index ? { ...currentLine, image: choice.url, images: [choice.url], imageName: '', imageIsNew: false, itemName: choice.itemName || currentLine.itemName, salePrice: choice.salePrice > 0 ? String(choice.salePrice) : currentLine.salePrice } : currentLine) })); setOpenPicker(null) }}><img src={choice.url} alt={choice.label} /><span>{choice.itemName || choice.label}<small>{formatMoney(choice.salePrice, language)} THB</small></span></button>)}
-                    {filteredImages.length === 0 && <span className="picker-empty">{t('createOrder.noMonthImages')}</span>}
-                  </div>
-                </div>}
               </section>
             )
           })}
           <button type="button" className="add-line-button" onClick={() => setDraft((current) => ({ ...current, paymentStatus: '', lines: [...current.lines, emptyDraftLine()] }))}><Plus size={15} /> {t('createOrder.addItem')}</button>
+          {imageError && <p className="form-error" role="alert">{imageError}</p>}
+          </fieldset>
 
+          <fieldset className="order-step-panel" data-order-step="2" disabled={currentStep !== 2} hidden={currentStep !== 2}>
+          <div className="form-section-heading"><h3>{t('createOrder.fulfillmentPayment')}</h3><span>{t('createOrder.statusHint')}</span></div>
           <div className="form-grid two-columns">
             <label>{t('createOrder.paymentStatus')}<select className="select select-bordered select-sm select-primary" value={draft.paymentStatus} onChange={(event) => updateField('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้ชำระ">{t('detail.paymentUnpaid')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option></select></label>
             <label>{t('createOrder.shippingStatus')}<select className="select select-bordered select-sm select-primary" value={draft.shippingStatus} onChange={(event) => updateField('shippingStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้สั่ง">{t('detail.shippingNotOrdered')}</option><option value="สั่งแล้ว">{t('detail.shippingOrdered')}</option><option value="รอเข้าไทย">{t('detail.shippingInbound')}</option><option value="ส่งแล้ว">{t('detail.shippingSent')}</option></select></label>
           </div>
 
           <section className="campaign-form-card">
+            <div className="campaign-card-heading"><h3>{t('createOrder.campaignSummary')}</h3><span>{t('createOrder.liveSummary')}</span></div>
             <label className="campaign-toggle"><input type="checkbox" checked={draft.isCampaign} onChange={(event) => { updateField('isCampaign', event.target.checked); updateField('paymentStatus', ''); if (!event.target.checked) updateField('campaignDiscount', '') }} />{t('createOrder.isCampaign')}</label>
             {draft.isCampaign && <label className="campaign-discount-field">
               <span className="field-label">{t('createOrder.campaignDiscount')} <span className="required-star">*</span></span>
@@ -940,12 +1030,23 @@ function CreateOrderDialog({
             <div className="campaign-net-total"><span>{t('createOrder.paymentStatusPreview')}</span><strong>{t((draft.paymentStatus || automaticPaymentStatus) === 'จ่ายเต็ม' ? 'detail.paymentFull' : (draft.paymentStatus || automaticPaymentStatus) === 'มัดจำ' ? 'detail.paymentDeposit' : 'detail.paymentUnpaid')}</strong></div>
           </section>
 
-          {imageError && <p className="form-error" role="alert">{imageError}</p>}
           {saveError && <p className="form-error" role="alert">{saveError}</p>}
           <p className="local-save-note">{t('createOrder.localOnly')}</p>
-          <footer className="modal-actions">
-            <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose} disabled={saving}>{t('createOrder.cancel')}</button>
-            <button type="submit" className="save-order-button btn btn-primary" disabled={saving}><Check size={16} /> {saving ? t('createOrder.saving') : t(initialOrder ? 'createOrder.update' : 'createOrder.save')}</button>
+          </fieldset>
+
+          <footer className="modal-actions order-modal-actions">
+            <div className="form-total-summary">
+              <span>{t('createOrder.afterDiscount')}</span>
+              <strong>{formatMoney(netSales, language)} THB</strong>
+              <small>{t('createOrder.orderDepositDue')}: {formatMoney(orderDepositDue, language)} THB</small>
+            </div>
+            <div className={`order-step-actions${currentStep === 0 ? ' two-actions' : ''}`}>
+              <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose} disabled={saving}>{t('createOrder.cancel')}</button>
+              {currentStep > 0 && <button type="button" className="back-order-button btn btn-ghost" onClick={() => goToStep(currentStep - 1)} disabled={saving}><ChevronLeft size={15} />{t('createOrder.back')}</button>}
+              {currentStep < 2
+                ? <button type="button" className="save-order-button btn btn-primary" onClick={goToNextStep} disabled={saving}>{t('createOrder.next')}<ChevronRight size={15} /></button>
+                : <button type="submit" className="save-order-button btn btn-primary" disabled={saving}><Check size={16} /> {saving ? t('createOrder.saving') : t(initialOrder ? 'createOrder.update' : 'createOrder.create')}</button>}
+            </div>
           </footer>
         </form>
       </section>
@@ -980,6 +1081,28 @@ function MonthlyExpensesSection({ expenses, onChange }: { expenses: MonthlyExpen
       </div>
       <button type="button" className="expense-add-button" onClick={add}><Plus size={14} /> {t('expenses.add')}</button>
     </section>
+  )
+}
+
+function MonthlyExpensesDialog({ sheetName, expenses, onClose, onSave }: { sheetName: string; expenses: MonthlyExpense[]; onClose: () => void; onSave: (expenses: MonthlyExpense[]) => void }) {
+  const { t } = useTranslation()
+  const [draft, setDraft] = useState(() => expenses.map((expense) => ({ ...expense })))
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(expenses)
+
+  return (
+    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget && !isDirty) onClose() }}>
+      <section className="create-order-modal monthly-expenses-modal" role="dialog" aria-modal="true" aria-labelledby="monthly-expenses-heading">
+        <header className="modal-header">
+          <div><p>{sheetName}</p><h2 id="monthly-expenses-heading">{t('expenses.title')}</h2><small className="modal-subtitle">{t('expenses.savePrompt')}</small></div>
+          <button type="button" className="modal-close" onClick={onClose} aria-label={t('expenses.close')}><X size={20} /></button>
+        </header>
+        <div className="monthly-expenses-modal-body"><MonthlyExpensesSection expenses={draft} onChange={setDraft} /></div>
+        <footer className="modal-actions expense-modal-actions">
+          <button type="button" className="cancel-order-button btn btn-ghost" onClick={onClose}>{t('createOrder.cancel')}</button>
+          <button type="button" className="save-order-button btn btn-primary" onClick={() => { onSave(draft); onClose() }} disabled={!isDirty}><Check size={15} />{t('expenses.save')}</button>
+        </footer>
+      </section>
+    </div>
   )
 }
 
@@ -1169,7 +1292,7 @@ function SheetOrdersPage({
       <div className="create-order-dock"><button type="button" className="create-order-list-button btn btn-primary" onClick={() => setCreateOpen(true)}><Plus size={17} /> {t('createOrder.open')}</button></div>
       <BottomNavigation />
       {createOpen && <CreateOrderDialog sheet={sheet} imageChoices={imageChoices} defaultExchangeRate={exchangeRate} onExchangeRateChange={onExchangeRateChange} onClose={() => setCreateOpen(false)} onSave={saveOrder} />}
-      {expensesOpen && <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setExpensesOpen(false) }}><section className="create-order-modal monthly-expenses-modal" role="dialog" aria-modal="true" aria-labelledby="monthly-expenses-heading"><header className="modal-header"><div><p>{t(sheet.titleKey)}</p><h2 id="monthly-expenses-heading">{t('expenses.title')}</h2></div><button type="button" className="modal-close" onClick={() => setExpensesOpen(false)} aria-label={t('expenses.close')}><X size={20} /></button></header><div className="monthly-expenses-modal-body"><MonthlyExpensesSection expenses={monthlyExpenses} onChange={(expenses) => onSaveMonthlyExpenses(sheet.id, expenses)} /></div><footer className="modal-actions"><button type="button" className="save-order-button btn btn-primary" onClick={() => setExpensesOpen(false)}>{t('expenses.done')}</button></footer></section></div>}
+      {expensesOpen && <MonthlyExpensesDialog sheetName={sheetTitle(sheet, t)} expenses={monthlyExpenses} onClose={() => setExpensesOpen(false)} onSave={(expenses) => onSaveMonthlyExpenses(sheet.id, expenses)} />}
       {notice && <p className="app-toast" role="status">{notice}</p>}
       {exportMessage && <p className="app-toast" role="status">{exportMessage}</p>}
     </section>
@@ -1251,24 +1374,22 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
             </div>
           </div>
 
-          <div className="order-stats" aria-label={t('details.summary')}>
-            <StatusBadge type="quantity" label={t('detail.quantity', { count: order.quantity, unit: order.quantity === 1 ? t('detail.piece') : t('detail.pieces') })} />
-            <StatusBadge type="payment" status={order.paymentStatus} />
-            <StatusBadge type="shipping" status={order.shippingStatus} />
-          </div>
-
           <section className="detail-card customer-card">
             <div><span>{t('detail.lineName')}</span><strong>{order.lineName || t('detail.notSet')}</strong></div>
             <div><span>{t('detail.customer')}</span><strong>{order.customerName || t('detail.notSet')}</strong></div>
           </section>
 
-          <section className="detail-status-controls" aria-label={t('details.summary')}>
+          <section className="detail-status-controls" aria-labelledby="detail-status-heading">
+            <div className="detail-status-heading">
+              <h3 id="detail-status-heading">{t('details.status')}</h3>
+              <span>{t('details.statusHint')}</span>
+            </div>
             <label>{t('createOrder.paymentStatus')}<select className={`select select-bordered select-sm select-primary detail-status-select payment-${paymentBadgeClass(order.paymentStatus)}`} value={order.paymentStatus} onChange={(event) => saveStatus('paymentStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้ชำระ">{t('detail.paymentUnpaid')}</option><option value="มัดจำ">{t('detail.paymentDeposit')}</option><option value="จ่ายเต็ม">{t('detail.paymentFull')}</option></select></label>
             <label>{t('createOrder.shippingStatus')}<select className={`select select-bordered select-sm select-primary detail-status-select shipping-${shippingBadgeClass(order.shippingStatus)}`} value={order.shippingStatus} onChange={(event) => saveStatus('shippingStatus', event.target.value)}><option value="">{t('detail.notSet')}</option><option value="ยังไม่ได้สั่ง">{t('detail.shippingNotOrdered')}</option><option value="สั่งแล้ว">{t('detail.shippingOrdered')}</option><option value="รอเข้าไทย">{t('detail.shippingInbound')}</option><option value="ส่งแล้ว">{t('detail.shippingSent')}</option></select></label>
           </section>
 
           <section className="detail-section">
-            <h3>{t('detail.items')}</h3>
+            <div className="detail-section-heading"><h3>{t('detail.items')}</h3><span className="order-quantity-chip">{t('detail.quantity', { count: order.quantity, unit: order.quantity === 1 ? t('detail.piece') : t('detail.pieces') })}</span></div>
             <div className="item-list-controls">
               <input value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder={t('orders.searchItems')} aria-label={t('orders.searchItems')} />
               <select className="select select-bordered select-sm select-primary" value={itemSort} onChange={(event) => setItemSort(event.target.value)} aria-label={t('filters.sortItems')}><option value="sales-desc">{t('filters.salesHighShort')}</option><option value="sales-asc">{t('filters.salesLowShort')}</option><option value="name">{t('filters.nameAZShort')}</option></select>
@@ -1324,6 +1445,7 @@ function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: str
   const { t } = useTranslation()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -1349,7 +1471,7 @@ function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: str
         <h1>{t('auth.title')}</h1>
         <form onSubmit={submit}>
           <label>{t('auth.username')}<input className="input input-bordered" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></label>
-          <label>{t('auth.password')}<input className="input input-bordered" autoComplete="current-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
+          <label>{t('auth.password')}<span className="login-password-field"><input className="input input-bordered" autoComplete="current-password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" className="password-visibility-toggle" aria-label={t(showPassword ? 'auth.hidePassword' : 'auth.showPassword')} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>
           {error && <p className="login-error" role="alert">{error}</p>}
           <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? t('auth.signingIn') : t('auth.signIn')}</button>
           <small>{t('auth.secureSession')}</small>
@@ -1359,7 +1481,7 @@ function AdminLoginPage({ onLogin }: { onLogin: (username: string, password: str
   )
 }
 
-function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, analyticsDataLoading, onLoadAllSalesSheets, onExportBackup, backupLoading, backupMessage, onLogout }: { dataBySheet: Record<string, SheetDataState>; monthlyExpensesBySheet: Record<string, MonthlyExpense[]>; sheets: SheetDefinition[]; loading: boolean; analyticsDataLoading: boolean; onLoadAllSalesSheets: () => void; onExportBackup: () => void; backupLoading: boolean; backupMessage: string; onLogout: () => void }) {
+function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, analyticsDataLoading, onLoadAllSalesSheets }: { dataBySheet: Record<string, SheetDataState>; monthlyExpensesBySheet: Record<string, MonthlyExpense[]>; sheets: SheetDefinition[]; loading: boolean; analyticsDataLoading: boolean; onLoadAllSalesSheets: () => void }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const currentSheet = getCurrentMonthSheet(dataBySheet, sheets)
@@ -1446,8 +1568,10 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
         <label className="analytics-status-filter"><span>{t('filters.status')}</span><select className="select select-bordered select-sm select-primary" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t('filters.allStatuses')}</option><option value="paid">{t('detail.paymentFull')}</option><option value="unpaid">{t('detail.paymentUnpaid')}</option><option value="deposit">{t('detail.paymentDeposit')}</option><option value="shipped">{t('detail.shippingSent')}</option><option value="not-ordered">{t('detail.shippingNotOrdered')}</option><option value="ordered">{t('detail.shippingOrdered')}</option><option value="inbound">{t('detail.shippingInbound')}</option><option value="unlisted">{t('filters.unlisted')}</option></select></label>
       </div>
       <div className="home-scroll-area analytics-scroll-area">
-        <div className="analytics-metrics">
-          {loading || analyticsDataLoading ? Array.from({ length: 8 }, (_, index) => <div className="metric-card-skeleton" key={index}><i /><b /></div>) : <>
+        {loading || analyticsDataLoading ? <div className="analytics-metrics">
+          {Array.from({ length: 4 }, (_, index) => <div className="metric-card-skeleton" key={index}><i /><b /></div>)}
+        </div> : <>
+          <div className="analytics-metrics analytics-primary-metrics">
             <article className="metric-card featured"><span>{statusFilter === 'all' ? t('analytics.thisMonth') : t('analytics.filteredSales')}</span><strong>{formatMoney(sheetTotal(scopedOrders), language)} <small>THB</small></strong></article>
             <article className="metric-card"><span>{t('analytics.totalProfit')}</span><strong className={scopedProfit.amount === null ? 'profit-unavailable' : scopedProfit.amount < 0 ? 'negative-text' : 'positive-text'}>{scopedProfit.amount === null ? '—' : `${formatMoney(scopedProfit.amount, language)} THB`}</strong><em>{scopedProfit.amount === null ? t('analytics.noPeriodProfit') : scopedProfit.knownLines < scopedProfit.totalLines ? t('analytics.profitCoverage', { known: scopedProfit.knownLines, total: scopedProfit.totalLines }) : statusFilter === 'all' ? t('analytics.currentScopeProfit') : t('analytics.filteredScopeProfit')}</em></article>
             <article className={`metric-card trend-card${currentSalesChange === null ? ' unavailable' : currentSalesChange < 0 ? ' negative' : ' positive'}`}>
@@ -1455,18 +1579,23 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
               <strong>{formatSignedPercent(currentSalesChange, language)}</strong>
               <em>{previousSalesSheet && currentSalesChange !== null ? t('analytics.changeContext', { month: sheetTitle(previousSalesSheet, t) }) : t('analytics.noComparison')}</em>
             </article>
-            <article className={`metric-card trend-card${yearOverYearChange === null ? ' unavailable' : yearOverYearChange < 0 ? ' negative' : ' positive'}`}>
-              <span>{t('analytics.yearlyChange')}</span>
-              <strong>{formatSignedPercent(yearOverYearChange, language)}</strong>
-              <em>{previousYearSheet && yearOverYearChange !== null ? t('analytics.yearlyContext', { year: currentYear - 1 }) : t('analytics.noYearlyComparison')}</em>
-            </article>
-            <article className="metric-card"><span>{t('analytics.averageSales')}</span><strong>{formatMoney(averageSales, language)} <small>THB</small></strong><em>{t('analytics.averageMonths', { count: populatedSalesSheets.length })}</em></article>
-            <article className="metric-card"><span>{t('analytics.averageProfit')}</span><strong>{averageProfit === null ? '—' : `${formatMoney(averageProfit, language)} THB`}</strong><em>{averageProfit === null ? t('analytics.noProfitData') : t('analytics.profitSample', { count: recordedProfits.length })}</em></article>
             <article className="metric-card"><span>{t('analytics.orders')}</span><strong>{scopedOrders.length}</strong></article>
-            <article className="metric-card"><span>{t('analytics.items')}</span><strong>{scopedOrders.reduce((sum, order) => sum + order.quantity, 0)}</strong></article>
-            <article className="metric-card"><span>{t('analytics.shipped')}</span><strong>{shipped}</strong></article>
-          </>}
-        </div>
+          </div>
+          <details className="analytics-more-metrics">
+            <summary>{t('analytics.moreMetrics')}</summary>
+            <div className="analytics-metrics analytics-secondary-metrics">
+              <article className={`metric-card trend-card${yearOverYearChange === null ? ' unavailable' : yearOverYearChange < 0 ? ' negative' : ' positive'}`}>
+                <span>{t('analytics.yearlyChange')}</span>
+                <strong>{formatSignedPercent(yearOverYearChange, language)}</strong>
+                <em>{previousYearSheet && yearOverYearChange !== null ? t('analytics.yearlyContext', { year: currentYear - 1 }) : t('analytics.noYearlyComparison')}</em>
+              </article>
+              <article className="metric-card"><span>{t('analytics.averageSales')}</span><strong>{formatMoney(averageSales, language)} <small>THB</small></strong><em>{t('analytics.averageMonths', { count: populatedSalesSheets.length })}</em></article>
+              <article className="metric-card"><span>{t('analytics.averageProfit')}</span><strong>{averageProfit === null ? '—' : `${formatMoney(averageProfit, language)} THB`}</strong><em>{averageProfit === null ? t('analytics.noProfitData') : t('analytics.profitSample', { count: recordedProfits.length })}</em></article>
+              <article className="metric-card"><span>{t('analytics.items')}</span><strong>{scopedOrders.reduce((sum, order) => sum + order.quantity, 0)}</strong></article>
+              <article className="metric-card"><span>{t('analytics.shipped')}</span><strong>{shipped}</strong></article>
+            </div>
+          </details>
+        </>}
 
         <section className="analytics-section">
           <h2>{t('analytics.statusTitle')}</h2>
@@ -1479,8 +1608,6 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
           <div className="status-summary-row"><span className="status-badge inbound">{t('detail.shippingInbound')}</span><strong>{inbound}</strong></div>
           </>}
         </section>
-
-        <AnalyticsUtilities onExportBackup={onExportBackup} backupLoading={backupLoading} backupMessage={backupMessage} onLogout={onLogout} />
 
         <section className="analytics-section analytics-chart-section">
           <h2>{t('analytics.salesProfitGraph')}</h2>
@@ -2114,7 +2241,8 @@ function App() {
           <Route path="/admin/orders" element={<SheetRouteView sheet={currentMonthSheet} dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={saveOrderToSheet} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} onExportMonthlyReport={exportMonthlyReport} exportingReport={exportingReportId === currentMonthSheet.id} exportMessage={exportMessage} />} />
           <Route path="/admin/sheets/:sheetId" element={<SheetRouteView dataBySheet={mergedDataBySheet} loading={loading} onRefresh={refresh} onCreateOrder={saveOrderToSheet} monthlyExpensesBySheet={monthlyExpensesBySheet} onSaveMonthlyExpenses={saveMonthlyExpenses} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} sheets={allSheets} onLoadMoreData={loadMoreSheetData} onExportMonthlyReport={exportMonthlyReport} exportingReport={exportingReportId === (location.pathname.split('/')[3] ?? '')} exportMessage={exportMessage} />} />
           <Route path="/admin/sheets/:sheetId/orders/:orderId" element={<OrderDetailsRoute dataBySheet={mergedDataBySheet} sheets={allSheets} loading={loading} onRefresh={refresh} onSaveOrder={saveOrderToSheet} exchangeRate={exchangeRate} onExchangeRateChange={setExchangeRate} onLoadMoreData={loadMoreSheetData} />} />
-          <Route path="/admin/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} monthlyExpensesBySheet={monthlyExpensesBySheet} sheets={allSheets} loading={loading} analyticsDataLoading={analyticsDataLoading} onLoadAllSalesSheets={loadAllSalesSheets} onExportBackup={exportFullBackup} backupLoading={backupLoading} backupMessage={backupMessage} onLogout={logout} />} />
+          <Route path="/admin/analytics" element={<AnalyticsPage dataBySheet={mergedDataBySheet} monthlyExpensesBySheet={monthlyExpensesBySheet} sheets={allSheets} loading={loading} analyticsDataLoading={analyticsDataLoading} onLoadAllSalesSheets={loadAllSalesSheets} />} />
+          <Route path="/admin/settings" element={<SettingsPage onExportBackup={exportFullBackup} backupLoading={backupLoading} backupMessage={backupMessage} onLogout={logout} />} />
           <Route path="*" element={<Navigate to="/admin/home" replace />} />
         </Routes>
       </div>
