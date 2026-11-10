@@ -1342,3 +1342,18 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
   .order-item-preview { grid-template-columns: 56px minmax(0, 1fr) auto; gap: 8px; }
   .order-item-preview-photo { width: 56px; height: 56px; }
 }
+
+/* Base compact/regular layouts on the usable app width after Duo safe-area insets. */
+.app-shell { container-type: inline-size; container-name: app-shell; }
+@container app-shell (max-width: 599px) {
+  .home-screen { padding-inline: 16px; }
+  .screen-fixed-header { padding-inline: 16px; }
+  .home-scroll-area { padding-inline: 16px; padding-bottom: 20px; }
+  .order-list-table { grid-template-columns: minmax(0, 1fr); }
+  .analytics-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .detail-body { max-width: none; margin-inline: 0; }
+  .order-list-row { grid-template-columns: 42px minmax(0, 1fr) auto; gap: 7px; padding: 10px; }
+  .order-row-title { font-size: 13px; }
+  .order-row-subtitle { font-size: 11px; }
+  .monthly-expense-row { grid-template-columns: 80px minmax(0, 1fr) 70px 25px; gap: 4px; }
+}
