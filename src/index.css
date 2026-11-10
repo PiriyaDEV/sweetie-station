@@ -1866,3 +1866,461 @@ textarea:focus-visible { @apply [outline:2px_solid_rgb(189_90_121_/_34%)] [outli
 @media (prefers-reduced-motion: reduce) {
   .profit-coverage-track span { transition: none; }
 }
+
+/* Give order-list item photos more room so products are easier to recognize. */
+.order-item-preview {
+  grid-template-columns: 100px minmax(0, 1fr) auto;
+  gap: 13px;
+}
+.order-item-preview-photo {
+  width: 100px;
+  height: 100px;
+  border-radius: 13px;
+}
+.order-item-preview-photo img { width: 100%; height: 100%; object-fit: cover; }
+@media (pointer: coarse) {
+  .order-item-preview { grid-template-columns: 104px minmax(0, 1fr) auto; gap: 14px; }
+  .order-item-preview-photo { width: 104px; height: 104px; border-radius: 14px; }
+}
+@media (max-width: 360px) {
+  .order-item-preview { grid-template-columns: 72px minmax(0, 1fr) auto; gap: 9px; }
+  .order-item-preview-photo { width: 72px; height: 72px; border-radius: 11px; }
+}
+@media (min-width: 1200px) and (pointer: fine) {
+  .order-item-preview { grid-template-columns: 112px minmax(0, 1fr) auto; gap: 15px; }
+  .order-item-preview-photo { width: 112px; height: 112px; border-radius: 14px; }
+}
+
+/* Larger product photos in the order-detail item list, matching the order-card previews. */
+.item-images {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+}
+.item-images img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+.item-images span {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: grid;
+  width: auto;
+  min-width: 24px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 999px;
+  padding: 0 6px;
+  background: rgb(55 43 48 / 76%);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  backdrop-filter: blur(5px);
+}
+@media (pointer: coarse) {
+  .item-images { width: 80px; height: 80px; }
+}
+@media (max-width: 360px) {
+  .item-images { width: 64px; height: 64px; }
+}
+@media (min-width: 1200px) and (pointer: fine) {
+  .item-images { width: 84px; height: 84px; }
+}
+
+/* Brand-mark fallback for missing or failed product photos. */
+.product-image-fallback { opacity: .5; }
+.order-item-preview-photo .product-image-fallback,
+.item-images .product-image-fallback {
+  background: #fff5f8;
+  object-fit: contain;
+  padding: 10px;
+}
+.sheet-card-image.product-image-fallback {
+  background: linear-gradient(145deg, #f7e5eb, #d7d0d2);
+  object-fit: contain;
+  padding: 16%;
+}
+.sheet-card-placeholder .product-image-fallback {
+  width: 58%;
+  height: 58%;
+  background: transparent;
+  object-fit: contain;
+  padding: 0;
+}
+.draft-item-photo .product-image-fallback {
+  background: transparent;
+  object-fit: contain;
+  padding: 10px;
+}
+
+/* Show a small product collage on each month/sheet card instead of a single image. */
+.sheet-card-image-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  gap: 3px;
+  overflow: hidden;
+  background: #fff;
+}
+.sheet-card-image-cell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #f7eef1;
+}
+.sheet-card-image-grid.count-1 { grid-template: 1fr / 1fr; }
+.sheet-card-image-grid.count-2 { grid-template: 1fr / repeat(2, minmax(0, 1fr)); }
+.sheet-card-image-grid.count-3 { grid-template: repeat(2, minmax(0, 1fr)) / 1.15fr .85fr; }
+.sheet-card-image-grid.count-3 .sheet-card-image-cell:first-child { grid-row: 1 / -1; }
+.sheet-card-image-grid.count-4 { grid-template: repeat(2, minmax(0, 1fr)) / repeat(2, minmax(0, 1fr)); }
+.sheet-card-image-cell .sheet-card-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sheet-card-image-cell .sheet-card-image.product-image-fallback { object-fit: contain; padding: 18%; }
+
+/* Keep sheet-card metrics focused on sales and profit, with sales as the visual lead. */
+.sheet-card-caption { gap: 7px; }
+.sheet-card-caption .sheet-card-sales-row {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sheet-card-caption .sheet-card-sales-label {
+  color: rgb(255 255 255 / 82%);
+  font-size: 12px;
+  font-weight: 650;
+}
+.sheet-card-caption .sheet-card-sales-value {
+  color: #fff;
+  font-size: clamp(16px, 1.3vw, 20px);
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .sheet-card-caption .sheet-card-sales-value { font-size: clamp(15px, 4vw, 18px); }
+}
+@media (max-width: 600px) {
+  .sheet-card-caption { min-height: 112px; gap: 4px; }
+  .sheet-card-caption .sheet-card-sales-row { flex-direction: column; align-items: flex-start; gap: 1px; }
+  .sheet-card-caption .sheet-card-sales-label { font-size: 10px; white-space: nowrap; }
+  .sheet-card-caption .sheet-card-sales-value { font-size: clamp(16px, 4.2vw, 19px); line-height: 1.05; }
+}
+
+/* Keep sales and profit readable without letting the caption dominate the photos. */
+.sheet-card-caption .sheet-card-sales-value { font-size: clamp(16px, 1.2vw, 18px); }
+.sheet-card-caption .sheet-card-profit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 1px 4px;
+  overflow: visible;
+  white-space: normal;
+  font-size: 11px;
+  line-height: 1.2;
+}
+.sheet-card-caption .sheet-card-profit-label { font-size: 10px; }
+.sheet-card-caption .sheet-card-profit-value { font-size: 11px; line-height: 1.2; }
+@media (max-width: 600px) {
+  .sheet-card-caption { min-height: 108px; gap: 4px; }
+  .sheet-card-caption .sheet-card-sales-row { flex-direction: column; align-items: flex-start; gap: 1px; }
+  .sheet-card-caption .sheet-card-sales-label { font-size: 10px; white-space: nowrap; }
+  .sheet-card-caption .sheet-card-sales-value { font-size: clamp(16px, 4vw, 18px); line-height: 1.05; }
+  .sheet-card-caption .sheet-card-profit { font-size: 10px; }
+  .sheet-card-caption .sheet-card-profit-label,
+  .sheet-card-caption .sheet-card-profit-value { font-size: 10px; }
+}
+
+/* Make the card's main price and profit easier to scan; keep THB inline with sales. */
+.order-row-total { gap: 5px; }
+.order-row-price {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 5px;
+  color: #40383a;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.order-row-price small {
+  margin: 0;
+  color: #807676;
+  font-size: 11px;
+  font-weight: 650;
+}
+.order-row-total .order-row-profit {
+  gap: 2px;
+  margin-top: 1px;
+  border-radius: 10px;
+  padding: 6px 9px;
+}
+.order-row-total .order-row-profit > small { font-size: 10px; }
+.order-row-total .order-row-profit > strong { font-size: 14px; }
+@media (max-width: 600px) {
+  .order-row-price { font-size: 18px; }
+  .order-row-price small { font-size: 10px; }
+  .order-row-total .order-row-profit { padding: 5px 7px; }
+  .order-row-total .order-row-profit > strong { font-size: 13px; }
+}
+
+/* Current-month top-item ranking. */
+.top-items-section { grid-column: 1 / -1; }
+.top-items-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.top-items-heading h2 { margin: 0; }
+.top-items-heading > span { color: #706665; font-size: 11px; }
+.top-items-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.top-item-card { min-width: 0; overflow: hidden; border: 1px solid #eee3e6; border-radius: 14px; padding: 9px; background: #fff; box-shadow: 0 4px 12px rgb(83 45 58 / 4%); }
+.top-item-photo { position: relative; width: 100%; overflow: hidden; aspect-ratio: 4 / 3; border-radius: 10px; background: #fff1f5; }
+.top-item-photo img { width: 100%; height: 100%; object-fit: cover; }
+.top-item-photo .product-image-fallback { background: #fff5f8; object-fit: contain; padding: 16px; opacity: .5; }
+.top-item-rank { position: absolute; top: 7px; left: 7px; display: grid; min-width: 30px; height: 26px; place-items: center; border: 1px solid rgb(255 255 255 / 78%); border-radius: 999px; padding: 0 7px; background: rgb(68 48 56 / 78%); color: #fff; font-size: 12px; font-weight: 800; }
+.top-item-info { display: grid; min-width: 0; gap: 4px; padding: 9px 3px 3px; }
+.top-item-info > strong { overflow: hidden; color: #42383a; font-size: 13px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.top-item-info > small { overflow: hidden; color: #786d6c; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.top-item-info > span { color: #766b69; font-size: 11px; }
+.top-item-info > b { color: #574148; font-size: 12px; font-weight: 800; }
+.top-items-empty { margin: 0; color: #736968; font-size: 13px; }
+.top-items-loading { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 1200px) {
+  .top-item-card { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 12px; padding: 12px; }
+  .top-item-photo { width: 92px; height: 92px; aspect-ratio: auto; }
+  .top-item-info { padding: 0; }
+}
+@media (max-width: 390px) {
+  .top-items-list,
+  .top-items-loading { grid-template-columns: minmax(0, 1fr); }
+  .top-item-card { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 10px; }
+  .top-item-photo { width: 72px; height: 72px; aspect-ratio: auto; }
+  .top-item-info { padding: 0; }
+}
+
+/* Smaller search/dropdown text on touch and narrow screens, while preserving field heights. */
+@media (max-width: 600px), (pointer: coarse) {
+  .app-shell .order-search input,
+  .app-shell .sheet-search-field input,
+  .app-shell .item-list-controls input,
+  .app-shell .month-image-picker input,
+  .app-shell .line-picker input { font-size: 13px !important; }
+
+  .app-shell select,
+  .app-shell select.select { font-size: 12px !important; }
+}
+
+/* Give Home sheet cards a pink, translucent caption. */
+.sheet-card-caption {
+  background: linear-gradient(145deg, rgb(194 105 138 / 82%), rgb(166 75 108 / 84%));
+  border-color: rgb(255 255 255 / 36%);
+  backdrop-filter: blur(14px);
+}
+
+/* Profit stays color-coded by value but no longer sits on a green-filled pill. */
+.order-row-total .order-row-profit {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* Keep search and dropdown typography compact across all touch-screen routes. */
+@media (max-width: 600px), (pointer: coarse) {
+  .app-shell .order-search input,
+  .app-shell .sheet-search-field input,
+  .app-shell .item-list-controls input,
+  .app-shell .month-image-picker input,
+  .app-shell .line-picker input { font-size: 13px !important; }
+
+  .app-shell select,
+  .app-shell select.select { font-size: 12px !important; }
+}
+
+/* Use a soft translucent rose surface instead of charcoal on Home sheet cards. */
+.sheet-card-caption {
+  border-color: rgb(255 255 255 / 54%);
+  background: linear-gradient(145deg, rgb(190 105 138 / 20%), rgb(164 74 108 / 22%));
+  backdrop-filter: blur(18px);
+  text-shadow: 0 1px 4px rgb(45 24 34 / 74%);
+}
+
+/* Profit remains color-coded, without a green-filled badge background. */
+.order-row-total .order-row-profit {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* Full-size product image lightbox. */
+.image-preview-backdrop { padding: 16px; background: rgb(34 23 28 / 78%); backdrop-filter: blur(6px); }
+.image-preview-dialog {
+  position: relative;
+  display: grid;
+  width: min(92vw, 400px);
+  height: min(88dvh, 400px);
+  max-width: min(calc(100vw - 32px), 400px);
+  max-height: min(calc(100dvh - 32px), 400px);
+  place-items: center;
+  overflow: visible;
+  border-radius: 16px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.image-preview-full {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  background: #fff;
+  object-fit: contain;
+  box-shadow: 0 24px 70px rgb(20 12 16 / 35%);
+}
+.image-preview-close {
+  position: absolute;
+  z-index: 2;
+  top: -14px;
+  right: -14px;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgb(120 77 92 / 20%);
+  border-radius: 50%;
+  background: #fff;
+  color: #5f4650;
+  box-shadow: 0 6px 20px rgb(20 12 16 / 22%);
+  cursor: pointer;
+}
+.image-preview-close:focus-visible { outline: 3px solid #e8a5ba; outline-offset: 2px; }
+@media (max-width: 600px) {
+  .image-preview-backdrop { padding: 16px; }
+  .image-preview-dialog { width: min(calc(100vw - 32px), 400px); height: min(calc(100dvh - 32px), 400px); }
+  .image-preview-close { top: -10px; right: -10px; width: 42px; height: 42px; }
+}
+
+/* Refined order-card layout: the summary and product rows are separate actions. */
+.order-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+}
+.order-row-summary {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 9px 10px;
+  border: 0;
+  padding: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.order-row-summary:focus-visible,
+.order-item-preview-photo:focus-visible,
+.order-item-preview-name:focus-visible,
+.order-item-preview-price:focus-visible { outline: 3px solid #f2abc0; outline-offset: 2px; }
+.order-list-row > .order-row-items {
+  grid-column: 1;
+  min-width: 0;
+  gap: 10px;
+  margin: 0 12px;
+  border-top: 1px solid #f1e7e9;
+  padding: 10px 0 12px;
+}
+.order-item-preview-photo {
+  border: 0;
+  padding: 0;
+  cursor: zoom-in;
+}
+.order-item-preview-name,
+.order-item-preview-price {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.order-item-preview-name { align-items: flex-start; text-align: left; }
+.order-item-preview-price { text-align: right; }
+@media (min-width: 768px) {
+  .order-row-summary { grid-template-columns: 58px minmax(0, 1fr) auto; padding: 12px 14px; }
+  .order-row-photo { width: 58px; height: 58px; }
+}
+@media (max-width: 600px) {
+  .order-row-summary { grid-template-columns: 42px minmax(0, 1fr) auto; gap: 7px; padding: 8px; }
+  .order-row-photo { width: 42px; height: 42px; }
+  .order-list-row > .order-row-items { margin: 0 10px; padding: 9px 0 10px; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .order-item-preview { grid-template-columns: 88px minmax(0, 1fr) auto; }
+  .order-item-preview-photo { width: 88px; height: 88px; }
+}
+@media (min-width: 1200px) {
+  .order-item-preview { grid-template-columns: 96px minmax(0, 1fr) auto; gap: 14px; }
+  .order-item-preview-photo { width: 96px; height: 96px; }
+}
+.orders-screen.compact-list .order-list-row { grid-template-columns: minmax(0, 1fr); padding: 0; }
+.orders-screen.compact-list .order-row-summary { grid-template-columns: 40px minmax(0, 1fr) minmax(100px, auto); padding: 9px 13px; }
+.orders-screen.compact-list .order-list-row > .order-row-items { display: none; }
+
+/* Square status tiles keep counts and emoji labels easy to scan. */
+.status-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.status-summary-card {
+  display: flex;
+  min-width: 0;
+  min-height: 104px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #efe2e6;
+  border-radius: 16px;
+  padding: 12px;
+  background: #fff;
+}
+.status-summary-card.paid, .status-summary-card.shipped { border-color: #dcebc9; background: #f7fbf1; }
+.status-summary-card.deposit, .status-summary-card.ordered { border-color: #f0e1c9; background: #fffaf2; }
+.status-summary-card.inbound { border-color: #d7e7f1; background: #f6fbfe; }
+.status-summary-card.not-ordered { border-color: #eee7e5; background: #fbf9f8; }
+.status-summary-card > strong { align-self: flex-end; color: #40383a; font-size: 24px; font-weight: 800; line-height: 1; }
+.status-summary-card .status-badge { min-height: 26px; font-size: 11px; }
+.status-badge-emoji { display: inline-block; margin-left: 4px; font-size: 1em; line-height: 1; }
+
+/* Profit figures on order cards use clean text, not a green-filled badge. */
+.order-row-total .order-row-profit { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+
+/* Analytics controls share a compact, clearly labelled two-column layout. */
+.analytics-header-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; min-width: 0; }
+.analytics-header-controls label { display: grid; min-width: 0; gap: 5px; margin: 0; color: #74696a; font-size: 11px; font-weight: 650; }
+.analytics-header-controls .select { width: 100%; min-width: 0; min-height: 40px; height: 40px; border-radius: 11px; padding-inline: 10px; font-size: 13px; }
+.analytics-status-filter { display: grid; justify-content: initial; }
+.analytics-status-filter select:not(.select) { width: 100%; max-width: none; height: 40px; font-size: 13px; }
+@media (min-width: 768px) {
+  .analytics-fixed-header { grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); gap: 20px; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .analytics-fixed-header { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+}
+@media (max-width: 390px) {
+  .analytics-header-controls { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Per-item profit is informational text rather than a filled green badge. */
+.item-profit { color: #527d39 !important; font-size: 12px !important; font-weight: 650; }
+.item-profit.negative { color: #ad4555 !important; }
+.item-profit.unavailable { color: #7c7372 !important; }
