@@ -44,7 +44,7 @@ export default function AnalyticsChart({
           <BarChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -6 }} barGap={2} barCategoryGap="22%" accessibilityLayer>
             <CartesianGrid stroke="#f3dbe5" strokeDasharray="3 4" vertical={false} />
             <XAxis dataKey="shortLabel" interval={0} tick={{ fill: '#8f7c74', fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#f0d3df' }} />
-            <YAxis tickFormatter={(value) => compact(Number(value))} tick={{ fill: '#8f7c74', fontSize: 11 }} tickLine={false} axisLine={false} width={44} />
+            <YAxis tickFormatter={(value) => `${compact(Number(value))} THB`} tick={{ fill: '#8f7c74', fontSize: 10 }} tickLine={false} axisLine={false} width={62} />
             <Tooltip
               cursor={{ fill: 'rgb(221 95 134 / 8%)' }}
               labelFormatter={(_, payload) => payload?.[0]?.payload?.label ?? ''}

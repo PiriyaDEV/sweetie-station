@@ -762,7 +762,7 @@ function HomePage({
                   </span>
                   <span className="product-price display">{error ? '—' : `${formatMoney(sheetTotal(orders), language)} THB`}</span>
                   <span className={`profit-chip${profitTone}`}>
-                    {t(profit.amount !== null && !profit.complete ? 'sheets.partialProfit' : 'sheets.profit')} {profit.amount === null ? '—' : `${profit.amount > 0 ? '+' : ''}${formatMoney(profit.amount, language)}`}
+                    {t(profit.amount !== null && !profit.complete ? 'sheets.partialProfit' : 'sheets.profit')} {profit.amount === null ? '—' : `${profit.amount > 0 ? '+' : ''}${formatMoney(profit.amount, language)} THB`}
                   </span>
                 </button>
               )
@@ -806,7 +806,7 @@ function OrderListRow({ order, sheet, compact = false }: { order: SheetOrder; sh
         </span>
         <span className="order-card-total">
           <span className="cart-price display">{formatMoney(order.totalSales, language)}<small> THB</small></span>
-          <span className={`profit-chip${profitTone}`}>{t('orders.profit')} {order.profitAmount === null ? '—' : `${order.profitAmount > 0 ? '+' : ''}${formatMoney(order.profitAmount, language)}`}</span>
+          <span className={`profit-chip${profitTone}`}>{t('orders.profit')} {order.profitAmount === null ? '—' : `${order.profitAmount > 0 ? '+' : ''}${formatMoney(order.profitAmount, language)} THB`}</span>
         </span>
       </button>
       {!compact && order.lines.length > 0 && <ul className="order-item-list" aria-label={t('detail.items')}>
@@ -1403,10 +1403,10 @@ function SheetOrdersPage({
           </div>}
 
           {loading && !sheetData ? <div className="stat-strip" aria-busy="true" aria-label={t('sheet.loading')}>{Array.from({ length: 3 }, (_, index) => <SkeletonLine className="h-[68px] w-full rounded-[20px]" key={index} />)}</div> : <div className={`stat-strip${sheet.kind === 'sales' ? '' : ' two'}`}>
-            <div className="stat-tile accent"><span>{t('analytics.totalSales')}</span><strong>{formatMoney(sheetTotal(orders), language)}</strong><em>THB</em></div>
+            <div className="stat-tile accent"><span>{t('analytics.totalSales')}</span><strong>{formatMoney(sheetTotal(orders), language)} THB</strong></div>
             {sheet.kind === 'sales' ? <>
-              <div className={`stat-tile${profitReady ? (totalProfit.amount! < 0 ? ' bad' : ' good') : ''}`}><span>{t('analytics.totalProfit')}</span><strong>{profitReady ? formatMoney(totalProfit.amount!, language) : '—'}</strong><em>{profitNote || 'THB'}</em></div>
-              <button type="button" className="stat-tile" onClick={() => setExpensesOpen(true)}><Pencil size={13} /><span>{t('expenses.open')}</span><strong>{formatMoney(expenseTotal, language)}</strong><em>THB</em></button>
+              <div className={`stat-tile${profitReady ? (totalProfit.amount! < 0 ? ' bad' : ' good') : ''}`}><span>{t('analytics.totalProfit')}</span><strong>{profitReady ? `${formatMoney(totalProfit.amount!, language)} THB` : '—'}</strong>{profitNote && <em>{profitNote}</em>}</div>
+              <button type="button" className="stat-tile" onClick={() => setExpensesOpen(true)}><Pencil size={13} /><span>{t('expenses.open')}</span><strong>{formatMoney(expenseTotal, language)} THB</strong></button>
             </> : <div className="stat-tile"><span>{t('analytics.orders')}</span><strong>{orders.length}</strong><em>{t('orders.orders')}</em></div>}
           </div>}
 
@@ -1534,7 +1534,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
             <p className="detail-hero-price display">{formatMoney(netSales, language)}<small>THB</small></p>
             <span className={`rating-pill${profitTone}`}>
               {order.profitPercent !== null && <><span>{formatProfitPercent(order.profitPercent, language)}</span><i aria-hidden="true" /></>}
-              <span>{t('orders.profit')} {orderProfit.amount === null ? '—' : formatMoney(orderProfit.amount, language)}</span>
+              <span>{t('orders.profit')} {orderProfit.amount === null ? '—' : `${formatMoney(orderProfit.amount, language)} THB`}</span>
             </span>
           </div>
         </div>
@@ -1573,7 +1573,7 @@ function OrderDetailsPage({ sheet, sheetData, loading, onRefresh, onSaveOrder, e
                     <span className="cart-price display">{line.salePrice ? `${formatMoney(line.salePrice, language)} THB` : '—'}</span>
                     <span className="status-badge quantity">× {line.quantity}</span>
                   </span>
-                  <span className={`profit-chip${unitProfit === null ? ' unavailable' : unitProfit < 0 ? ' negative' : ''}`}>{t('detail.itemProfitPerUnit')} {unitProfit === null ? '—' : formatMoney(unitProfit, language)}</span>
+                  <span className={`profit-chip${unitProfit === null ? ' unavailable' : unitProfit < 0 ? ' negative' : ''}`}>{t('detail.itemProfitPerUnit')} {unitProfit === null ? '—' : `${formatMoney(unitProfit, language)} THB`}</span>
                   {line.costRMB != null && <span className="cart-sub">{t('createOrder.costRMB')}: {formatMoney(line.costRMB, language)} CNY{line.costTHB != null && ` · ${formatMoney(line.costTHB, language)} THB`}</span>}
                   {line.attributes.length > 0 && <div className="item-attributes">{line.attributes.slice(0, 3).map((attribute) => <span key={`${attribute.key}-${attribute.value}`}>{fieldLabel(attribute.key, t)}: {attribute.value}</span>)}</div>}
                 </div>
@@ -1826,7 +1826,7 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
                       <span className="cart-sub">{t('analytics.unitsSold', { count: item.quantity })}</span>
                       <span className="cart-price-row">
                         <span className="cart-price display">{formatMoney(item.sales, language)} THB</span>
-                        <span className={`profit-chip${item.knownProfitLines === 0 ? ' unavailable' : ''}`}>{t(item.knownProfitLines > 0 && item.knownProfitLines < item.lineCount ? 'analytics.partialItemProfit' : 'analytics.itemProfit')} {item.knownProfitLines === 0 ? '—' : formatMoney(item.profit, language)}</span>
+                        <span className={`profit-chip${item.knownProfitLines === 0 ? ' unavailable' : ''}`}>{t(item.knownProfitLines > 0 && item.knownProfitLines < item.lineCount ? 'analytics.partialItemProfit' : 'analytics.itemProfit')} {item.knownProfitLines === 0 ? '—' : `${formatMoney(item.profit, language)} THB`}</span>
                       </span>
                     </div>
                   </li>
@@ -1873,7 +1873,7 @@ function AnalyticsPage({ dataBySheet, monthlyExpensesBySheet, sheets, loading, a
               : undefined
             const change = dataBySheet[sheet.id] && !dataBySheet[sheet.id].error && !isFutureMonth ? getPercentChange(currentAmountForChange, previousAmountForChange) : null
             const width = Math.max(amount > 0 ? 5 : 0, Math.round((amount / maximum) * 100))
-            return <button type="button" className="monthly-bar-row" key={sheet.id} onClick={() => navigate(`/admin/sheets/${sheet.id}`)}><span className="monthly-bar-month">{sheetTitle(sheet, t)}<small className={change === null ? 'trend-unavailable' : change < 0 ? 'negative-text' : 'positive-text'}>{change === null ? '—' : `${formatSignedPercent(change, language)}${isThisMonth ? ' MTD' : ' MoM'}`}</small></span><span className="monthly-bar"><i style={{ width: `${width}%` }} /></span><strong>{formatMoney(amount, language)}</strong></button>
+            return <button type="button" className="monthly-bar-row" key={sheet.id} onClick={() => navigate(`/admin/sheets/${sheet.id}`)}><span className="monthly-bar-month">{sheetTitle(sheet, t)}<small className={change === null ? 'trend-unavailable' : change < 0 ? 'negative-text' : 'positive-text'}>{change === null ? '—' : `${formatSignedPercent(change, language)}${isThisMonth ? ' MTD' : ' MoM'}`}</small></span><span className="monthly-bar"><i style={{ width: `${width}%` }} /></span><strong>{formatMoney(amount, language)} THB</strong></button>
           })}
         </section>
       </div>
