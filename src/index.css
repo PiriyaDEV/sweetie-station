@@ -52,7 +52,7 @@
   font-optical-sizing: auto;
 }
 
-:root:has(.app-stage.splash-stage) { background: linear-gradient(151deg, #f8c8f1 0%, #f5a9d1 46%, #f47799 100%); }
+:root:has(.app-stage.splash-stage) { background-color: #f5a9d1; background-image: linear-gradient(151deg, #f8c8f1 0%, #f5a9d1 46%, #f47799 100%); }
 
 :root:lang(th) { font-family: 'Prompt', 'DM Sans', Arial, sans-serif; }
 
@@ -60,9 +60,11 @@
 html, body, #root { width: 100%; height: 100%; min-width: 320px; margin: 0; overflow: hidden; background: #fff; }
 html { scroll-behavior: smooth; }
 html:has(.splash-stage), body:has(.splash-stage), #root:has(.splash-stage) {
-  background: linear-gradient(151deg, #f8c8f1 0%, #f5a9d1 46%, #f47799 100%);
+  background-color: #f5a9d1;
+  background-image: linear-gradient(151deg, #f8c8f1 0%, #f5a9d1 46%, #f47799 100%);
 }
-body { height: 100%; overflow: hidden; }
+body { height: 100%; overflow: hidden; background-color: #fff; }
+body:has(.app-stage.splash-stage) { background-color: #f5a9d1; }
 button { font: inherit; -webkit-tap-highlight-color: transparent; }
 
 .app-stage {
@@ -1216,7 +1218,7 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 
 @media (max-width: 600px) {
   /* Continue the splash gradient through the phone's safe-area gutters. */
-  .app-stage.splash-stage { background: linear-gradient(151deg, #f8c8f1 0%, #f5a9d1 46%, #f47799 100%); }
+  .app-stage.splash-stage { background-color: #f5a9d1; background-image: linear-gradient(151deg, #f8c8f1 0%, #f5a9d1 46%, #f47799 100%); }
 
 }
 
@@ -1255,7 +1257,7 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
 @media (pointer: coarse) {
   .app-stage { display: block; width: 100%; height: 100vh; height: 100dvh; padding: 0; background: #fff; }
   .app-shell { width: 100%; height: 100vh; height: 100dvh; min-height: 0; max-height: none; border-radius: 0; box-shadow: none; }
-  .app-stage.splash-stage { background: linear-gradient(151deg, #f8c8f1 0%, #f5a9d1 46%, #f47799 100%); }
+  .app-stage.splash-stage { background-color: #f5a9d1; background-image: linear-gradient(151deg, #f8c8f1 0%, #f5a9d1 46%, #f47799 100%); }
 }
 
 @media (display-mode: standalone) and (pointer: coarse) {
@@ -1316,4 +1318,17 @@ button { font: inherit; -webkit-tap-highlight-color: transparent; }
   .monthly-expenses-modal .modal-header { padding: 18px 20px 15px; }
   .monthly-expenses-modal-body { padding: 17px 20px 16px; }
   .monthly-expenses-modal .modal-actions { padding: 14px 20px max(16px, env(safe-area-inset-bottom)); }
+}
+
+/* On a phone, item photos should be recognizable at a glance. */
+@media (pointer: coarse) {
+  .order-item-preview { grid-template-columns: 64px minmax(0, 1fr) auto; gap: 10px; }
+  .order-item-preview-photo { width: 64px; height: 64px; border-radius: 11px; }
+  .splash-content { position: absolute; inset: 0; justify-content: center; padding: 24px; transform: none; }
+  .sweetie-mark-image { width: min(58%, 320px); max-height: 32svh; }
+  .splash-tagline { margin-top: 18px; font-size: clamp(18px, 2.5vw, 24px); }
+}
+@media (pointer: coarse) and (max-width: 360px) {
+  .order-item-preview { grid-template-columns: 56px minmax(0, 1fr) auto; gap: 8px; }
+  .order-item-preview-photo { width: 56px; height: 56px; }
 }
